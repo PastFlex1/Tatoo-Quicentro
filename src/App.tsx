@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState } from 'react';
 import { StudioProvider, useStudio } from './context/StudioContext';
 import { Sidebar } from './components/layout/Sidebar';
