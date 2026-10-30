@@ -1,35 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import {
   Calendar as CalendarIcon,
-  Clock,
   PlusCircle,
   Search,
-  Filter,
-  User,
-  Phone,
-  Instagram,
-  CheckCircle2,
-  AlertCircle,
-  PlayCircle,
-  XCircle,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  ShieldAlert,
-  CreditCard,
-  DollarSign,
   Receipt,
   Trash2,
-  Edit3,
-  ExternalLink,
   MessageCircle,
-  Sparkles,
-  MapPin,
   X,
-  Layers,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { Appointment, AppointmentStatus, ServiceCategory, PaymentMethod, SaleRecord } from '../../types';
+import { Appointment, AppointmentStatus, PaymentMethod, SaleRecord } from '../../types';
 import { NewAppointmentModal } from './NewAppointmentModal';
 
 interface AppointmentsViewProps {
@@ -44,7 +27,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
     artists,
     formatMoney,
     updateAppointmentStatus,
-    updateAppointment,
     deleteAppointment,
     completeAndBillAppointment,
     settings,
@@ -219,12 +201,12 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Top Banner & Quick KPI Summary */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#24242A] pb-5">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366]"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366] shrink-0"></span>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">
               Agenda & Agendamiento de Citas
             </h2>
@@ -235,9 +217,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
         </div>
 
         {/* Action Toolbar */}
-        <div className="flex items-center flex-wrap gap-3">
-          {/* View mode toggle pill matching reference */}
-          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730]">
+        <div className="flex items-center flex-wrap gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730] overflow-x-auto max-w-full">
             {[
               { id: 'calendar', label: 'Calendario Mensual' },
               { id: 'timeline', label: 'Timeline Cabinas' },
@@ -246,7 +227,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               <button
                 key={vm.id}
                 onClick={() => setViewMode(vm.id as ViewMode)}
-                className={`px-3 py-1 text-xs rounded-full transition-all cursor-pointer ${
+                className={`px-3 py-1 text-xs rounded-full transition-all cursor-pointer whitespace-nowrap ${
                   viewMode === vm.id
                     ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
                     : 'text-neutral-400 hover:text-white'
@@ -257,10 +238,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             ))}
           </div>
 
-          {/* New Appointment Button */}
           <button
             onClick={() => setIsNewAppointmentOpen(true)}
-            className="flex items-center gap-2 px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_14px_rgba(255,51,102,0.35)] cursor-pointer"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_14px_rgba(255,51,102,0.35)] cursor-pointer shrink-0"
           >
             <PlusCircle className="w-4 h-4 text-white" />
             <span>Nueva Cita</span>
@@ -269,11 +249,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
           <span className="text-neutral-400 text-xs block mb-1">Citas para Hoy</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">{activeTodayCount}</span>
+            <span className="text-xl sm:text-2xl font-bold font-mono text-white">{activeTodayCount}</span>
             <span className="text-xs text-neutral-400">activas / en cabina</span>
           </div>
           <span className="text-[11px] text-neutral-400 mt-2 pt-2 border-t border-[#23232A]">
@@ -281,9 +261,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
           </span>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
           <span className="text-neutral-400 text-xs block mb-1">Señas en Custodia</span>
-          <div className="text-2xl font-bold font-mono text-[#FF3366]">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-[#FF3366]">
             {formatMoney(totalDepositsHeld)}
           </div>
           <span className="text-[11px] text-neutral-400 mt-2 pt-2 border-t border-[#23232A]">
@@ -291,17 +271,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
           </span>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
           <span className="text-neutral-400 text-xs block mb-1">Total Citas en Sistema</span>
-          <div className="text-2xl font-bold font-mono text-white">{appointments.length}</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-white">{appointments.length}</div>
           <span className="text-[11px] text-neutral-400 mt-2 pt-2 border-t border-[#23232A]">
             Histórico registrado
           </span>
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
           <span className="text-neutral-400 text-xs block mb-1">Artistas en Turno</span>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-xl sm:text-2xl font-bold font-mono text-white">
             {artists.filter(a => a.active).length}
           </div>
           <span className="text-[11px] text-neutral-400 mt-2 pt-2 border-t border-[#23232A]">
@@ -311,9 +291,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
       </div>
 
       {/* Filter Bar with Search, Category & Artist Filter */}
-      <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        {/* Search Input */}
-        <div className="relative flex-1 max-w-md">
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="relative flex-1 lg:max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-3 text-[#FF3366]" />
           <input
             type="text"
@@ -324,9 +303,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
           />
         </div>
 
-        {/* Dropdowns / Pills */}
-        <div className="flex items-center flex-wrap gap-2.5">
-          {/* Artist Filter */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex items-center gap-2.5">
           <select
             value={filterArtist}
             onChange={e => setFilterArtist(e.target.value)}
@@ -340,7 +317,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             ))}
           </select>
 
-          {/* Category Filter */}
           <select
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
@@ -353,7 +329,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             <option value="other">Retoques / Consultas</option>
           </select>
 
-          {/* Status Filter */}
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
@@ -370,16 +345,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
         </div>
       </div>
 
-      {/* VIEW 1: CALENDAR VIEW (MONTHLY WITH SELECTED DAY DETAIL) */}
+      {/* VIEW 1: CALENDAR VIEW */}
       {viewMode === 'calendar' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 2 Cols: Monthly Calendar Matrix (Matching Reference Calendar Widget) */}
-          <div className="lg:col-span-2 p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-4">
-            {/* Calendar Month Navigation Header */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
+          {/* Left 2 Cols: Monthly Calendar Matrix */}
+          <div className="xl:col-span-2 p-3.5 sm:p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-4">
             <div className="flex items-center justify-between border-b border-[#24242A] pb-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_6px_#FF3366]"></span>
-                <span className="text-sm font-bold text-white capitalize tracking-wide font-sans">
+                <span className="text-xs sm:text-sm font-bold text-white capitalize tracking-wide font-sans">
                   {monthName}
                 </span>
               </div>
@@ -407,8 +381,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               </div>
             </div>
 
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-neutral-400 py-1">
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs font-bold text-neutral-400 py-1">
               <span>Dom</span>
               <span>Lun</span>
               <span>Mar</span>
@@ -418,14 +391,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               <span>Sáb</span>
             </div>
 
-            {/* Calendar Days Grid */}
-            <div className="grid grid-cols-7 gap-1.5">
-              {/* Empty leading cells */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
               {Array.from({ length: firstDayIndex }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-20 rounded-xl bg-[#141417]/40 border border-transparent opacity-30" />
+                <div key={`empty-${i}`} className="h-14 sm:h-22 rounded-xl bg-[#141417]/40 border border-transparent opacity-30" />
               ))}
 
-              {/* Day cells */}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const dayNum = i + 1;
                 const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
@@ -438,7 +408,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                   <div
                     key={dateKey}
                     onClick={() => setSelectedDayString(dateKey)}
-                    className={`h-22 p-1.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group ${
+                    className={`h-14 sm:h-22 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group ${
                       isSelected
                         ? 'bg-[#1F1F27] border-[#FF3366] shadow-[0_0_12px_rgba(255,51,102,0.25)]'
                         : isToday
@@ -448,7 +418,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${
+                        className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-mono font-bold ${
                           isSelected
                             ? 'bg-[#FF3366] text-white shadow-[0_0_8px_#FF3366]'
                             : isToday
@@ -459,14 +429,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                         {dayNum}
                       </span>
                       {dayApts.length > 0 && (
-                        <span className="text-[10px] font-mono text-[#FF3366] font-bold">
-                          {dayApts.length} {dayApts.length === 1 ? 'cita' : 'citas'}
+                        <span className="text-[9px] sm:text-[10px] font-mono text-[#FF3366] font-bold">
+                          <span className="sm:hidden">{dayApts.length}</span>
+                          <span className="hidden sm:inline">
+                            {dayApts.length} {dayApts.length === 1 ? 'cita' : 'citas'}
+                          </span>
                         </span>
                       )}
                     </div>
 
-                    {/* Chips for appointments on this day */}
-                    <div className="space-y-1 overflow-hidden mt-1">
+                    {/* Chips for appointments on desktop, dots on mobile */}
+                    <div className="hidden sm:block space-y-1 overflow-hidden mt-1">
                       {dayApts.slice(0, 2).map(apt => (
                         <div
                           key={apt.id}
@@ -491,14 +464,31 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                         </span>
                       )}
                     </div>
+
+                    {dayApts.length > 0 && (
+                      <div className="flex sm:hidden items-center justify-center gap-1 pb-0.5">
+                        {dayApts.slice(0, 3).map(apt => (
+                          <span
+                            key={apt.id}
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              apt.status === 'in_progress'
+                                ? 'bg-[#FF3366]'
+                                : apt.status === 'confirmed'
+                                ? 'bg-emerald-400'
+                                : 'bg-blue-400'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Right Col: Selected Day Appointments Drawer / Agenda */}
-          <div className="p-6 rounded-3xl bg-[#18181D] border border-[#272730] flex flex-col justify-between space-y-4">
+          {/* Right Col: Selected Day Appointments Drawer */}
+          <div className="p-4 sm:p-6 rounded-3xl bg-[#18181D] border border-[#272730] flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between border-b border-[#24242A] pb-3 mb-4">
                 <div>
@@ -510,9 +500,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    setIsNewAppointmentOpen(true);
-                  }}
+                  onClick={() => setIsNewAppointmentOpen(true)}
                   className="p-1.5 rounded-full bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] hover:bg-[#FF3366] hover:text-white transition-all"
                   title="Nueva cita en esta fecha"
                 >
@@ -520,7 +508,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 </button>
               </div>
 
-              {/* Day Appointment Cards */}
               <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
                 {appointmentsForSelectedDay.length === 0 ? (
                   <div className="text-center py-12 text-neutral-500 text-xs">
@@ -539,9 +526,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                     return (
                       <div
                         key={apt.id}
-                        className="p-4 rounded-2xl bg-[#131317] border border-[#272730] space-y-3 hover:border-[#FF3366]/40 transition-colors"
+                        className="p-3.5 sm:p-4 rounded-2xl bg-[#131317] border border-[#272730] space-y-3 hover:border-[#FF3366]/40 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-bold text-[#FF3366] bg-[#FF3366]/10 px-2 py-0.5 rounded-full">
                               {apt.startTime} - {apt.endTime}
@@ -569,7 +556,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                           </p>
                         </div>
 
-                        {/* Financial summary for appointment */}
                         <div className="p-2.5 rounded-xl bg-[#191920] border border-[#24242C] flex items-center justify-between text-xs font-mono">
                           <div>
                             <span className="text-[10px] text-neutral-400 block">Total Est.</span>
@@ -589,9 +575,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                           </div>
                         </div>
 
-                        {/* Quick action buttons */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#222228] gap-2">
-                          {/* WhatsApp Shortcut */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#222228] gap-2 flex-wrap">
                           <a
                             href={getWhatsAppLink(apt)}
                             target="_blank"
@@ -602,7 +586,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                             <MessageCircle className="w-3.5 h-3.5" />
                           </a>
 
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             {apt.status !== 'completed' && (
                               <button
                                 onClick={() => handleStartBilling(apt)}
@@ -613,7 +597,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                               </button>
                             )}
 
-                            {/* Status Quick changer */}
                             <select
                               value={apt.status}
                               onChange={e =>
@@ -649,7 +632,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               </div>
             </div>
 
-            {/* Bottom summary note */}
             <div className="p-3 rounded-2xl bg-[#121215] border border-[#23232A] text-[11px] text-neutral-400 flex items-center justify-between">
               <span>Señas protegidas en caja:</span>
               <span className="font-mono text-emerald-400 font-bold">
@@ -666,8 +648,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
 
       {/* VIEW 2: TIMELINE POR CABINAS Y ARTISTAS */}
       {viewMode === 'timeline' && (
-        <div className="p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-5">
-          <div className="flex items-center justify-between border-b border-[#24242A] pb-3">
+        <div className="p-4 sm:p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#24242A] pb-3">
             <div>
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                 Timeline de Cabinas & Estaciones del Estudio
@@ -699,31 +681,30 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                     key={artist.id}
                     className="p-4 rounded-2xl bg-[#121215] border border-[#24242C] space-y-3"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] font-bold text-xs flex items-center justify-center">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] font-bold text-xs flex items-center justify-center shrink-0">
                           {artist.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="font-bold text-white text-xs">{artist.name}</div>
-                          <div className="text-[10px] text-neutral-400">
+                        <div className="min-w-0">
+                          <div className="font-bold text-white text-xs truncate">{artist.name}</div>
+                          <div className="text-[10px] text-neutral-400 truncate">
                             {artist.role} · Cabina {artist.specialty}
                           </div>
                         </div>
                       </div>
-                      <span className="text-xs font-mono text-neutral-400">
+                      <span className="text-xs font-mono text-neutral-400 shrink-0">
                         {artistDayApts.length} {artistDayApts.length === 1 ? 'cita' : 'citas'}
                       </span>
                     </div>
 
-                    {/* Timeline Track (10:00 - 20:00) */}
                     <div className="space-y-2">
                       {artistDayApts.length === 0 ? (
                         <div className="p-3 rounded-xl bg-[#16161B] border border-dashed border-[#2A2A33] text-center text-[11px] text-neutral-500">
                           Cabina libre en esta fecha.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
                           {artistDayApts.map(apt => (
                             <div
                               key={apt.id}
@@ -768,8 +749,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
 
       {/* VIEW 3: LISTADO COMPLETO DE CITAS */}
       {viewMode === 'list' && (
-        <div className="p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-4">
-          <div className="flex items-center justify-between border-b border-[#24242A] pb-3">
+        <div className="p-4 sm:p-6 rounded-3xl bg-[#18181D] border border-[#272730] space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#24242A] pb-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">
               Listado Cronológico de Citas ({filteredAppointments.length})
             </h3>
@@ -782,15 +763,15 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             <table className="w-full text-xs text-left">
               <thead className="bg-[#121215] text-neutral-400 border-b border-[#26262E] font-medium">
                 <tr>
-                  <th className="py-3 px-4">Fecha & Hora</th>
-                  <th className="py-3 px-4">Cliente</th>
-                  <th className="py-3 px-4">Servicio & Zona</th>
-                  <th className="py-3 px-4">Artista</th>
-                  <th className="py-3 px-4 text-right">Presupuesto ($)</th>
-                  <th className="py-3 px-4 text-right">Seña ($)</th>
-                  <th className="py-3 px-4 text-center">Consentimiento</th>
-                  <th className="py-3 px-4 text-center">Estado</th>
-                  <th className="py-3 px-4 text-right">Acciones</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Fecha & Hora</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Cliente</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Servicio & Zona</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Artista</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Presupuesto ($)</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Seña ($)</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">Consentimiento</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap">Estado</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#22222A]">
@@ -812,7 +793,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                           </div>
                         </td>
 
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4 whitespace-nowrap">
                           <div className="font-bold text-white">{apt.clientName}</div>
                           <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
                             <span>{apt.clientPhone}</span>
@@ -822,7 +803,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                           </div>
                         </td>
 
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4 min-w-[200px]">
                           <div className="font-medium text-neutral-200">{apt.serviceName}</div>
                           {apt.bodyPlacement && (
                             <div className="text-[10px] text-neutral-400">
@@ -845,7 +826,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                           </span>
                         </td>
 
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
                           {apt.consentSigned ? (
                             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
                               <ShieldCheck className="w-3 h-3" />
@@ -950,7 +931,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             </div>
 
             <div className="p-6 space-y-5 text-xs">
-              {/* Financial Calculation Breakdown */}
               <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
                 <div className="flex justify-between text-neutral-300">
                   <span>Precio Acordado / Final:</span>
@@ -992,12 +972,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 </div>
               </div>
 
-              {/* Payment Method Selector */}
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
                   Método de Pago para el Saldo
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
                     { id: 'card', label: 'Tarjeta POS' },
                     { id: 'cash', label: 'Efectivo en Caja' },
@@ -1019,7 +998,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 </div>
               </div>
 
-              {/* Health consent status */}
               <div className="p-3 rounded-xl bg-[#121215] border border-[#24242C] flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -1030,7 +1008,6 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 </span>
               </div>
 
-              {/* Actions */}
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#24242A]">
                 <button
                   type="button"

@@ -11,6 +11,10 @@ import {
   Appointment,
   AppointmentStatus,
   PaymentMethod,
+  KardexMovement,
+  KardexMovementType,
+  ManualJournalEntry,
+  ClientProfile,
 } from '../types';
 import {
   INITIAL_ARTISTS,
@@ -20,6 +24,8 @@ import {
   INITIAL_SALES,
   INITIAL_SETTINGS,
   INITIAL_APPOINTMENTS,
+  INITIAL_KARDEX,
+  INITIAL_CLIENTS,
 } from '../data/initialData';
 
 interface StudioContextType {
@@ -29,7 +35,10 @@ interface StudioContextType {
   artists: Artist[];
   settlements: ArtistSettlement[];
   inventory: InventoryItem[];
+  kardexMovements: KardexMovement[];
+  manualJournalEntries: ManualJournalEntry[];
   appointments: Appointment[];
+  clients: ClientProfile[];
   currentShift: CashShift;
   pastShifts: CashShift[];
   settings: StudioSettings;
@@ -76,11 +85,31 @@ interface StudioContextType {
     notes?: string
   ) => void;
 
-  // Actions - Inventory
+  // Actions - Inventory & Kardex
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
   updateInventoryItem: (id: string, updated: Partial<InventoryItem>) => void;
-  adjustStock: (id: string, delta: number) => void;
+  adjustStock: (id: string, delta: number, reason?: string) => void;
   deleteInventoryItem: (id: string) => void;
+  addKardexMovement: (params: {
+    itemId: string;
+    type: KardexMovementType;
+    quantity: number;
+    unitCost?: number;
+    reference?: string;
+    concept: string;
+    responsible?: string;
+    date?: string;
+  }) => void;
+
+  // Actions - Clients & History
+  addClient: (client: Omit<ClientProfile, 'id' | 'createdAt'>) => ClientProfile;
+  updateClient: (id: string, updated: Partial<ClientProfile>) => void;
+  deleteClient: (id: string) => void;
+  upsertClient: (profile: Partial<ClientProfile> & { name: string }) => ClientProfile;
+
+  // Actions - General Ledger Manual Entries
+  addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id'>) => void;
+  deleteManualJournalEntry: (id: string) => void;
 
   // Actions - Cash Shift
   openCashShift: (openingCash: number, openedBy: string, notes?: string) => void;
@@ -107,7 +136,10 @@ const STORAGE_KEYS = {
   ARTISTS: 'inkledger_artists_v1',
   SETTLEMENTS: 'inkledger_settlements_v1',
   INVENTORY: 'inkledger_inventory_v1',
+  KARDEX: 'inkledger_kardex_v1',
+  JOURNAL: 'inkledger_journal_v1',
   APPOINTMENTS: 'inkledger_appointments_v1',
+  CLIENTS: 'inkledger_clients_v1',
   CURRENT_SHIFT: 'inkledger_curr_shift_v1',
   PAST_SHIFTS: 'inkledger_past_shifts_v1',
   SETTINGS: 'inkledger_settings_v1',
@@ -141,9 +173,24 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
   });
 
+  const [kardexMovements, setKardexMovements] = useState<KardexMovement[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.KARDEX);
+    return saved ? JSON.parse(saved) : INITIAL_KARDEX;
+  });
+
+  const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.JOURNAL);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
     return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+  });
+
+  const [clients, setClients] = useState<ClientProfile[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CLIENTS);
+    return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
   });
 
   const [currentShift, setCurrentShift] = useState<CashShift>(() => {
@@ -203,8 +250,20 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [inventory]);
 
   useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.KARDEX, JSON.stringify(kardexMovements));
+  }, [kardexMovements]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.JOURNAL, JSON.stringify(manualJournalEntries));
+  }, [manualJournalEntries]);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments));
   }, [appointments]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
+  }, [clients]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SHIFT, JSON.stringify(currentShift));
@@ -342,6 +401,58 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   }, [sales, expenses, currentShift.date, currentShift.status, currentShift.openingCash]);
 
+  // Client Operations
+  const addClient = (clientData: Omit<ClientProfile, 'id' | 'createdAt'>): ClientProfile => {
+    const newClient: ClientProfile = {
+      ...clientData,
+      id: `cli-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    setClients(prev => [newClient, ...prev]);
+    return newClient;
+  };
+
+  const updateClient = (id: string, updated: Partial<ClientProfile>) => {
+    setClients(prev => prev.map(c => (c.id === id ? { ...c, ...updated } : c)));
+  };
+
+  const deleteClient = (id: string) => {
+    setClients(prev => prev.filter(c => c.id !== id));
+  };
+
+  const upsertClient = (profile: Partial<ClientProfile> & { name: string }): ClientProfile => {
+    const cleanName = profile.name.trim();
+    const existing = clients.find(
+      c =>
+        c.name.toLowerCase() === cleanName.toLowerCase() ||
+        (profile.phone && c.phone && c.phone === profile.phone) ||
+        (profile.dni && c.dni && c.dni.toLowerCase() === profile.dni.toLowerCase())
+    );
+
+    if (existing) {
+      const updated: ClientProfile = {
+        ...existing,
+        phone: profile.phone || existing.phone,
+        dni: profile.dni || existing.dni,
+        email: profile.email || existing.email,
+        instagram: profile.instagram || existing.instagram,
+        consentSigned: profile.consentSigned !== undefined ? profile.consentSigned : existing.consentSigned,
+      };
+      updateClient(existing.id, updated);
+      return updated;
+    } else {
+      return addClient({
+        name: cleanName,
+        phone: profile.phone,
+        dni: profile.dni,
+        email: profile.email,
+        instagram: profile.instagram,
+        consentSigned: profile.consentSigned || false,
+        tags: ['Nuevo'],
+      });
+    }
+  };
+
   // Appointment Operations
   const addAppointment = (aptData: Omit<Appointment, 'id' | 'createdAt'>): Appointment => {
     const newApt: Appointment = {
@@ -350,6 +461,18 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       createdAt: new Date().toISOString(),
     };
     setAppointments(prev => [newApt, ...prev]);
+
+    // Ensure client profile exists
+    if (aptData.clientName) {
+      upsertClient({
+        name: aptData.clientName,
+        phone: aptData.clientPhone,
+        email: aptData.clientEmail,
+        instagram: aptData.clientInstagram,
+        consentSigned: aptData.consentSigned,
+      });
+    }
+
     return newApt;
   };
 
@@ -439,6 +562,18 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       invoiceNumber,
     };
     setSales(prev => [newSale, ...prev]);
+
+    // Ensure client profile is synced in client directory
+    if (saleData.clientName) {
+      upsertClient({
+        name: saleData.clientName,
+        phone: saleData.clientPhone,
+        email: saleData.clientEmail,
+        dni: saleData.clientDni,
+        consentSigned: saleData.consentFormSigned,
+      });
+    }
+
     return newSale;
   };
 
@@ -537,31 +672,173 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
   };
 
-  // Inventory Operations
+  // Inventory & Kardex Operations
   const addInventoryItem = (itemData: Omit<InventoryItem, 'id'>) => {
+    const newId = `inv-${Date.now()}`;
     const newItem: InventoryItem = {
       ...itemData,
-      id: `inv-${Date.now()}`,
+      id: newId,
     };
     setInventory(prev => [...prev, newItem]);
+
+    if (itemData.currentStock > 0) {
+      const totalVal = Math.round(itemData.currentStock * itemData.unitCost * 100) / 100;
+      const kdx: KardexMovement = {
+        id: `kdx-${Date.now()}`,
+        date: new Date().toISOString(),
+        itemId: newId,
+        itemName: itemData.name,
+        itemSku: itemData.sku,
+        unit: itemData.unit,
+        type: 'initial',
+        reference: `ALTA-${newId.slice(-4)}`,
+        concept: 'Alta inicial de insumo en catálogo',
+        responsible: 'Administración',
+        quantityIn: itemData.currentStock,
+        unitCostIn: itemData.unitCost,
+        totalIn: totalVal,
+        quantityOut: 0,
+        unitCostOut: 0,
+        totalOut: 0,
+        balanceQty: itemData.currentStock,
+        balanceUnitCost: itemData.unitCost,
+        balanceTotal: totalVal,
+      };
+      setKardexMovements(prev => [kdx, ...prev]);
+    }
   };
 
   const updateInventoryItem = (id: string, updated: Partial<InventoryItem>) => {
     setInventory(prev => prev.map(item => (item.id === id ? { ...item, ...updated } : item)));
   };
 
-  const adjustStock = (id: string, delta: number) => {
+  const addKardexMovement = (params: {
+    itemId: string;
+    type: KardexMovementType;
+    quantity: number;
+    unitCost?: number;
+    reference?: string;
+    concept: string;
+    responsible?: string;
+    date?: string;
+  }) => {
+    const item = inventory.find(i => i.id === params.itemId);
+    if (!item || params.quantity <= 0) return;
+
+    const isEntry = params.type === 'purchase_in' || params.type === 'initial';
+    const qty = params.quantity;
+    const costPerUnit = params.unitCost !== undefined && params.unitCost > 0 ? params.unitCost : item.unitCost;
+
+    let newBalanceQty = item.currentStock;
+    let newUnitCost = item.unitCost;
+
+    if (isEntry) {
+      const prevVal = item.currentStock * item.unitCost;
+      const entryVal = qty * costPerUnit;
+      newBalanceQty = item.currentStock + qty;
+      newUnitCost =
+        newBalanceQty > 0
+          ? Math.round(((prevVal + entryVal) / newBalanceQty) * 100) / 100
+          : costPerUnit;
+    } else {
+      newBalanceQty = Math.max(0, item.currentStock - qty);
+    }
+
+    const totalMovement = Math.round(qty * costPerUnit * 100) / 100;
+    const newBalanceTotal = Math.round(newBalanceQty * newUnitCost * 100) / 100;
+
+    const movement: KardexMovement = {
+      id: `kdx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      date: params.date || new Date().toISOString(),
+      itemId: item.id,
+      itemName: item.name,
+      itemSku: item.sku,
+      unit: item.unit,
+      type: params.type,
+      reference: params.reference || `KDX-${Date.now().toString().slice(-5)}`,
+      concept: params.concept,
+      responsible: params.responsible || 'Administración',
+      quantityIn: isEntry ? qty : 0,
+      unitCostIn: isEntry ? costPerUnit : 0,
+      totalIn: isEntry ? totalMovement : 0,
+      quantityOut: !isEntry ? qty : 0,
+      unitCostOut: !isEntry ? costPerUnit : 0,
+      totalOut: !isEntry ? totalMovement : 0,
+      balanceQty: newBalanceQty,
+      balanceUnitCost: newUnitCost,
+      balanceTotal: newBalanceTotal,
+    };
+
+    setKardexMovements(prev => [movement, ...prev]);
     setInventory(prev =>
-      prev.map(item => {
-        if (item.id !== id) return item;
-        const newStock = Math.max(0, item.currentStock + delta);
-        return { ...item, currentStock: newStock };
-      })
+      prev.map(i =>
+        i.id === item.id
+          ? { ...i, currentStock: newBalanceQty, unitCost: newUnitCost }
+          : i
+      )
     );
+  };
+
+  const adjustStock = (id: string, delta: number, reason?: string) => {
+    const item = inventory.find(i => i.id === id);
+    if (!item || delta === 0) return;
+
+    const newStock = Math.max(0, item.currentStock + delta);
+    const actualDelta = newStock - item.currentStock;
+    if (actualDelta === 0) return;
+
+    const isEntry = actualDelta > 0;
+    const absQty = Math.abs(actualDelta);
+    const totalMov = Math.round(absQty * item.unitCost * 100) / 100;
+    const balanceTotal = Math.round(newStock * item.unitCost * 100) / 100;
+
+    const movement: KardexMovement = {
+      id: `kdx-${Date.now()}`,
+      date: new Date().toISOString(),
+      itemId: item.id,
+      itemName: item.name,
+      itemSku: item.sku,
+      unit: item.unit,
+      type: isEntry ? 'purchase_in' : 'cabin_out',
+      reference: `AJU-${Date.now().toString().slice(-5)}`,
+      concept:
+        reason ||
+        (isEntry
+          ? 'Ingreso rápido de stock desde inventario'
+          : 'Salida / consumo en cabina registrado desde inventario'),
+      responsible: 'Operador de Estudio',
+      quantityIn: isEntry ? absQty : 0,
+      unitCostIn: isEntry ? item.unitCost : 0,
+      totalIn: isEntry ? totalMov : 0,
+      quantityOut: !isEntry ? absQty : 0,
+      unitCostOut: !isEntry ? item.unitCost : 0,
+      totalOut: !isEntry ? totalMov : 0,
+      balanceQty: newStock,
+      balanceUnitCost: item.unitCost,
+      balanceTotal,
+    };
+
+    setInventory(prev =>
+      prev.map(i => (i.id === id ? { ...i, currentStock: newStock } : i))
+    );
+    setKardexMovements(prev => [movement, ...prev]);
   };
 
   const deleteInventoryItem = (id: string) => {
     setInventory(prev => prev.filter(i => i.id !== id));
+  };
+
+  // Manual Journal Entries for General Ledger
+  const addManualJournalEntry = (entryData: Omit<ManualJournalEntry, 'id'>) => {
+    const newEntry: ManualJournalEntry = {
+      ...entryData,
+      id: `jrnl-${Date.now()}`,
+    };
+    setManualJournalEntries(prev => [newEntry, ...prev]);
+  };
+
+  const deleteManualJournalEntry = (id: string) => {
+    setManualJournalEntries(prev => prev.filter(j => j.id !== id));
   };
 
   // Cash Shift Operations
@@ -614,7 +891,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setExpenses(INITIAL_EXPENSES);
     setArtists(INITIAL_ARTISTS);
     setInventory(INITIAL_INVENTORY);
+    setKardexMovements(INITIAL_KARDEX);
+    setManualJournalEntries([]);
     setAppointments(INITIAL_APPOINTMENTS);
+    setClients(INITIAL_CLIENTS);
     setCurrentShift(INITIAL_CASH_SHIFT);
     setSettlements([]);
     setSettings(INITIAL_SETTINGS);
@@ -625,7 +905,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSales([]);
     setExpenses([]);
     setSettlements([]);
+    setKardexMovements([]);
+    setManualJournalEntries([]);
     setAppointments([]);
+    setClients([]);
     const freshShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -645,14 +928,17 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Backup Export & Import
   const exportBackup = () => {
     const data = {
-      version: '1.0',
+      version: '1.2',
       exportedAt: new Date().toISOString(),
       settings,
       artists,
       sales,
       expenses,
       inventory,
+      kardexMovements,
+      manualJournalEntries,
       appointments,
+      clients,
       settlements,
       pastShifts,
       currentShift,
@@ -673,7 +959,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.expenses && Array.isArray(parsed.expenses)) setExpenses(parsed.expenses);
       if (parsed.artists && Array.isArray(parsed.artists)) setArtists(parsed.artists);
       if (parsed.inventory && Array.isArray(parsed.inventory)) setInventory(parsed.inventory);
+      if (parsed.kardexMovements && Array.isArray(parsed.kardexMovements)) setKardexMovements(parsed.kardexMovements);
+      if (parsed.manualJournalEntries && Array.isArray(parsed.manualJournalEntries)) setManualJournalEntries(parsed.manualJournalEntries);
       if (parsed.appointments && Array.isArray(parsed.appointments)) setAppointments(parsed.appointments);
+      if (parsed.clients && Array.isArray(parsed.clients)) setClients(parsed.clients);
       if (parsed.settlements && Array.isArray(parsed.settlements)) setSettlements(parsed.settlements);
       if (parsed.settings) setSettings(parsed.settings);
       if (parsed.currentShift) setCurrentShift(parsed.currentShift);
@@ -692,7 +981,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         artists,
         settlements,
         inventory,
+        kardexMovements,
+        manualJournalEntries,
         appointments,
+        clients,
         currentShift,
         pastShifts,
         settings,
@@ -720,6 +1012,13 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updateInventoryItem,
         adjustStock,
         deleteInventoryItem,
+        addKardexMovement,
+        addClient,
+        updateClient,
+        deleteClient,
+        upsertClient,
+        addManualJournalEntry,
+        deleteManualJournalEntry,
         openCashShift,
         closeCashShift,
         updateSettings,

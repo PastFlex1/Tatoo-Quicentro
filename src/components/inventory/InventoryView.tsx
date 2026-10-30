@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Boxes,
   PlusCircle,
   AlertTriangle,
   Search,
@@ -9,6 +8,7 @@ import {
   Edit2,
   Trash2,
   X,
+  BookOpen,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { InventoryCategory, InventoryItem } from '../../types';
@@ -20,6 +20,7 @@ export const InventoryView: React.FC = () => {
     updateInventoryItem,
     adjustStock,
     deleteInventoryItem,
+    setActiveTab,
     formatMoney,
   } = useStudio();
 
@@ -157,9 +158,9 @@ export const InventoryView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Top Banner & Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <span className="text-[10px] text-neutral-400 block mb-1">Valorización Total Stock</span>
           <span className="text-lg font-bold font-mono tabular-nums text-white">
@@ -188,20 +189,27 @@ export const InventoryView: React.FC = () => {
           <span className="text-[10px] text-neutral-500 block mt-1">Bajo mínimo sanitario</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex items-center justify-center">
+        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-center gap-2">
           <button
             onClick={handleOpenAdd}
-            className="w-full py-2.5 px-4 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)]"
+            className="w-full py-2 px-4 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)]"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Nuevo Insumo / Joya</span>
           </button>
+          <button
+            onClick={() => setActiveTab('ledger')}
+            className="w-full py-1.5 px-4 rounded-full bg-[#121215] border border-[#FF3366]/50 text-[#FF3366] hover:bg-[#FF3366]/10 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Abrir Kardex Valorizado</span>
+          </button>
         </div>
       </div>
 
-      {/* Filter & Search Bar with Tag Pills */}
-      <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
+      {/* Filter & Search Bar */}
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="relative w-full md:w-80">
           <input
             type="text"
             placeholder="Buscar por nombre, marca o SKU..."
@@ -212,7 +220,7 @@ export const InventoryView: React.FC = () => {
           <Search className="w-4 h-4 text-[#FF3366] absolute right-3.5 top-2.5" />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
           {[
             { id: 'all', label: 'Todo' },
             { id: 'cartridge', label: 'Agujas' },
@@ -226,7 +234,7 @@ export const InventoryView: React.FC = () => {
               <button
                 key={tag.id}
                 onClick={() => setCategoryFilter(tag.id)}
-                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap ${
+                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 ${
                   isActive
                     ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -240,7 +248,7 @@ export const InventoryView: React.FC = () => {
           <button
             type="button"
             onClick={() => setOnlyLowStock(!onlyLowStock)}
-            className={`px-3 py-1 text-xs rounded-full border transition-all flex items-center gap-1.5 whitespace-nowrap ml-2 ${
+            className={`px-3 py-1 text-xs rounded-full border transition-all flex items-center gap-1.5 whitespace-nowrap ml-auto md:ml-2 shrink-0 ${
               onlyLowStock
                 ? 'bg-[#FF3366] text-white font-bold border-[#FF3366]'
                 : 'bg-[#121215] border-[#272730] text-neutral-400 hover:text-white'
@@ -252,22 +260,22 @@ export const InventoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* Inventory Table with Stepper Controls `- 1 +` matching reference */}
+      {/* Inventory Table */}
       <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                <th className="py-3.5 px-4">Insumo / Producto</th>
-                <th className="py-3.5 px-4">Marca</th>
-                <th className="py-3.5 px-4">Categoría</th>
-                <th className="py-3.5 px-4">Ubicación</th>
-                <th className="py-3.5 px-4 text-center">Stock Actual</th>
-                <th className="py-3.5 px-4 text-right">Costo Unidad</th>
-                <th className="py-3.5 px-4 text-right">PVP Venta</th>
-                <th className="py-3.5 px-4 text-right">Valor Total</th>
-                <th className="py-3.5 px-4 text-center">Ajuste Stepper</th>
-                <th className="py-3.5 px-4 text-center">Acciones</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Insumo / Producto</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Marca</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Categoría</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Ubicación</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Stock Actual</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Costo Unidad</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">PVP Venta</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Valor Total</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Ajuste Stepper</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#222228]">
@@ -287,7 +295,7 @@ export const InventoryView: React.FC = () => {
                         isCritical ? 'bg-[#25151D]/40' : ''
                       }`}
                     >
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 min-w-[200px]">
                         <div className="font-semibold text-white flex items-center gap-1.5">
                           {isCritical && (
                             <span title="Stock bajo el mínimo">
@@ -300,13 +308,13 @@ export const InventoryView: React.FC = () => {
                           <span className="font-mono text-[10px] text-neutral-500">{item.sku}</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-neutral-300">{item.brand}</td>
+                      <td className="py-3 px-4 text-neutral-300 whitespace-nowrap">{item.brand}</td>
                       <td className="py-3 px-4 whitespace-nowrap">
                         <span className="text-[11px] text-neutral-400">
                           {getCatLabel(item.category)}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-neutral-400 text-[11px]">
+                      <td className="py-3 px-4 text-neutral-400 text-[11px] whitespace-nowrap">
                         {item.location || '—'}
                       </td>
                       <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
@@ -330,13 +338,12 @@ export const InventoryView: React.FC = () => {
                         {formatMoney(item.currentStock * item.unitCost)}
                       </td>
 
-                      {/* Stepper Control `- 1 +` matching reference image */}
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1 bg-[#121215] px-2 py-1 rounded-xl border border-[#272730]">
                           <button
                             onClick={() => adjustStock(item.id, -1)}
                             className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#25252E] transition-colors"
-                            title="Restar 1"
+                            title="Restar 1 (registra salida en Kardex)"
                           >
                             <Minus className="w-3 h-3" />
                           </button>
@@ -346,7 +353,7 @@ export const InventoryView: React.FC = () => {
                           <button
                             onClick={() => adjustStock(item.id, 1)}
                             className="w-5 h-5 rounded-md flex items-center justify-center text-[#FF3366] hover:bg-[#25252E] transition-colors"
-                            title="Sumar 1"
+                            title="Sumar 1 (registra entrada en Kardex)"
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -380,7 +387,7 @@ export const InventoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* Add / Edit Inventory Modal matching reference Dialog */}
+      {/* Add / Edit Inventory Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#17171C] border border-[#2B2B36] rounded-2xl max-w-lg w-full shadow-2xl p-6 space-y-4">
@@ -406,7 +413,7 @@ export const InventoryView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1.5">Marca</label>
                   <input

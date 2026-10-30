@@ -128,6 +128,46 @@ export interface InventoryItem {
   notes?: string;
 }
 
+export type KardexMovementType =
+  | 'initial'       // Inventario inicial
+  | 'purchase_in'   // Entrada por compra / reposición
+  | 'cabin_out'     // Salida por consumo en cabina (tatuaje/piercing)
+  | 'retail_sale'   // Salida por venta en mostrador
+  | 'adjustment';   // Ajuste de inventario / merma sanitaria
+
+export interface KardexMovement {
+  id: string;
+  date: string; // ISO string
+  itemId: string;
+  itemName: string;
+  itemSku?: string;
+  unit: string;
+  type: KardexMovementType;
+  reference: string; // e.g. "INV-KILLER-9482", "CABINA-1", "FAC-2026-0184"
+  concept: string;
+  responsible?: string; // Artista o encargado
+  quantityIn: number;
+  unitCostIn: number;
+  totalIn: number;
+  quantityOut: number;
+  unitCostOut: number;
+  totalOut: number;
+  balanceQty: number; // Saldo en existencia tras el movimiento
+  balanceUnitCost: number; // Costo promedio ponderado
+  balanceTotal: number; // Saldo valorizado total
+}
+
+export interface ManualJournalEntry {
+  id: string;
+  date: string;
+  reference: string;
+  concept: string;
+  debitAccountCode: string;
+  creditAccountCode: string;
+  amount: number;
+  notes?: string;
+}
+
 export interface CashShift {
   id: string;
   date: string;
@@ -197,5 +237,24 @@ export interface Appointment {
   notes?: string;
   designNotes?: string;
   saleId?: string; // ID de la venta si ya fue facturada en POS
+  createdAt: string;
+}
+
+export interface ClientProfile {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  dni?: string;
+  instagram?: string;
+  birthDate?: string;
+  bloodType?: string;
+  allergies?: string; // Látex, lidocaína, níquel, apósitos adhesivos
+  medicalConditions?: string; // Anticoagulantes, diabetes, queloides, dermatitis
+  skinNotes?: string; // Piel sensible, buena cicatrización, prefiere film
+  tags?: string[]; // VIP, Frecuente, Coleccionista, Piel Sensible
+  consentSigned: boolean;
+  emergencyContact?: string;
+  notes?: string;
   createdAt: string;
 }

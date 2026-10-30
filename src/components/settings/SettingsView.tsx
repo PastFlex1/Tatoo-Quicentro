@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SlidersHorizontal, Save, CheckCircle } from 'lucide-react';
+import { Save, CheckCircle } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 
 export const SettingsView: React.FC = () => {
@@ -10,7 +10,7 @@ export const SettingsView: React.FC = () => {
   const [address, setAddress] = useState(settings.address);
   const [phone, setPhone] = useState(settings.phone);
   const [email, setEmail] = useState(settings.email);
-  const [website, setWebsite] = useState(settings.website);
+  const [website] = useState(settings.website);
   const [currency, setCurrency] = useState(settings.currency);
   const [currencyCode, setCurrencyCode] = useState(settings.currencyCode);
   const [defaultTaxRate, setDefaultTaxRate] = useState<number>(settings.defaultTaxRate);
@@ -45,7 +45,7 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       <div className="border-b border-[#24242A] pb-4">
         <h2 className="text-sm font-bold text-white uppercase tracking-wider">
           Configuración del Estudio y Parámetros
@@ -55,13 +55,13 @@ export const SettingsView: React.FC = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-6">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-6">
         <div>
           <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3">
             Identificación Comercial & Sanitaria
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 text-xs">
             <div>
               <label className="block font-semibold text-neutral-300 mb-1.5">Nombre Comercial *</label>
               <input
@@ -135,7 +135,7 @@ export const SettingsView: React.FC = () => {
             Parámetros Financieros
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             <div>
               <label className="block font-semibold text-neutral-300 mb-1.5">Símbolo Moneda</label>
               <input
@@ -199,7 +199,7 @@ export const SettingsView: React.FC = () => {
         </div>
 
         {/* Submit */}
-        <div className="pt-4 border-t border-[#24242B] flex items-center justify-between">
+        <div className="pt-4 border-t border-[#24242B] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div>
             {isSaved && (
               <span className="text-xs text-[#FF3366] font-bold flex items-center gap-2">
@@ -211,7 +211,7 @@ export const SettingsView: React.FC = () => {
 
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
+            className="justify-center px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
           >
             <Save className="w-4 h-4" />
             <span>Guardar Configuración</span>

@@ -31,13 +31,12 @@ export const ReportsView: React.FC = () => {
     dateFilter,
     setDateFilter,
     resetToDemo,
-    clearAllData,
     exportBackup,
     importBackup,
   } = useStudio();
 
   const [activeReportTab, setActiveReportTab] = useState<ReportTab>('executive');
-  const [selectedArtistFilter, setSelectedArtistFilter] = useState<string>('all');
+  const [selectedArtistFilter] = useState<string>('all');
   const [pieChartMode, setPieChartMode] = useState<'revenue' | 'expenses' | 'payments'>('revenue');
   const [barChartMode, setBarChartMode] = useState<'artists' | 'departments' | 'hours'>('artists');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,14 +61,6 @@ export const ReportsView: React.FC = () => {
 
   const totalArtistCommissions = useMemo(() => {
     return validSales.reduce((acc, s) => acc + s.artistShare, 0);
-  }, [validSales]);
-
-  const totalStudioRetained = useMemo(() => {
-    return validSales.reduce((acc, s) => acc + s.studioShare, 0);
-  }, [validSales]);
-
-  const totalTips = useMemo(() => {
-    return validSales.reduce((acc, s) => acc + s.tipAmount, 0);
   }, [validSales]);
 
   const averageTicket = useMemo(() => {
@@ -234,14 +225,14 @@ export const ReportsView: React.FC = () => {
     return artistProductivity.map(a => ({
       id: a.artist.id,
       label: a.artist.nickname || a.artist.name.split(' ')[0],
-      value1: a.commission, // Artista
-      value2: a.studioCut, // Casa
+      value1: a.commission,
+      value2: a.studioCut,
       label1: 'Comisión Artista',
       label2: 'Retención Estudio',
     }));
   }, [artistProductivity]);
 
-  // Dynamic Pie Chart Data based on user-selected mode
+  // Dynamic Pie Chart Data
   const currentPieData = useMemo(() => {
     if (pieChartMode === 'expenses') {
       const slices = [
@@ -281,7 +272,7 @@ export const ReportsView: React.FC = () => {
     }
   }, [pieChartMode, supplyExpenses, rentExpense, bioSanitaryExpense, utilitiesExpense, otherFixedExpenses, paymentBreakdown, pieChartSlices, totalGrossRevenue]);
 
-  // Dynamic Bar Chart Data based on user-selected mode
+  // Dynamic Bar Chart Data
   const currentBarData = useMemo(() => {
     if (barChartMode === 'departments') {
       return {
@@ -419,7 +410,7 @@ export const ReportsView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Printable Report (Print media) */}
       <div id="printable-receipt" className="hidden print:block p-8 bg-white text-black font-sans text-xs">
         <div className="border-b-2 border-black pb-4 mb-4 text-center">
@@ -466,17 +457,6 @@ export const ReportsView: React.FC = () => {
               </tbody>
             </table>
           </div>
-
-          <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs">
-            <div className="border-t border-neutral-400 pt-2">
-              <p className="font-bold">Dirección / Administración del Estudio</p>
-              <p className="text-[10px] text-neutral-500">Firma y Sello</p>
-            </div>
-            <div className="border-t border-neutral-400 pt-2">
-              <p className="font-bold">Responsable Contable</p>
-              <p className="text-[10px] text-neutral-500">Conformidad de Cierre</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -484,7 +464,7 @@ export const ReportsView: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#24242A] pb-5">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366]"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366] shrink-0"></span>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">
               Centro Integral de Reportes & Gráficas Contables
             </h2>
@@ -496,8 +476,7 @@ export const ReportsView: React.FC = () => {
 
         {/* Action Buttons Toolbar */}
         <div className="flex items-center flex-wrap gap-2.5">
-          {/* Quick Date Range Filter */}
-          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730]">
+          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730] overflow-x-auto max-w-full">
             {(['today', 'week', 'month', 'quarter', 'year', 'all'] as DateFilterRange[]).map(df => (
               <button
                 key={df}
@@ -542,7 +521,7 @@ export const ReportsView: React.FC = () => {
       </div>
 
       {/* Sub-report Navigation Tabs */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-2 border-b border-[#24242A]">
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 border-b border-[#24242A]">
         {[
           { id: 'executive', label: 'Resumen Ejecutivo & Gráficas', icon: TrendingUp },
           { id: 'visual_charts', label: 'Solo Gráficas (Pastel & Barras)', icon: BarChart3 },
@@ -558,7 +537,7 @@ export const ReportsView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveReportTab(tab.id as ReportTab)}
-              className={`flex items-center gap-2 py-2 px-3.5 rounded-full text-xs transition-all whitespace-nowrap ${
+              className={`flex items-center gap-2 py-2 px-3.5 rounded-full text-xs transition-all whitespace-nowrap shrink-0 ${
                 isActive
                   ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.35)]'
                   : 'bg-[#18181D] text-neutral-400 hover:text-white border border-[#272730]'
@@ -571,16 +550,15 @@ export const ReportsView: React.FC = () => {
         })}
       </div>
 
-      {/* SUB-REPORT 1: RESUMEN EJECUTIVO CON AMBAS GRÁFICAS (PASTEL Y BARRAS) */}
+      {/* SUB-REPORT 1: RESUMEN EJECUTIVO CON AMBAS GRÁFICAS */}
       {(activeReportTab === 'executive' || activeReportTab === 'visual_charts') && (
-        <div className="space-y-6">
-          {/* Executive KPI Cards (If in executive tab) */}
+        <div className="space-y-4 sm:space-y-6">
           {activeReportTab === 'executive' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
                 <div>
                   <span className="text-neutral-400 text-xs block mb-1">Facturación Bruta Período</span>
-                  <div className="text-2xl font-bold font-mono text-white">{formatMoney(totalGrossRevenue)}</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-white">{formatMoney(totalGrossRevenue)}</div>
                 </div>
                 <div className="text-[11px] text-neutral-400 mt-3 pt-3 border-t border-[#23232A] flex justify-between">
                   <span>Con impuestos ({validSales.length} ventas):</span>
@@ -588,10 +566,10 @@ export const ReportsView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
                 <div>
                   <span className="text-neutral-400 text-xs block mb-1">Margen Bruto de la Casa</span>
-                  <div className="text-2xl font-bold font-mono text-[#FF3366]">{formatMoney(grossProfit)}</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-[#FF3366]">{formatMoney(grossProfit)}</div>
                 </div>
                 <div className="text-[11px] text-neutral-400 mt-3 pt-3 border-t border-[#23232A] flex justify-between">
                   <span>Margen operativo:</span>
@@ -599,10 +577,10 @@ export const ReportsView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
                 <div>
                   <span className="text-neutral-400 text-xs block mb-1">Utilidad Neta (EBITDA)</span>
-                  <div className={`text-2xl font-bold font-mono ${netOperatingProfit >= 0 ? 'text-white' : 'text-[#FF3366]'}`}>
+                  <div className={`text-xl sm:text-2xl font-bold font-mono ${netOperatingProfit >= 0 ? 'text-white' : 'text-[#FF3366]'}`}>
                     {formatMoney(netOperatingProfit)}
                   </div>
                 </div>
@@ -614,10 +592,10 @@ export const ReportsView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
+              <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-between">
                 <div>
                   <span className="text-neutral-400 text-xs block mb-1">Ticket Promedio por Cita</span>
-                  <div className="text-2xl font-bold font-mono text-white">{formatMoney(averageTicket)}</div>
+                  <div className="text-xl sm:text-2xl font-bold font-mono text-white">{formatMoney(averageTicket)}</div>
                 </div>
                 <div className="text-[11px] text-neutral-400 mt-3 pt-3 border-t border-[#23232A] flex justify-between">
                   <span>Horas tatuadas registradas:</span>
@@ -627,11 +605,10 @@ export const ReportsView: React.FC = () => {
             </div>
           )}
 
-          {/* DUAL CHARTS GRID: GRÁFICA DE PASTEL Y GRÁFICA DE BARRAS */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* 1. GRÁFICA DE PASTEL / DONA (PIE CHART) */}
+          {/* DUAL CHARTS GRID */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
             <div className="flex flex-col space-y-2">
-              <div className="flex items-center justify-between px-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
                   <PieChartIcon className="w-3.5 h-3.5 text-[#FF3366]" />
                   Gráfica de Pastel
@@ -665,9 +642,8 @@ export const ReportsView: React.FC = () => {
               />
             </div>
 
-            {/* 2. GRÁFICA DE BARRAS (BAR CHART) */}
             <div className="flex flex-col space-y-2">
-              <div className="flex items-center justify-between px-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
                   <BarChart3 className="w-3.5 h-3.5 text-[#FF3366]" />
                   Gráfica de Barras
@@ -703,7 +679,6 @@ export const ReportsView: React.FC = () => {
             </div>
           </div>
 
-          {/* Additional Financial Flow Bar Chart if in visual_charts tab */}
           {activeReportTab === 'visual_charts' && (
             <BarChartWidget
               title="Gráfica de Barras: Flujo Financiero Global"
@@ -740,11 +715,9 @@ export const ReportsView: React.FC = () => {
             />
           )}
 
-          {/* Performance Summary Cards (Only in executive tab) */}
           {activeReportTab === 'executive' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Direct Cost Distribution Card */}
-              <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+              <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
                 <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">Estructura de Costos del Período</h3>
                   <span className="text-xs font-mono text-[#FF3366] font-bold">Total: {formatMoney(totalDirectCosts + totalFixedExpenses)}</span>
@@ -783,14 +756,13 @@ export const ReportsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Payment Channels */}
-              <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+              <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
                 <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">Cobros por Método</h3>
                   <span className="text-xs font-mono text-white font-bold">{formatMoney(paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)}</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-center text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs">
                   <div className="p-3.5 rounded-xl bg-[#121215] border border-[#272730]">
                     <span className="text-[10px] text-neutral-400 block mb-1">Efectivo</span>
                     <span className="font-mono text-base font-bold text-emerald-400">{formatMoney(paymentBreakdown.cash)}</span>
@@ -812,7 +784,7 @@ export const ReportsView: React.FC = () => {
 
       {/* SUB-REPORT 2: P&L DETALLADO */}
       {activeReportTab === 'pl_statement' && (
-        <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-6">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -822,7 +794,7 @@ export const ReportsView: React.FC = () => {
                 {settings.studioName} · Período contable: {dateFilter}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] font-mono font-bold text-xs">
                 Margen Bruto: {grossMarginPercent}%
               </span>
@@ -838,7 +810,7 @@ export const ReportsView: React.FC = () => {
                 <span>1. INGRESOS OPERATIVOS BRUTOS</span>
                 <span className="font-mono text-base">{formatMoney(totalGrossRevenue)}</span>
               </div>
-              <div className="pl-4 space-y-1 text-neutral-400">
+              <div className="pl-3 sm:pl-4 space-y-1 text-neutral-400">
                 <div className="flex justify-between py-1 border-b border-[#202026]">
                   <span>Facturación Tatuajes Artísticos</span>
                   <span className="font-mono text-white font-semibold">{formatMoney(tattooRevenue)}</span>
@@ -869,7 +841,7 @@ export const ReportsView: React.FC = () => {
                 <span>2. COSTOS DIRECTOS DE SERVICIO (COGS)</span>
                 <span className="font-mono text-base">-{formatMoney(totalDirectCosts)}</span>
               </div>
-              <div className="pl-4 space-y-1 text-neutral-400">
+              <div className="pl-3 sm:pl-4 space-y-1 text-neutral-400">
                 <div className="flex justify-between py-1 border-b border-[#202026]">
                   <span>Comisiones a Tatuadores y Anilladores</span>
                   <span className="font-mono text-[#FF3366] font-semibold">-{formatMoney(totalArtistCommissions)}</span>
@@ -891,7 +863,7 @@ export const ReportsView: React.FC = () => {
                 <span>3. GASTOS FIJOS Y ESTRUCTURA (OPEX)</span>
                 <span className="font-mono text-base">-{formatMoney(totalFixedExpenses)}</span>
               </div>
-              <div className="pl-4 space-y-1 text-neutral-400">
+              <div className="pl-3 sm:pl-4 space-y-1 text-neutral-400">
                 <div className="flex justify-between py-1 border-b border-[#202026]">
                   <span>Alquiler del Local Comercial</span>
                   <span className="font-mono text-neutral-200">{formatMoney(rentExpense)}</span>
@@ -914,17 +886,17 @@ export const ReportsView: React.FC = () => {
             </div>
 
             <div
-              className={`p-4 rounded-2xl border flex justify-between items-center text-sm ${
+              className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm ${
                 netOperatingProfit >= 0
                   ? 'bg-[#14231A] border-emerald-500/40 text-emerald-400'
                   : 'bg-[#29141D] border-[#FF3366]/40 text-[#FF4D79]'
               }`}
             >
               <div>
-                <span className="font-bold text-base block">(=) RESULTADO NETO DEL ESTUDIO (EBITDA)</span>
+                <span className="font-bold text-sm sm:text-base block">(=) RESULTADO NETO DEL ESTUDIO (EBITDA)</span>
                 <span className="text-[11px] text-neutral-400">Ganancia final líquida generada</span>
               </div>
-              <span className="font-mono text-2xl font-bold">{formatMoney(netOperatingProfit)}</span>
+              <span className="font-mono text-xl sm:text-2xl font-bold">{formatMoney(netOperatingProfit)}</span>
             </div>
           </div>
         </div>
@@ -933,7 +905,7 @@ export const ReportsView: React.FC = () => {
       {/* SUB-REPORT 3: PRODUCTIVIDAD DE ARTISTAS */}
       {activeReportTab === 'artists_productivity' && (
         <div className="space-y-6">
-          <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+          <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
               <div>
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -952,15 +924,15 @@ export const ReportsView: React.FC = () => {
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                    <th className="py-3 px-4">Artista</th>
-                    <th className="py-3 px-4">Rol / Especialidad</th>
-                    <th className="py-3 px-4 text-center">Citas</th>
-                    <th className="py-3 px-4 text-center">Horas Tatuaje</th>
-                    <th className="py-3 px-4 text-right">Facturación Bruta</th>
-                    <th className="py-3 px-4 text-right">Comisión Artista</th>
-                    <th className="py-3 px-4 text-right">Retención Casa</th>
-                    <th className="py-3 px-4 text-right">Propinas</th>
-                    <th className="py-3 px-4 text-right">Ticket Promedio</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Artista</th>
+                    <th className="py-3 px-4 whitespace-nowrap">Rol / Especialidad</th>
+                    <th className="py-3 px-4 text-center whitespace-nowrap">Citas</th>
+                    <th className="py-3 px-4 text-center whitespace-nowrap">Horas Tatuaje</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Facturación Bruta</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Comisión Artista</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Retención Casa</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Propinas</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Ticket Promedio</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#222228]">
@@ -969,14 +941,14 @@ export const ReportsView: React.FC = () => {
                       <td className="py-3.5 px-4 font-bold text-white whitespace-nowrap">
                         {item.artist.name}
                       </td>
-                      <td className="py-3.5 px-4 text-neutral-400">
+                      <td className="py-3.5 px-4 text-neutral-400 whitespace-nowrap">
                         <span className="text-[#FF3366] font-semibold">{item.artist.role}</span>
                         <span className="block text-[10px] text-neutral-500 truncate max-w-[160px]">{item.artist.specialty}</span>
                       </td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-white">
+                      <td className="py-3.5 px-4 text-center font-mono font-bold text-white whitespace-nowrap">
                         {item.sessionsCount}
                       </td>
-                      <td className="py-3.5 px-4 text-center font-mono text-neutral-300">
+                      <td className="py-3.5 px-4 text-center font-mono text-neutral-300 whitespace-nowrap">
                         {item.hours > 0 ? `${item.hours}h` : '—'}
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
@@ -1006,7 +978,7 @@ export const ReportsView: React.FC = () => {
       {/* SUB-REPORT 4: LÍNEAS DE NEGOCIO & MÉTODOS DE COBRO */}
       {activeReportTab === 'sales_departments' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
             <PieChartWidget
               title="Distribución de Facturación por Departamento"
               subtitle="Desglose de ingresos en Tatuajes, Piercings, Joyería y Aftercare"
@@ -1015,7 +987,7 @@ export const ReportsView: React.FC = () => {
               formatMoney={formatMoney}
             />
 
-            <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+            <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
               <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                   Canales de Cobro Utilizados
@@ -1063,7 +1035,7 @@ export const ReportsView: React.FC = () => {
 
       {/* SUB-REPORT 5: AUDITORÍA FISCAL */}
       {activeReportTab === 'tax_audit' && (
-        <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -1073,7 +1045,7 @@ export const ReportsView: React.FC = () => {
                 Cálculo de impuestos repercutidos en tickets de venta vs impuestos soportados en compras de suministros
               </p>
             </div>
-            <span className="font-mono font-bold text-xs text-[#FF3366] bg-[#FF3366]/15 px-3 py-1 rounded-full border border-[#FF3366]/30">
+            <span className="font-mono font-bold text-xs text-[#FF3366] bg-[#FF3366]/15 px-3 py-1 rounded-full border border-[#FF3366]/30 self-start sm:self-auto">
               Período: {dateFilter}
             </span>
           </div>
@@ -1104,7 +1076,7 @@ export const ReportsView: React.FC = () => {
 
       {/* SUB-REPORT 6: COSTOS DE INSUMOS & STOCK */}
       {activeReportTab === 'inventory_costs' && (
-        <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -1144,7 +1116,7 @@ export const ReportsView: React.FC = () => {
       )}
 
       {/* System Backup & Data Reset Section */}
-      <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h4 className="text-xs font-bold text-white uppercase tracking-wider">Copias de Seguridad y Respaldo</h4>
           <p className="text-[11px] text-neutral-400">
@@ -1152,7 +1124,7 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center flex-wrap gap-2.5">
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#272730] bg-[#121215] hover:border-[#FF3366] text-white text-xs font-semibold transition-all"

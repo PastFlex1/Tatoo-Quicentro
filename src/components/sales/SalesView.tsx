@@ -21,7 +21,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [methodFilter, setMethodFilter] = useState<string>('all');
+  const [methodFilter] = useState<string>('all');
 
   const salesList = useMemo(() => {
     return filteredSales.filter(sale => {
@@ -110,9 +110,9 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-5">
       {/* Top summary strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <span className="text-[10px] text-neutral-400 block mb-1">Ventas Filtradas</span>
           <span className="text-lg font-bold font-mono tabular-nums text-white">
@@ -145,7 +145,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
           <span className="text-[10px] text-neutral-500 block mt-1">Repercutido</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-center">
+        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-center xs:col-span-2 lg:col-span-1">
           <button
             onClick={onOpenNewSale}
             className="w-full py-2.5 px-3 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)]"
@@ -156,10 +156,9 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
         </div>
       </div>
 
-      {/* Filter and Search Bar with Tag pills matching reference */}
-      <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Search Input (Matching Search... with pink icon in reference) */}
-        <div className="relative w-full sm:w-80">
+      {/* Filter and Search Bar with Tag pills */}
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="relative w-full md:w-80">
           <input
             type="text"
             placeholder="Buscar cliente, factura o artista..."
@@ -170,8 +169,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
           <Search className="w-4 h-4 text-[#FF3366] absolute right-3.5 top-2.5" />
         </div>
 
-        {/* Tag Filters matching reference Tags */}
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
           {[
             { id: 'all', label: 'Todo' },
             { id: 'tattoo', label: 'Tatuajes' },
@@ -184,7 +182,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
               <button
                 key={tag.id}
                 onClick={() => setCategoryFilter(tag.id)}
-                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap ${
+                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 ${
                   isActive
                     ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -197,7 +195,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
 
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-4 py-1 rounded-full border border-[#FF3366] text-[#FF3366] hover:bg-[#FF3366]/10 text-xs font-semibold transition-all whitespace-nowrap ml-2"
+            className="flex items-center gap-1.5 px-4 py-1 rounded-full border border-[#FF3366] text-[#FF3366] hover:bg-[#FF3366]/10 text-xs font-semibold transition-all whitespace-nowrap ml-auto md:ml-2 shrink-0"
             title="Exportar a CSV / Excel"
           >
             <Download className="w-3.5 h-3.5" />
@@ -212,17 +210,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                <th className="py-3.5 px-4">Factura</th>
-                <th className="py-3.5 px-4">Fecha</th>
-                <th className="py-3.5 px-4">Cliente</th>
-                <th className="py-3.5 px-4">Concepto / Servicio</th>
-                <th className="py-3.5 px-4">Artista</th>
-                <th className="py-3.5 px-4">Pago</th>
-                <th className="py-3.5 px-4 text-right">Total</th>
-                <th className="py-3.5 px-4 text-right">Artista</th>
-                <th className="py-3.5 px-4 text-right">Estudio</th>
-                <th className="py-3.5 px-4 text-center">Ficha</th>
-                <th className="py-3.5 px-4 text-center">Acciones</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Factura</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Fecha</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Cliente</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Concepto / Servicio</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Artista</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Pago</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Artista</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Estudio</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Ficha</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#222228]">
@@ -246,13 +244,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         minute: '2-digit',
                       })}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <div className="font-semibold text-white">{sale.clientName}</div>
                       {sale.clientPhone && (
                         <div className="text-[10px] text-neutral-500">{sale.clientPhone}</div>
                       )}
                     </td>
-                    <td className="py-3 px-4 max-w-[240px]">
+                    <td className="py-3 px-4 max-w-[240px] xl:max-w-[380px]">
                       <div className="text-neutral-200 font-medium truncate">{sale.serviceName}</div>
                       <div className="text-[10px] text-neutral-500 flex items-center gap-1">
                         <span className="capitalize">{sale.serviceCategory}</span>

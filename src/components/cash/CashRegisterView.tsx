@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import {
-  BadgeDollarSign,
   Lock,
   Unlock,
   Coins,
   Minus,
   Plus,
-  CheckCircle,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 
@@ -15,7 +13,7 @@ export const CashRegisterView: React.FC = () => {
 
   const [openFund, setOpenFund] = useState<number>(150);
   const [openedByName, setOpenedByName] = useState('Encargado de Caja');
-  const [openNotes, setOpenNotes] = useState('');
+  const [openNotes] = useState('');
 
   const [countedCash, setCountedCash] = useState<number>(currentShift.expectedCash || 0);
   const [closedByName, setClosedByName] = useState('Encargado de Turno');
@@ -55,7 +53,7 @@ export const CashRegisterView: React.FC = () => {
   const calculatedDiscrepancy = Math.round((countedCash - currentShift.expectedCash) * 100) / 100;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Top Banner */}
       <div className="border-b border-[#24242A] pb-4">
         <h2 className="text-sm font-bold text-white tracking-wide uppercase">Arqueo y Cierre Diario de Caja</h2>
@@ -65,11 +63,11 @@ export const CashRegisterView: React.FC = () => {
       </div>
 
       {/* Current Shift Status Card */}
-      <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-6">
+      <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
           <div className="flex items-center gap-3">
             <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+              className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                 currentShift.status === 'open'
                   ? 'bg-[#FF3366]/15 text-[#FF3366] border border-[#FF3366]/40 shadow-[0_0_12px_rgba(255,51,102,0.2)]'
                   : 'bg-neutral-800 text-neutral-400'
@@ -82,7 +80,7 @@ export const CashRegisterView: React.FC = () => {
               )}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-sm text-white">
                   Turno de Caja: {currentShift.date}
                 </h3>
@@ -106,16 +104,16 @@ export const CashRegisterView: React.FC = () => {
             </div>
           </div>
 
-          <div className="text-right">
+          <div className="sm:text-right">
             <span className="text-[11px] text-neutral-400 block">Efectivo Teórico en Cajón:</span>
-            <span className="font-mono text-2xl font-bold text-[#FF3366]">
+            <span className="font-mono text-xl sm:text-2xl font-bold text-[#FF3366]">
               {formatMoney(currentShift.expectedCash)}
             </span>
           </div>
         </div>
 
         {/* Breakdown Formulas */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div className="p-3.5 rounded-xl bg-[#121215] border border-[#272730]">
             <span className="text-[10px] text-neutral-400 block mb-1">(+) Fondo Inicial</span>
             <span className="font-mono font-bold text-white text-sm">
@@ -151,8 +149,8 @@ export const CashRegisterView: React.FC = () => {
 
         {/* Action Panel */}
         {currentShift.status === 'open' ? (
-          <div className="p-5 rounded-2xl bg-[#121215] border border-[#272730] space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#121215] border border-[#272730] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider">
                   Cuadre y Cierre de Turno
@@ -164,20 +162,19 @@ export const CashRegisterView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowDenomCalculator(!showDenomCalculator)}
-                className="text-xs text-[#FF3366] font-semibold flex items-center gap-1.5 hover:underline"
+                className="text-xs text-[#FF3366] font-semibold flex items-center gap-1.5 hover:underline self-start sm:self-auto"
               >
                 <Coins className="w-3.5 h-3.5" />
                 <span>{showDenomCalculator ? 'Ocultar Desglose' : 'Calculadora de Billetes'}</span>
               </button>
             </div>
 
-            {/* Denomination Counter with Stepper `- 1 +` matching reference */}
             {showDenomCalculator && (
               <div className="p-4 bg-[#17171C] rounded-xl border border-[#272730] text-xs space-y-3">
                 <span className="text-[11px] text-neutral-400 font-semibold block">
                   Conteo por denominación (Stepper control):
                 </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                   {Object.entries(denominations).map(([denom, qty]) => (
                     <div key={denom} className="flex items-center justify-between p-2 bg-[#121215] rounded-xl border border-[#272730]">
                       <span className="font-mono font-bold text-white text-xs">${denom}</span>
@@ -269,7 +266,7 @@ export const CashRegisterView: React.FC = () => {
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
+                  className="w-full sm:w-auto justify-center px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
                 >
                   <Lock className="w-3.5 h-3.5" />
                   <span>Efectuar Cierre Oficial de Turno</span>
@@ -278,7 +275,7 @@ export const CashRegisterView: React.FC = () => {
             </form>
           </div>
         ) : (
-          <div className="p-5 rounded-2xl bg-[#121215] border border-[#272730] space-y-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#121215] border border-[#272730] space-y-4">
             <div>
               <h4 className="text-xs font-bold text-white uppercase tracking-wider">
                 Abrir Nuevo Turno de Caja
@@ -317,7 +314,7 @@ export const CashRegisterView: React.FC = () => {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
+                  className="w-full sm:w-auto justify-center px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(255,51,102,0.35)] transition-all"
                 >
                   <Unlock className="w-3.5 h-3.5" />
                   <span>Abrir Turno de Caja</span>
@@ -330,7 +327,7 @@ export const CashRegisterView: React.FC = () => {
 
       {/* Historical Shift Closings */}
       {pastShifts.length > 0 && (
-        <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
           <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">
               Histórico de Cierres Anteriores
@@ -342,41 +339,41 @@ export const CashRegisterView: React.FC = () => {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[#24242B] text-neutral-400 font-medium">
-                  <th className="py-2.5 px-3">Fecha</th>
-                  <th className="py-2.5 px-3">Apertura</th>
-                  <th className="py-2.5 px-3">Cierre</th>
-                  <th className="py-2.5 px-3">Fondo Inicial</th>
-                  <th className="py-2.5 px-3">Ventas Efectivo</th>
-                  <th className="py-2.5 px-3">Saldo Esperado</th>
-                  <th className="py-2.5 px-3">Físico Contado</th>
-                  <th className="py-2.5 px-3 text-center">Diferencia</th>
-                  <th className="py-2.5 px-3">Responsable</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Apertura</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Cierre</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Fondo Inicial</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Ventas Efectivo</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Saldo Esperado</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Físico Contado</th>
+                  <th className="py-2.5 px-3 text-center whitespace-nowrap">Diferencia</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Responsable</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222228]">
                 {pastShifts.map(s => (
                   <tr key={s.id} className="hover:bg-[#1E1E25]">
-                    <td className="py-2.5 px-3 font-mono font-bold text-white">{s.date}</td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-400">
+                    <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">{s.date}</td>
+                    <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap">
                       {new Date(s.openedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-400">
+                    <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap">
                       {s.closedAt ? new Date(s.closedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-300">{formatMoney(s.openingCash)}</td>
-                    <td className="py-2.5 px-3 font-mono text-emerald-400">+{formatMoney(s.cashSalesTotal)}</td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-white">{formatMoney(s.expectedCash)}</td>
-                    <td className="py-2.5 px-3 font-mono font-bold text-neutral-200">
+                    <td className="py-2.5 px-3 font-mono text-neutral-300 whitespace-nowrap">{formatMoney(s.openingCash)}</td>
+                    <td className="py-2.5 px-3 font-mono text-emerald-400 whitespace-nowrap">+{formatMoney(s.cashSalesTotal)}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">{formatMoney(s.expectedCash)}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-neutral-200 whitespace-nowrap">
                       {formatMoney(s.actualCashCounted ?? s.expectedCash)}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold">
+                    <td className="py-2.5 px-3 text-center font-mono font-bold whitespace-nowrap">
                       {(s.discrepancy ?? 0) === 0 ? (
                         <span className="text-emerald-400">0.00</span>
                       ) : (
                         <span className="text-[#FF3366]">{formatMoney(s.discrepancy)}</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-neutral-300">{s.closedBy || s.openedBy}</td>
+                    <td className="py-2.5 px-3 text-neutral-300 whitespace-nowrap">{s.closedBy || s.openedBy}</td>
                   </tr>
                 ))}
               </tbody>

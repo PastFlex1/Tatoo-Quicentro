@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Users,
   PlusCircle,
   DollarSign,
   Edit2,
@@ -116,7 +115,7 @@ export const ArtistsView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#24242A] pb-4">
         <div>
@@ -145,7 +144,7 @@ export const ArtistsView: React.FC = () => {
       </div>
 
       {/* Artist Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-5">
         {artists.map(art => {
           const artistSales = filteredSales.filter(
             s => s.artistId === art.id && s.status !== 'cancelled'
@@ -163,116 +162,120 @@ export const ArtistsView: React.FC = () => {
           return (
             <div
               key={art.id}
-              className={`p-6 rounded-2xl border transition-all ${
+              className={`p-4 sm:p-6 rounded-2xl border transition-all flex flex-col justify-between ${
                 art.active
                   ? 'bg-[#18181D] border-[#272730]'
                   : 'bg-[#141418] border-[#202026] opacity-60'
               }`}
             >
-              {/* Card Header */}
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-[#FF3366]/15 border border-[#FF3366]/40 flex items-center justify-center font-bold text-sm text-[#FF3366] shadow-[0_0_10px_rgba(255,51,102,0.15)] shrink-0">
-                    {art.name.slice(0, 2).toUpperCase()}
+              <div>
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-[#FF3366]/15 border border-[#FF3366]/40 flex items-center justify-center font-bold text-sm text-[#FF3366] shadow-[0_0_10px_rgba(255,51,102,0.15)] shrink-0">
+                      {art.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-sm text-white truncate">{art.name}</h3>
+                        {art.nickname && (
+                          <span className="text-[11px] text-[#FF3366]">"{art.nickname}"</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mt-0.5">
+                        <span className="text-white font-semibold shrink-0">{art.role}</span>
+                        <span>·</span>
+                        <span className="truncate">{art.specialty}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm text-white">{art.name}</h3>
-                      {art.nickname && (
-                        <span className="text-[11px] text-[#FF3366]">"{art.nickname}"</span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-neutral-400 flex items-center gap-2 mt-0.5">
-                      <span className="text-white font-semibold">{art.role}</span>
-                      <span>·</span>
-                      <span className="truncate max-w-[200px]">{art.specialty}</span>
-                    </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => startEdit(art)}
+                      className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#25252E] transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => toggleArtistStatus(art.id)}
+                      className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                        art.active
+                          ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/40'
+                          : 'bg-neutral-800 text-neutral-400'
+                      }`}
+                    >
+                      {art.active ? 'Activo' : 'Inactivo'}
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                {/* Commission Stats Pill Grid */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-2.5 mb-4 text-xs">
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block mb-1 truncate">Facturación</span>
+                    <span className="font-mono font-bold text-white text-xs sm:text-sm block truncate">
+                      {formatMoney(grossBilled)}
+                    </span>
+                    <span className="text-[9px] text-neutral-500 block mt-1">{artistSales.length} citas</span>
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block mb-1 truncate">Comisión {art.defaultCommissionRate}%</span>
+                    <span className="font-mono font-bold text-[#FF3366] text-xs sm:text-sm block truncate">
+                      {formatMoney(commissionEarned)}
+                    </span>
+                    {tipsEarned > 0 && (
+                      <span className="text-[9px] text-neutral-400 block mt-1 truncate">+{formatMoney(tipsEarned)} tips</span>
+                    )}
+                  </div>
+
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block mb-1 truncate">Casa ({100 - art.defaultCommissionRate}%)</span>
+                    <span className="font-mono font-bold text-white text-xs sm:text-sm block truncate">
+                      {formatMoney(studioKept)}
+                    </span>
+                    <span className="text-[9px] text-neutral-500 block mt-1">Retenido</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {/* Payout Status Banner & Action */}
+                <div className="p-3 sm:p-3.5 rounded-xl bg-[#121215] border border-[#272730] flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-neutral-400 block">Pendiente de Liquidar:</span>
+                    <span className="font-mono font-bold text-sm text-[#FF3366]">
+                      {formatMoney(pendingBalance)}
+                    </span>
+                  </div>
+
                   <button
-                    onClick={() => startEdit(art)}
-                    className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#25252E] transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => toggleArtistStatus(art.id)}
-                    className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold ${
-                      art.active
-                        ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/40'
-                        : 'bg-neutral-800 text-neutral-400'
+                    onClick={() => openSettleModal(art, pendingBalance, 0)}
+                    disabled={pendingBalance <= 0}
+                    className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      pendingBalance > 0
+                        ? 'bg-[#FF3366] hover:bg-[#E62557] text-white shadow-[0_0_12px_rgba(255,51,102,0.3)]'
+                        : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
                     }`}
                   >
-                    {art.active ? 'Activo' : 'Inactivo'}
+                    <DollarSign className="w-3.5 h-3.5" />
+                    <span>Liquidar Pago</span>
                   </button>
                 </div>
-              </div>
 
-              {/* Commission Stats Pill Grid */}
-              <div className="grid grid-cols-3 gap-2.5 mb-4 text-xs">
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#272730]">
-                  <span className="text-[10px] text-neutral-400 block mb-1">Facturación</span>
-                  <span className="font-mono font-bold text-white text-sm">
-                    {formatMoney(grossBilled)}
+                {/* Contact info footer */}
+                <div className="mt-3.5 pt-2.5 border-t border-[#23232A] flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-500">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-[#FF3366]" /> {art.phone}
                   </span>
-                  <span className="text-[9px] text-neutral-500 block mt-1">{artistSales.length} citas</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#272730]">
-                  <span className="text-[10px] text-neutral-400 block mb-1">Comisión {art.defaultCommissionRate}%</span>
-                  <span className="font-mono font-bold text-[#FF3366] text-sm">
-                    {formatMoney(commissionEarned)}
-                  </span>
-                  {tipsEarned > 0 && (
-                    <span className="text-[9px] text-neutral-400 block mt-1">+{formatMoney(tipsEarned)} tips</span>
+                  {art.email && (
+                    <span className="flex items-center gap-1.5 truncate max-w-[200px]">
+                      <Mail className="w-3 h-3 text-neutral-500 shrink-0" /> {art.email}
+                    </span>
                   )}
                 </div>
-
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#272730]">
-                  <span className="text-[10px] text-neutral-400 block mb-1">Casa ({100 - art.defaultCommissionRate}%)</span>
-                  <span className="font-mono font-bold text-white text-sm">
-                    {formatMoney(studioKept)}
-                  </span>
-                  <span className="text-[9px] text-neutral-500 block mt-1">Retenido</span>
-                </div>
-              </div>
-
-              {/* Payout Status Banner & Action */}
-              <div className="p-3.5 rounded-xl bg-[#121215] border border-[#272730] flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-neutral-400 block">Pendiente de Liquidar:</span>
-                  <span className="font-mono font-bold text-sm text-[#FF3366]">
-                    {formatMoney(pendingBalance)}
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => openSettleModal(art, pendingBalance, 0)}
-                  disabled={pendingBalance <= 0}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all ${
-                    pendingBalance > 0
-                      ? 'bg-[#FF3366] hover:bg-[#E62557] text-white shadow-[0_0_12px_rgba(255,51,102,0.3)]'
-                      : 'bg-neutral-800 text-neutral-600 cursor-not-allowed'
-                  }`}
-                >
-                  <DollarSign className="w-3.5 h-3.5" />
-                  <span>Liquidar Pago</span>
-                </button>
-              </div>
-
-              {/* Contact info footer */}
-              <div className="mt-3.5 pt-2.5 border-t border-[#23232A] flex items-center justify-between text-[11px] text-neutral-500">
-                <span className="flex items-center gap-1.5">
-                  <Phone className="w-3 h-3 text-[#FF3366]" /> {art.phone}
-                </span>
-                {art.email && (
-                  <span className="flex items-center gap-1.5 truncate max-w-[180px]">
-                    <Mail className="w-3 h-3 text-neutral-500" /> {art.email}
-                  </span>
-                )}
               </div>
             </div>
           );
@@ -281,7 +284,7 @@ export const ArtistsView: React.FC = () => {
 
       {/* Past Settlements History */}
       {settlements.length > 0 && (
-        <div className="p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
+        <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
           <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">
               Historial de Liquidaciones Emitidas
@@ -293,36 +296,36 @@ export const ArtistsView: React.FC = () => {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="border-b border-[#24242B] text-neutral-400 font-medium">
-                  <th className="py-2.5 px-3">Fecha</th>
-                  <th className="py-2.5 px-3">Artista</th>
-                  <th className="py-2.5 px-3">Comisión Base</th>
-                  <th className="py-2.5 px-3">Propinas</th>
-                  <th className="py-2.5 px-3">Deducciones</th>
-                  <th className="py-2.5 px-3 text-right">Neto Pagado</th>
-                  <th className="py-2.5 px-3">Método</th>
-                  <th className="py-2.5 px-3">Notas</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Comisión Base</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Propinas</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Deducciones</th>
+                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Neto Pagado</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Método</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Notas</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222228]">
                 {settlements.map(st => (
                   <tr key={st.id} className="hover:bg-[#1E1E25]">
-                    <td className="py-2.5 px-3 font-mono text-neutral-400">
+                    <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap">
                       {new Date(st.date).toLocaleDateString('es-ES')}
                     </td>
-                    <td className="py-2.5 px-3 font-semibold text-white">{st.artistName}</td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-300">
+                    <td className="py-2.5 px-3 font-semibold text-white whitespace-nowrap">{st.artistName}</td>
+                    <td className="py-2.5 px-3 font-mono text-neutral-300 whitespace-nowrap">
                       {formatMoney(st.commissionEarned)}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-400">
+                    <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap">
                       {formatMoney(st.tipsEarned)}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[#FF3366]">
+                    <td className="py-2.5 px-3 font-mono text-[#FF3366] whitespace-nowrap">
                       -{formatMoney(st.deductions)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-white whitespace-nowrap">
                       {formatMoney(st.amountPaid)}
                     </td>
-                    <td className="py-2.5 px-3 uppercase text-[10px] font-mono text-neutral-400">
+                    <td className="py-2.5 px-3 uppercase text-[10px] font-mono text-neutral-400 whitespace-nowrap">
                       {st.paymentMethod === 'cash' ? 'Efectivo' : 'Transf'}
                     </td>
                     <td className="py-2.5 px-3 text-neutral-400 text-[11px] truncate max-w-[200px]">
@@ -336,7 +339,7 @@ export const ArtistsView: React.FC = () => {
         </div>
       )}
 
-      {/* Settle Commission Modal matching reference Dialog */}
+      {/* Settle Commission Modal */}
       {settleArtistId && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#17171C] border border-[#2B2B36] rounded-2xl max-w-md w-full shadow-2xl p-6 space-y-4">
@@ -463,7 +466,7 @@ export const ArtistsView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1">Apodo / Firma</label>
                   <input
@@ -501,7 +504,7 @@ export const ArtistsView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1">% Comisión</label>
                   <input

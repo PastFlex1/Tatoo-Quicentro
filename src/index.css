@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  --breakpoint-xs: 480px;
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --color-brand: #FF3366;
@@ -15,16 +16,25 @@
 }
 
 @layer base {
-  body {
+  html, body {
     background-color: #111113;
     color: #F4F4F5;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overflow-x: hidden;
   }
 
   ::selection {
     background-color: rgba(255, 51, 102, 0.3);
     color: #FFFFFF;
   }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Custom scrollbar for data tables and panels */

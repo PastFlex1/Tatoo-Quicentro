@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, PlusCircle, Trash2, ArrowDownRight } from 'lucide-react';
+import { Search, PlusCircle, Trash2 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ExpenseCategory } from '../../types';
 
@@ -60,9 +60,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
   };
 
   return (
-    <div className="p-6 space-y-5 max-w-7xl mx-auto">
+    <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-5">
       {/* Top Aggregates */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <span className="text-[10px] text-neutral-400 block mb-1">Total Gastos Operativos</span>
           <span className="text-lg font-bold font-mono tabular-nums text-[#FF3366]">
@@ -98,9 +98,9 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
         </div>
       </div>
 
-      {/* Filter and Search Bar with Tag Pills matching reference */}
-      <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-80">
+      {/* Filter and Search Bar */}
+      <div className="p-3.5 sm:p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        <div className="relative w-full md:w-80">
           <input
             type="text"
             placeholder="Buscar concepto o proveedor..."
@@ -111,7 +111,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
           <Search className="w-4 h-4 text-[#FF3366] absolute right-3.5 top-2.5" />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
           {[
             { id: 'all', label: 'Todo' },
             { id: 'supplies_tattoo', label: 'Insumos Tatuaje' },
@@ -125,7 +125,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
               <button
                 key={tag.id}
                 onClick={() => setSelectedCat(tag.id)}
-                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap ${
+                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 ${
                   isActive
                     ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -144,15 +144,15 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                <th className="py-3.5 px-4">Fecha</th>
-                <th className="py-3.5 px-4">Categoría</th>
-                <th className="py-3.5 px-4">Descripción / Concepto</th>
-                <th className="py-3.5 px-4">Proveedor</th>
-                <th className="py-3.5 px-4">N° Factura</th>
-                <th className="py-3.5 px-4">Pago</th>
-                <th className="py-3.5 px-4 text-center">Deducible</th>
-                <th className="py-3.5 px-4 text-right">Importe</th>
-                <th className="py-3.5 px-4 text-center">Acción</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Fecha</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Categoría</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Descripción / Concepto</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Proveedor</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">N° Factura</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Pago</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Deducible</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Importe</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#222228]">
@@ -177,7 +177,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                         {getCategoryLabel(item.category)}
                       </span>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 min-w-[200px]">
                       <div className="font-semibold text-white">{item.description}</div>
                       {item.notes && <div className="text-[10px] text-neutral-500 italic">{item.notes}</div>}
                     </td>
