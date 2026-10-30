@@ -13,6 +13,7 @@ import { InventoryView } from './components/inventory/InventoryView';
 import { LedgerKardexView } from './components/ledger/LedgerKardexView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AppointmentsView } from './components/appointments/AppointmentsView';
+import { ProformasView } from './components/proformas/ProformasView';
 import { SettingsView } from './components/settings/SettingsView';
 import { NewExpenseModal } from './components/expenses/NewExpenseModal';
 import { ReceiptModal } from './components/sales/ReceiptModal';
@@ -57,6 +58,8 @@ const MainLayout: React.FC = () => {
         return <ClientsView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'appointments':
         return <AppointmentsView onOpenReceipt={sale => setReceiptSale(sale)} />;
+      case 'proformas':
+        return <ProformasView />;
       case 'sales':
         return (
           <SalesView

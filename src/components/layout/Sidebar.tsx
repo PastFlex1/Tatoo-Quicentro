@@ -13,6 +13,7 @@ import {
   FileSpreadsheet,
   SlidersHorizontal,
   AlertTriangle,
+  FileText,
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -23,9 +24,10 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
-  const { activeTab, setActiveTab, currentShift, inventory, appointments, settings, formatMoney } = useStudio();
+  const { activeTab, setActiveTab, currentShift, inventory, appointments, proformas, settings, formatMoney } = useStudio();
 
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockAlert).length;
+  const pendingProformasCount = proformas.filter(p => p.status === 'pending').length;
   const todayStr = new Date().toISOString().split('T')[0];
   const todayUpcomingAppointmentsCount = appointments.filter(
     a => a.date === todayStr && (a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress')
@@ -36,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { id: 'pos', label: 'Terminal POS / Cobro', icon: CreditCard },
     { id: 'clients', label: 'Historial Clientes', icon: UserCheck },
     { id: 'appointments', label: 'Agenda de Citas', icon: Calendar },
+    { id: 'proformas', label: 'Cotizaciones & Proformas', icon: FileText },
     { id: 'sales', label: 'Ventas & Servicios', icon: ReceiptText },
     { id: 'expenses', label: 'Gastos & Compras', icon: WalletCards },
     { id: 'artists', label: 'Liquidación Artistas', icon: Users },
@@ -80,10 +83,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-bold text-sm tracking-tight text-white truncate">
-                  InkLedger Studio
+                  Devolution Ink
                 </span>
-                <span className="text-[11px] text-neutral-400 truncate">
-                  {settings.studioName}
+                <span className="text-[11px] text-[#FF3366] font-medium truncate">
+                  Tattoo Studio · Quicentro
                 </span>
               </div>
             </div>
@@ -127,6 +130,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
                   {item.id === 'appointments' && todayUpcomingAppointmentsCount > 0 && (
                     <span className="text-[10px] font-mono text-white bg-[#FF3366] px-2 py-0.5 rounded-full font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)] shrink-0">
                       {todayUpcomingAppointmentsCount}
+                    </span>
+                  )}
+                  {item.id === 'proformas' && pendingProformasCount > 0 && (
+                    <span className="text-[10px] font-mono text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
+                      {pendingProformasCount}
                     </span>
                   )}
                   {item.id === 'inventory' && lowStockCount > 0 && (

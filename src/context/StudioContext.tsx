@@ -15,6 +15,8 @@ import {
   KardexMovementType,
   ManualJournalEntry,
   ClientProfile,
+  Proforma,
+  ProformaItem,
 } from '../types';
 import {
   INITIAL_ARTISTS,
@@ -26,6 +28,7 @@ import {
   INITIAL_APPOINTMENTS,
   INITIAL_KARDEX,
   INITIAL_CLIENTS,
+  INITIAL_PROFORMAS,
 } from '../data/initialData';
 
 interface StudioContextType {
@@ -39,6 +42,7 @@ interface StudioContextType {
   manualJournalEntries: ManualJournalEntry[];
   appointments: Appointment[];
   clients: ClientProfile[];
+  proformas: Proforma[];
   currentShift: CashShift;
   pastShifts: CashShift[];
   settings: StudioSettings;
@@ -62,6 +66,19 @@ interface StudioContextType {
     tipAmount?: number,
     finalTotal?: number
   ) => SaleRecord;
+
+  // Actions - Cotizaciones & Proformas
+  addProforma: (proforma: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>) => Proforma;
+  updateProforma: (id: string, updated: Partial<Proforma>) => void;
+  deleteProforma: (id: string) => void;
+  convertProformaToAppointment: (
+    proformaId: string,
+    appointmentDate?: string,
+    startTime?: string,
+    depositPaid?: boolean,
+    depositPaymentMethod?: PaymentMethod
+  ) => Appointment;
+  getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
   // Actions - Sales
   addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>) => SaleRecord;
@@ -140,6 +157,7 @@ const STORAGE_KEYS = {
   JOURNAL: 'inkledger_journal_v1',
   APPOINTMENTS: 'inkledger_appointments_v1',
   CLIENTS: 'inkledger_clients_v1',
+  PROFORMAS: 'inkledger_proformas_v1',
   CURRENT_SHIFT: 'inkledger_curr_shift_v1',
   PAST_SHIFTS: 'inkledger_past_shifts_v1',
   SETTINGS: 'inkledger_settings_v1',
@@ -193,6 +211,11 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
   });
 
+  const [proformas, setProformas] = useState<Proforma[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PROFORMAS);
+    return saved ? JSON.parse(saved) : INITIAL_PROFORMAS;
+  });
+
   const [currentShift, setCurrentShift] = useState<CashShift>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_SHIFT);
     return saved ? JSON.parse(saved) : INITIAL_CASH_SHIFT;
@@ -211,6 +234,18 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (parsed.currency === '€' || parsed.currencyCode === 'EUR') {
           parsed.currency = '$';
           parsed.currencyCode = 'USD';
+        }
+        if (
+          !parsed.studioName ||
+          parsed.studioName === 'Black Lotus Tattoo & Piercing Atelier' ||
+          parsed.studioName.includes('Black Lotus')
+        ) {
+          parsed.studioName = INITIAL_SETTINGS.studioName;
+          parsed.address = INITIAL_SETTINGS.address;
+          parsed.email = INITIAL_SETTINGS.email;
+          parsed.website = INITIAL_SETTINGS.website;
+          parsed.receiptFooterMessage = INITIAL_SETTINGS.receiptFooterMessage;
+          parsed.healthSanitaryRegistration = INITIAL_SETTINGS.healthSanitaryRegistration;
         }
         return parsed;
       } catch {
@@ -264,6 +299,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(clients));
   }, [clients]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PROFORMAS, JSON.stringify(proformas));
+  }, [proformas]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SHIFT, JSON.stringify(currentShift));
@@ -473,6 +512,51 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     }
 
+    // Automatically generate and attach a Proforma for this appointment
+    const currentYear = new Date().getFullYear();
+    const aptProforma: Proforma = {
+      id: `prof-apt-${newApt.id}`,
+      proformaNumber: `PROF-${currentYear}-${String(Date.now()).slice(-4)}`,
+      date: aptData.date || new Date().toISOString().split('T')[0],
+      validUntil: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      clientName: aptData.clientName,
+      clientPhone: aptData.clientPhone,
+      clientEmail: aptData.clientEmail,
+      clientInstagram: aptData.clientInstagram,
+      artistId: aptData.artistId,
+      artistName: aptData.artistName,
+      serviceCategory: aptData.serviceCategory,
+      serviceName: aptData.serviceName,
+      bodyPlacement: aptData.bodyPlacement,
+      sizeApprox: aptData.sizeApprox,
+      items: [
+        {
+          id: `pitem-${Date.now()}`,
+          concept: `${aptData.serviceName} (${aptData.estimatedHours}h est.)`,
+          category: aptData.serviceCategory,
+          hours: aptData.estimatedHours,
+          quantity: 1,
+          unitPrice: aptData.estimatedPrice,
+          total: aptData.estimatedPrice,
+        },
+      ],
+      subtotal: aptData.estimatedPrice,
+      discount: 0,
+      taxRate: 0,
+      taxAmount: 0,
+      total: aptData.estimatedPrice,
+      suggestedDeposit: aptData.depositAmount,
+      estimatedHours: aptData.estimatedHours,
+      appointmentId: newApt.id,
+      appointmentDate: aptData.date,
+      appointmentTime: aptData.startTime,
+      status: aptData.depositPaid ? 'accepted' : 'draft',
+      termsAndConditions: 'Proforma y reserva oficial de cita de estudio. Anticipo deducible del total del servicio en cabina. Avisar con mínimo 48h para reprogramación.',
+      notes: aptData.notes,
+      createdAt: newApt.createdAt,
+    };
+    setProformas(prev => [aptProforma, ...prev]);
+
     return newApt;
   };
 
@@ -550,6 +634,145 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     return sale;
+  };
+
+  // Cotizaciones & Proformas Operations
+  const addProforma = (profData: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>): Proforma => {
+    const currentYear = new Date().getFullYear();
+    const nextSeq = String(proformas.length + 45).padStart(4, '0');
+    const newProf: Proforma = {
+      ...profData,
+      id: `prof-${Date.now()}`,
+      proformaNumber: `PROF-${currentYear}-${nextSeq}`,
+      createdAt: new Date().toISOString(),
+    };
+    setProformas(prev => [newProf, ...prev]);
+
+    if (profData.clientName) {
+      upsertClient({
+        name: profData.clientName,
+        phone: profData.clientPhone,
+        email: profData.clientEmail,
+        instagram: profData.clientInstagram,
+        dni: profData.clientDni,
+        tags: ['Cotización'],
+      });
+    }
+
+    return newProf;
+  };
+
+  const updateProforma = (id: string, updated: Partial<Proforma>) => {
+    setProformas(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
+  };
+
+  const deleteProforma = (id: string) => {
+    setProformas(prev => prev.filter(p => p.id !== id));
+  };
+
+  const getProformaByAppointmentId = (appointmentId: string): Proforma | undefined => {
+    const existing = proformas.find(p => p.appointmentId === appointmentId);
+    if (existing) return existing;
+
+    const apt = appointments.find(a => a.id === appointmentId);
+    if (!apt) return undefined;
+
+    const currentYear = new Date().getFullYear();
+    const fallbackProf: Proforma = {
+      id: `prof-apt-${apt.id}`,
+      proformaNumber: `PROF-${currentYear}-${apt.id.slice(-4).toUpperCase()}`,
+      date: apt.date || new Date().toISOString().split('T')[0],
+      validUntil: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      clientName: apt.clientName,
+      clientPhone: apt.clientPhone,
+      clientEmail: apt.clientEmail,
+      clientInstagram: apt.clientInstagram,
+      artistId: apt.artistId,
+      artistName: apt.artistName,
+      serviceCategory: apt.serviceCategory,
+      serviceName: apt.serviceName,
+      bodyPlacement: apt.bodyPlacement,
+      sizeApprox: apt.sizeApprox,
+      items: [
+        {
+          id: `pitem-${apt.id}`,
+          concept: `${apt.serviceName} (${apt.estimatedHours}h est.)`,
+          category: apt.serviceCategory,
+          hours: apt.estimatedHours,
+          quantity: 1,
+          unitPrice: apt.estimatedPrice,
+          total: apt.estimatedPrice,
+        },
+      ],
+      subtotal: apt.estimatedPrice,
+      discount: 0,
+      taxRate: 0,
+      taxAmount: 0,
+      total: apt.estimatedPrice,
+      suggestedDeposit: apt.depositAmount,
+      estimatedHours: apt.estimatedHours,
+      appointmentId: apt.id,
+      appointmentDate: apt.date,
+      appointmentTime: apt.startTime,
+      status: apt.status === 'completed' ? 'converted' : apt.depositPaid ? 'accepted' : 'draft',
+      termsAndConditions: 'Proforma y confirmación de reserva. Anticipo deducible del total del servicio en cabina. Se requiere 48h de preaviso para reprogramar.',
+      notes: apt.notes,
+      createdAt: apt.createdAt,
+    };
+    return fallbackProf;
+  };
+
+  const convertProformaToAppointment = (
+    proformaId: string,
+    appointmentDate?: string,
+    startTime?: string,
+    depositPaid: boolean = false,
+    depositPaymentMethod?: PaymentMethod
+  ): Appointment => {
+    const prof = proformas.find(p => p.id === proformaId);
+    if (!prof) throw new Error('Cotización / Proforma no encontrada');
+
+    const date = appointmentDate || prof.appointmentDate || new Date().toISOString().split('T')[0];
+    const time = startTime || prof.appointmentTime || '11:00';
+    const hours = prof.estimatedHours || 2;
+    const [h, m] = time.split(':').map(Number);
+    const endTotalMinutes = (isNaN(h) ? 11 : h) * 60 + (isNaN(m) ? 0 : m) + Math.round(hours * 60);
+    const endH = String(Math.floor(endTotalMinutes / 60) % 24).padStart(2, '0');
+    const endM = String(endTotalMinutes % 60).padStart(2, '0');
+    const endTime = `${endH}:${endM}`;
+
+    const newApt = addAppointment({
+      clientName: prof.clientName,
+      clientPhone: prof.clientPhone || 'No especificado',
+      clientEmail: prof.clientEmail,
+      clientInstagram: prof.clientInstagram,
+      artistId: prof.artistId,
+      artistName: prof.artistName,
+      serviceCategory: prof.serviceCategory,
+      serviceName: prof.serviceName,
+      date,
+      startTime: time,
+      endTime,
+      estimatedHours: prof.estimatedHours || 2,
+      estimatedPrice: prof.total,
+      depositAmount: prof.suggestedDeposit || 0,
+      depositPaid,
+      depositPaymentMethod,
+      bodyPlacement: prof.bodyPlacement,
+      sizeApprox: prof.sizeApprox,
+      status: depositPaid ? 'confirmed' : 'scheduled',
+      consentSigned: false,
+      notes: prof.notes,
+    });
+
+    updateProforma(proformaId, {
+      status: 'converted',
+      appointmentId: newApt.id,
+      appointmentDate: date,
+      appointmentTime: time,
+    });
+
+    return newApt;
   };
 
   // Sale Operations
@@ -895,6 +1118,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setManualJournalEntries([]);
     setAppointments(INITIAL_APPOINTMENTS);
     setClients(INITIAL_CLIENTS);
+    setProformas(INITIAL_PROFORMAS);
     setCurrentShift(INITIAL_CASH_SHIFT);
     setSettlements([]);
     setSettings(INITIAL_SETTINGS);
@@ -909,6 +1133,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setManualJournalEntries([]);
     setAppointments([]);
     setClients([]);
+    setProformas([]);
     const freshShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -939,6 +1164,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       manualJournalEntries,
       appointments,
       clients,
+      proformas,
       settlements,
       pastShifts,
       currentShift,
@@ -963,6 +1189,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.manualJournalEntries && Array.isArray(parsed.manualJournalEntries)) setManualJournalEntries(parsed.manualJournalEntries);
       if (parsed.appointments && Array.isArray(parsed.appointments)) setAppointments(parsed.appointments);
       if (parsed.clients && Array.isArray(parsed.clients)) setClients(parsed.clients);
+      if (parsed.proformas && Array.isArray(parsed.proformas)) setProformas(parsed.proformas);
       if (parsed.settlements && Array.isArray(parsed.settlements)) setSettlements(parsed.settlements);
       if (parsed.settings) setSettings(parsed.settings);
       if (parsed.currentShift) setCurrentShift(parsed.currentShift);
@@ -985,6 +1212,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         manualJournalEntries,
         appointments,
         clients,
+        proformas,
         currentShift,
         pastShifts,
         settings,
@@ -999,6 +1227,11 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         deleteAppointment,
         updateAppointmentStatus,
         completeAndBillAppointment,
+        addProforma,
+        updateProforma,
+        deleteProforma,
+        convertProformaToAppointment,
+        getProformaByAppointmentId,
         addSale,
         updateSale,
         deleteSale,

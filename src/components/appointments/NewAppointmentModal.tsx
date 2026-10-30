@@ -548,7 +548,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_16px_rgba(255,51,102,0.4)] cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirmar & Agendar Cita</span>
+              <span>Confirmar & Ver Proforma</span>
             </button>
           </div>
         </form>

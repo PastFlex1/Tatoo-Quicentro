@@ -37,6 +37,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Historial & Expediente de Clientes';
       case 'appointments':
         return 'Agenda & Agendamiento de Citas';
+      case 'proformas':
+        return 'Cotizaciones & Proformas Oficiales';
       case 'sales':
         return 'Libro Diario de Ventas';
       case 'expenses':

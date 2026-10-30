@@ -258,3 +258,49 @@ export interface ClientProfile {
   notes?: string;
   createdAt: string;
 }
+
+export type ProformaStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'expired';
+
+export interface ProformaItem {
+  id: string;
+  concept: string;
+  category: ServiceCategory;
+  hours?: number;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Proforma {
+  id: string;
+  proformaNumber: string; // Ej: PROF-2026-0042
+  date: string;
+  validUntil: string;
+  clientName: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientDni?: string;
+  clientInstagram?: string;
+  artistId: string;
+  artistName: string;
+  serviceCategory: ServiceCategory;
+  serviceName: string;
+  bodyPlacement?: string;
+  sizeApprox?: string;
+  complexity?: 'Sencillo / Flash' | 'Medio' | 'Complejo / Detallado' | 'Gran Formato';
+  items: ProformaItem[];
+  subtotal: number;
+  discount: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  suggestedDeposit: number; // Anticipo / seña sugerida
+  estimatedHours?: number;
+  termsAndConditions?: string;
+  notes?: string;
+  appointmentId?: string; // Si se originó al agendar cita o generó una cita
+  appointmentDate?: string;
+  appointmentTime?: string;
+  status: ProformaStatus;
+  createdAt: string;
+}

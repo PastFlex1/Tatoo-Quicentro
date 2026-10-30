@@ -9,11 +9,13 @@ import {
   Receipt,
   Trash2,
   MessageCircle,
+  FileText,
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { Appointment, AppointmentStatus, PaymentMethod, SaleRecord } from '../../types';
+import { Appointment, AppointmentStatus, PaymentMethod, SaleRecord, Proforma } from '../../types';
 import { NewAppointmentModal } from './NewAppointmentModal';
+import { ProformaModal } from '../proformas/ProformaModal';
 
 interface AppointmentsViewProps {
   onOpenReceipt?: (sale: SaleRecord) => void;
@@ -29,6 +31,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
     updateAppointmentStatus,
     deleteAppointment,
     completeAndBillAppointment,
+    getProformaByAppointmentId,
     settings,
   } = useStudio();
 
@@ -36,6 +39,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [proformaModalData, setProformaModalData] = useState<Proforma | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -576,15 +580,29 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-[#222228] gap-2 flex-wrap">
-                          <a
-                            href={getWhatsAppLink(apt)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-1.5 rounded-lg border border-[#2A2A33] text-neutral-400 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors"
-                            title="Enviar recordatorio por WhatsApp"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                          </a>
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href={getWhatsAppLink(apt)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 rounded-lg border border-[#2A2A33] text-neutral-400 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors"
+                              title="Enviar recordatorio por WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+
+                            <button
+                              onClick={() => {
+                                const prof = getProformaByAppointmentId(apt.id);
+                                if (prof) setProformaModalData(prof);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#2A2A33] hover:border-[#FF3366]/50 bg-[#1A1A22] text-neutral-300 hover:text-white text-[11px] font-semibold transition-colors"
+                              title="Ver / Imprimir Proforma Oficial de Cita"
+                            >
+                              <FileText className="w-3 h-3 text-[#FF3366]" />
+                              <span>Proforma</span>
+                            </button>
+                          </div>
 
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {apt.status !== 'completed' && (
@@ -725,9 +743,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                                 {apt.serviceName}
                               </div>
                               <div className="pt-2 border-t border-[#252530] flex items-center justify-between">
-                                <span className="text-[10px] font-mono text-neutral-300">
-                                  Total: {formatMoney(apt.estimatedPrice)}
-                                </span>
+                                <button
+                                  onClick={() => {
+                                    const prof = getProformaByAppointmentId(apt.id);
+                                    if (prof) setProformaModalData(prof);
+                                  }}
+                                  className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1 font-medium transition-colors"
+                                  title="Ver Proforma"
+                                >
+                                  <FileText className="w-3 h-3 text-[#FF3366]" />
+                                  <span>Proforma</span>
+                                </button>
                                 <button
                                   onClick={() => handleStartBilling(apt)}
                                   className="text-[11px] text-[#FF3366] font-semibold hover:underline"
@@ -850,6 +876,17 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
 
                         <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                const prof = getProformaByAppointmentId(apt.id);
+                                if (prof) setProformaModalData(prof);
+                              }}
+                              className="p-1.5 rounded-lg border border-[#2A2A33] hover:border-[#FF3366]/50 bg-[#1A1A22] text-neutral-400 hover:text-white transition-colors"
+                              title="Ver / Imprimir Proforma Oficial de Cita"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-[#FF3366]" />
+                            </button>
+
                             {apt.status !== 'completed' && (
                               <button
                                 onClick={() => handleStartBilling(apt)}
@@ -900,8 +937,20 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
       <NewAppointmentModal
         isOpen={isNewAppointmentOpen}
         onClose={() => setIsNewAppointmentOpen(false)}
+        onAppointmentCreated={createdApt => {
+          const prof = getProformaByAppointmentId(createdApt.id);
+          if (prof) {
+            setProformaModalData(prof);
+          }
+        }}
         initialDate={selectedDayString}
         initialArtistId={filterArtist !== 'all' ? filterArtist : undefined}
+      />
+
+      {/* MODAL: PROFORMA DE CITA */}
+      <ProformaModal
+        proforma={proformaModalData}
+        onClose={() => setProformaModalData(null)}
       />
 
       {/* MODAL 2: FACTURAR / COBRAR CITA DIRECTO EN POS */}
