@@ -1,0 +1,6 @@
+{
+  "name": "InkLedger - Sistema Contable para Tatuajes y Piercings",
+  "description": "Sistema integral de contabilidad, control de ingresos, gastos, liquidación de comisiones de tatuadores, inventario de insumos y arqueo de caja para estudios de tatuajes y piercings.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

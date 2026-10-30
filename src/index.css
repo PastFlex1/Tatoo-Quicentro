@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-brand: #FF3366;
+  --color-brand-hover: #E62557;
+  --color-brand-muted: rgba(255, 51, 102, 0.15);
+  --color-surface-bg: #111113;
+  --color-surface-card: #17171A;
+  --color-surface-input: #121215;
+  --color-surface-border: #26262B;
+}
+
+@layer base {
+  body {
+    background-color: #111113;
+    color: #F4F4F5;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background-color: rgba(255, 51, 102, 0.3);
+    color: #FFFFFF;
+  }
+}
+
+/* Custom scrollbar for data tables and panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272F;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #383842;
+}
+
+/* Range input styling */
+input[type="range"] {
+  accent-color: #FF3366;
+}
+
+/* Checkbox and Radio styling */
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #FF3366;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+    background: white !important;
+    color: black !important;
+  }
+}
