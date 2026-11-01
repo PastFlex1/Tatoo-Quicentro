@@ -10,7 +10,8 @@ import { ExpensesView } from './components/expenses/ExpensesView';
 import { ArtistsView } from './components/artists/ArtistsView';
 import { CashRegisterView } from './components/cash/CashRegisterView';
 import { InventoryView } from './components/inventory/InventoryView';
-import { LedgerKardexView } from './components/ledger/LedgerKardexView';
+import { KardexView } from './components/kardex/KardexView';
+import { GeneralLedgerView } from './components/ledger/GeneralLedgerView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AppointmentsView } from './components/appointments/AppointmentsView';
 import { ProformasView } from './components/proformas/ProformasView';
@@ -75,8 +76,10 @@ const MainLayout: React.FC = () => {
         return <CashRegisterView />;
       case 'inventory':
         return <InventoryView />;
+      case 'kardex':
+        return <KardexView />;
       case 'ledger':
-        return <LedgerKardexView />;
+        return <GeneralLedgerView />;
       case 'reports':
         return <ReportsView />;
       case 'settings':
@@ -108,7 +111,7 @@ const MainLayout: React.FC = () => {
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
         />
 
-        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 w-full overflow-y-auto overflow-x-hidden outline-none focus:outline-none">
           {renderActiveTab()}
         </main>
       </div>

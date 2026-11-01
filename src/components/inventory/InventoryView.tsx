@@ -9,6 +9,7 @@ import {
   Trash2,
   X,
   BookOpen,
+  Layers,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { InventoryCategory, InventoryItem } from '../../types';
@@ -198,11 +199,11 @@ export const InventoryView: React.FC = () => {
             <span>Nuevo Insumo / Joya</span>
           </button>
           <button
-            onClick={() => setActiveTab('ledger')}
-            className="w-full py-1.5 px-4 rounded-full bg-[#121215] border border-[#FF3366]/50 text-[#FF3366] hover:bg-[#FF3366]/10 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all"
+            onClick={() => setActiveTab('kardex')}
+            className="w-full py-1.5 px-4 rounded-full bg-[#121215] border border-[#FF3366]/50 text-[#FF3366] hover:bg-[#FF3366]/10 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Abrir Kardex Valorizado</span>
+            <Layers className="w-3.5 h-3.5" />
+            <span>Abrir Kardex de Insumos</span>
           </button>
         </div>
       </div>

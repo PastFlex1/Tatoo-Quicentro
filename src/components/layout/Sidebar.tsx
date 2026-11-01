@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   AlertTriangle,
   FileText,
+  Layers,
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -44,7 +45,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { id: 'artists', label: 'Liquidación Artistas', icon: Users },
     { id: 'cash', label: 'Arqueo de Caja', icon: BadgeDollarSign },
     { id: 'inventory', label: 'Inventario & Joyería', icon: Boxes },
-    { id: 'ledger', label: 'Kardex & Libro Mayor', icon: BookOpen },
+    { id: 'kardex', label: 'Kardex de Insumos', icon: Layers },
+    { id: 'ledger', label: 'Libro Mayor Contable', icon: BookOpen },
     { id: 'reports', label: 'Centro de Reportes', icon: FileSpreadsheet },
     { id: 'settings', label: 'Configuración', icon: SlidersHorizontal },
   ];
@@ -112,10 +114,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
                 <button
                   key={item.id}
                   onClick={() => handleSelectTab(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all outline-none focus:outline-none focus-visible:outline-none focus:ring-0 active:outline-none select-none cursor-pointer ${
                     isActive
                       ? 'bg-[#FF3366]/15 text-[#FF3366] font-semibold border border-[#FF3366]/30 shadow-[0_0_10px_rgba(255,51,102,0.1)]'
-                      : 'text-neutral-400 hover:text-white hover:bg-[#1C1C22]'
+                      : 'text-neutral-400 hover:text-white hover:bg-[#1C1C22] border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">

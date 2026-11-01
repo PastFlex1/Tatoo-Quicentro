@@ -49,8 +49,10 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Arqueo de Caja';
       case 'inventory':
         return 'Inventario & Joyería';
+      case 'kardex':
+        return 'Kardex Valorizado de Insumos';
       case 'ledger':
-        return 'Kardex Valorizado & Libro Mayor';
+        return 'Libro Mayor & Plan Contable';
       case 'reports':
         return 'Centro de Reportes Financieros';
       case 'settings':
@@ -76,6 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
     'sales',
     'expenses',
     'artists',
+    'kardex',
     'ledger',
     'reports',
   ].includes(activeTab);
@@ -154,9 +157,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Primary Button: Navigates to exclusive POS section */}
           <button
             onClick={onOpenNewSale}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-white text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-white text-xs font-bold transition-all whitespace-nowrap outline-none focus:outline-none focus-visible:outline-none ${
               activeTab === 'pos'
-                ? 'bg-[#E62557] ring-2 ring-white/30 shadow-[0_0_20px_rgba(255,51,102,0.5)]'
+                ? 'bg-[#E62557] ring-2 ring-[#FF3366]/50 shadow-[0_0_20px_rgba(255,51,102,0.5)]'
                 : 'bg-[#FF3366] hover:bg-[#E62557] shadow-[0_0_16px_rgba(255,51,102,0.35)]'
             }`}
             title="Ir a la sección exclusiva de Terminal POS"
