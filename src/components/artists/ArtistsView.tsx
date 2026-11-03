@@ -87,7 +87,7 @@ export const ArtistsView: React.FC = () => {
         role,
         specialty: specialty.trim() || 'Tatuador Artístico',
         defaultCommissionRate,
-        phone: phone.trim() || '+34 600 000 000',
+        phone: phone.trim() || '+593 99 000 0000',
         email: email.trim() || undefined,
         active: true,
         avatarColor: 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30',
@@ -522,7 +522,7 @@ export const ArtistsView: React.FC = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">Teléfono</label>
                   <input
                     type="text"
-                    placeholder="+34 600..."
+                    placeholder="+593 99 000 0000"
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
                     className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"

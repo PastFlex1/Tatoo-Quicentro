@@ -217,13 +217,15 @@ export const GeneralLedgerView: React.FC = () => {
     // 3. Operating Expenses postings
     filteredExpenses.forEach(exp => {
       const isArtistPayout = exp.category === 'artist_payout';
-      const debitAccount = isArtistPayout ? '2101' : exp.category === 'inventory_purchase' ? '1105' : '5201';
+      const isInventorySupplies = exp.category === 'jewelry_restock' || exp.category === 'supplies_tattoo' || exp.category === 'supplies_piercing';
+      const debitAccount = isArtistPayout ? '2101' : isInventorySupplies ? '1105' : '5201';
       const creditAccount = exp.paymentMethod === 'cash' ? '1101' : '1102';
+      const refCode = exp.invoiceReference || `GAS-${exp.id.slice(-4)}`;
 
       list.push({
         id: `post-exp-d-${exp.id}`,
         date: exp.date,
-        reference: exp.invoiceNumber || `GAS-${exp.id.slice(-4)}`,
+        reference: refCode,
         accountCode: debitAccount,
         concept: `${exp.description} (${exp.supplier})`,
         debit: exp.amount,
@@ -234,7 +236,7 @@ export const GeneralLedgerView: React.FC = () => {
       list.push({
         id: `post-exp-c-${exp.id}`,
         date: exp.date,
-        reference: exp.invoiceNumber || `GAS-${exp.id.slice(-4)}`,
+        reference: refCode,
         accountCode: creditAccount,
         concept: `Pago ${exp.paymentMethod === 'cash' ? 'en efectivo' : 'bancario'}: ${exp.description}`,
         debit: 0,

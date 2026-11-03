@@ -12,6 +12,8 @@ import {
   Mail,
   User,
   Instagram,
+  Receipt,
+  FileCheck,
 } from 'lucide-react';
 import { Proforma } from '../../types';
 import { useStudio } from '../../context/StudioContext';
@@ -20,12 +22,14 @@ interface ProformaModalProps {
   proforma: Proforma | null;
   onClose: () => void;
   onConvertToAppointment?: (proforma: Proforma) => void;
+  onConvertToInvoice?: (proforma: Proforma) => void;
 }
 
 export const ProformaModal: React.FC<ProformaModalProps> = ({
   proforma,
   onClose,
   onConvertToAppointment,
+  onConvertToInvoice,
 }) => {
   const { settings, formatMoney } = useStudio();
 
@@ -120,6 +124,24 @@ export const ProformaModal: React.FC<ProformaModalProps> = ({
               <span>Imprimir / PDF</span>
             </button>
 
+            {proforma.invoiceNumber ? (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Factura #{proforma.invoiceNumber}</span>
+              </span>
+            ) : (
+              onConvertToInvoice && (
+                <button
+                  onClick={() => onConvertToInvoice(proforma)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-full bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] cursor-pointer"
+                  title="Facturar directamente esta proforma en POS"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>Facturar Proforma</span>
+                </button>
+              )
+            )}
+
             {onConvertToAppointment && proforma.status !== 'converted' && (
               <button
                 onClick={() => onConvertToAppointment(proforma)}
@@ -154,7 +176,7 @@ export const ProformaModal: React.FC<ProformaModalProps> = ({
               </div>
               <p className="text-neutral-600 mt-1">{settings.address}</p>
               <p className="text-neutral-500 text-[11px]">
-                NIF / Tax ID: <span className="font-semibold text-neutral-700">{settings.taxId}</span> · Tel: {settings.phone}
+                RUC: <span className="font-semibold text-neutral-700">{settings.ruc || settings.taxId}</span> · Tel: {settings.phone}
               </p>
               <p className="text-neutral-500 text-[11px]">
                 Email: {settings.email} {settings.website && `· Web: ${settings.website}`}

@@ -78,6 +78,12 @@ interface StudioContextType {
     depositPaid?: boolean,
     depositPaymentMethod?: PaymentMethod
   ) => Appointment;
+  convertProformaToSale: (
+    proformaId: string,
+    paymentMethod?: PaymentMethod,
+    tipAmount?: number,
+    finalTotal?: number
+  ) => SaleRecord;
   getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
   // Actions - Sales
@@ -145,7 +151,23 @@ interface StudioContextType {
   filteredExpenses: ExpenseRecord[];
 }
 
-const StudioContext = createContext<StudioContextType | undefined>(undefined);
+const StudioContext: React.Context<StudioContextType | undefined> =
+  (typeof globalThis !== 'undefined' && (globalThis as any).__STUDIO_CONTEXT__) ||
+  createContext<StudioContextType | undefined>(undefined);
+
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).__STUDIO_CONTEXT__ = StudioContext;
+}
+
+function safeLoadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (err) {
+    console.warn(`[StudioContext] Error al parsear "${key}" desde localStorage:`, err);
+    return fallback;
+  }
+}
 
 const STORAGE_KEYS = {
   SALES: 'inkledger_sales_v1',
@@ -165,76 +187,63 @@ const STORAGE_KEYS = {
 };
 
 export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Load initial from localStorage or fall back to defaults
-  const [sales, setSales] = useState<SaleRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SALES);
-    return saved ? JSON.parse(saved) : INITIAL_SALES;
-  });
+  // Load initial from localStorage safely or fall back to defaults
+  const [sales, setSales] = useState<SaleRecord[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.SALES, INITIAL_SALES)
+  );
 
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES);
-    return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-  });
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.EXPENSES, INITIAL_EXPENSES)
+  );
 
-  const [artists, setArtists] = useState<Artist[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.ARTISTS);
-    return saved ? JSON.parse(saved) : INITIAL_ARTISTS;
-  });
+  const [artists, setArtists] = useState<Artist[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.ARTISTS, INITIAL_ARTISTS)
+  );
 
-  const [settlements, setSettlements] = useState<ArtistSettlement[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.SETTLEMENTS);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [settlements, setSettlements] = useState<ArtistSettlement[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.SETTLEMENTS, [])
+  );
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.INVENTORY);
-    return saved ? JSON.parse(saved) : INITIAL_INVENTORY;
-  });
+  const [inventory, setInventory] = useState<InventoryItem[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.INVENTORY, INITIAL_INVENTORY)
+  );
 
-  const [kardexMovements, setKardexMovements] = useState<KardexMovement[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.KARDEX);
-    return saved ? JSON.parse(saved) : INITIAL_KARDEX;
-  });
+  const [kardexMovements, setKardexMovements] = useState<KardexMovement[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.KARDEX, INITIAL_KARDEX)
+  );
 
-  const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.JOURNAL);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.JOURNAL, [])
+  );
 
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.APPOINTMENTS);
-    return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
-  });
+  const [appointments, setAppointments] = useState<Appointment[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.APPOINTMENTS, INITIAL_APPOINTMENTS)
+  );
 
-  const [clients, setClients] = useState<ClientProfile[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CLIENTS);
-    return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
-  });
+  const [clients, setClients] = useState<ClientProfile[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS)
+  );
 
-  const [proformas, setProformas] = useState<Proforma[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PROFORMAS);
-    return saved ? JSON.parse(saved) : INITIAL_PROFORMAS;
-  });
+  const [proformas, setProformas] = useState<Proforma[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.PROFORMAS, INITIAL_PROFORMAS)
+  );
 
-  const [currentShift, setCurrentShift] = useState<CashShift>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_SHIFT);
-    return saved ? JSON.parse(saved) : INITIAL_CASH_SHIFT;
-  });
+  const [currentShift, setCurrentShift] = useState<CashShift>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.CURRENT_SHIFT, INITIAL_CASH_SHIFT)
+  );
 
-  const [pastShifts, setPastShifts] = useState<CashShift[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.PAST_SHIFTS);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [pastShifts, setPastShifts] = useState<CashShift[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.PAST_SHIFTS, [])
+  );
 
   const [settings, setSettings] = useState<StudioSettings>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed.currency === '€' || parsed.currencyCode === 'EUR') {
-          parsed.currency = '$';
-          parsed.currencyCode = 'USD';
-        }
+        // En Ecuador la moneda oficial es el Dólar estadounidense ($ USD)
+        parsed.currency = '$';
+        parsed.currencyCode = 'USD';
         if (
           !parsed.studioName ||
           parsed.studioName === 'Black Lotus Tattoo & Piercing Atelier' ||
@@ -247,7 +256,20 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           parsed.receiptFooterMessage = INITIAL_SETTINGS.receiptFooterMessage;
           parsed.healthSanitaryRegistration = INITIAL_SETTINGS.healthSanitaryRegistration;
         }
-        return parsed;
+        return {
+          ...INITIAL_SETTINGS,
+          ...parsed,
+          ruc: parsed.ruc || parsed.taxId || INITIAL_SETTINGS.ruc,
+          razonSocial: parsed.razonSocial || INITIAL_SETTINGS.razonSocial,
+          nombreComercial: parsed.nombreComercial || parsed.studioName || INITIAL_SETTINGS.nombreComercial,
+          dirMatriz: parsed.dirMatriz || parsed.address || INITIAL_SETTINGS.dirMatriz,
+          dirEstablecimiento: parsed.dirEstablecimiento || parsed.address || INITIAL_SETTINGS.dirEstablecimiento,
+          telefono: parsed.telefono || parsed.phone || INITIAL_SETTINGS.telefono,
+          codigoEstablecimiento: parsed.codigoEstablecimiento || INITIAL_SETTINGS.codigoEstablecimiento,
+          puntoEmision: parsed.puntoEmision || INITIAL_SETTINGS.puntoEmision,
+          regimenTributario: parsed.regimenTributario || INITIAL_SETTINGS.regimenTributario,
+          ambiente: parsed.ambiente || INITIAL_SETTINGS.ambiente,
+        };
       } catch {
         return INITIAL_SETTINGS;
       }
@@ -775,6 +797,72 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newApt;
   };
 
+  const convertProformaToSale = (
+    proformaId: string,
+    paymentMethod: PaymentMethod = 'card',
+    tipAmount: number = 0,
+    finalTotal?: number
+  ): SaleRecord => {
+    const prof = proformas.find(p => p.id === proformaId);
+    if (!prof) throw new Error('Cotización / Proforma no encontrada');
+
+    const artist = artists.find(a => a.id === prof.artistId);
+    const commissionPercent = artist?.defaultCommissionRate || settings.defaultArtistCommission;
+
+    const baseAmount = finalTotal !== undefined ? finalTotal : prof.total;
+    const taxRate = prof.taxRate ?? settings.defaultTaxRate;
+    const taxableBase = prof.subtotal > 0 ? Math.max(0, prof.subtotal - (prof.discount || 0)) : baseAmount;
+    const taxAmount = prof.taxAmount > 0 ? prof.taxAmount : Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+    const total = finalTotal !== undefined ? finalTotal : (prof.total || (taxableBase + taxAmount));
+    const deposit = prof.suggestedDeposit || 0;
+    const amountPaidNow = total;
+
+    const artistShare = ((total - taxAmount) * commissionPercent) / 100;
+    const studioShare = total - artistShare;
+
+    const sale = addSale({
+      date: new Date().toISOString(),
+      clientName: prof.clientName,
+      clientPhone: prof.clientPhone,
+      clientEmail: prof.clientEmail,
+      clientDni: prof.clientDni,
+      serviceCategory: prof.serviceCategory,
+      serviceName: prof.serviceName,
+      artistId: prof.artistId,
+      artistName: prof.artistName,
+      hours: prof.estimatedHours || 2,
+      pieces: 1,
+      subtotal: prof.subtotal || taxableBase,
+      discount: prof.discount || 0,
+      taxRate,
+      taxAmount,
+      total,
+      depositAmount: deposit,
+      amountPaidNow,
+      remainingBalance: 0,
+      paymentMethod,
+      cashPaid: paymentMethod === 'cash' ? amountPaidNow : 0,
+      cardPaid: paymentMethod === 'card' ? amountPaidNow : 0,
+      transferPaid: paymentMethod === 'transfer' ? amountPaidNow : 0,
+      tipAmount,
+      artistCommissionPercent: commissionPercent,
+      artistShare,
+      studioShare,
+      status: 'completed',
+      consentFormSigned: true,
+      notes: `Factura oficial generada desde Proforma ${prof.proformaNumber}. ${prof.notes || ''}`.trim(),
+    });
+
+    // Mark proforma as converted with reference to sale
+    updateProforma(proformaId, {
+      status: 'converted',
+      saleId: sale.id,
+      invoiceNumber: sale.invoiceNumber,
+    });
+
+    return sale;
+  };
+
   // Sale Operations
   const addSale = (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): SaleRecord => {
     const nextSeq = sales.length + 183;
@@ -1231,6 +1319,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updateProforma,
         deleteProforma,
         convertProformaToAppointment,
+        convertProformaToSale,
         getProformaByAppointmentId,
         addSale,
         updateSale,
@@ -1269,10 +1358,76 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   );
 };
 
-export const useStudio = () => {
+const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
+  sales: INITIAL_SALES,
+  expenses: INITIAL_EXPENSES,
+  artists: INITIAL_ARTISTS,
+  settlements: [],
+  inventory: INITIAL_INVENTORY,
+  kardexMovements: INITIAL_KARDEX,
+  manualJournalEntries: [],
+  appointments: INITIAL_APPOINTMENTS,
+  clients: INITIAL_CLIENTS,
+  proformas: INITIAL_PROFORMAS,
+  currentShift: INITIAL_CASH_SHIFT,
+  pastShifts: [],
+  settings: INITIAL_SETTINGS,
+  theme: 'dark',
+  activeTab: 'dashboard',
+  dateFilter: 'all',
+  setActiveTab: () => {},
+  setDateFilter: () => {},
+  toggleTheme: () => {},
+  addAppointment: (app) => ({ ...app, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updateAppointment: () => {},
+  deleteAppointment: () => {},
+  updateAppointmentStatus: () => {},
+  completeAndBillAppointment: () => ({} as any),
+  addProforma: (prof) => ({ ...prof, id: 'temp-' + Date.now(), createdAt: new Date().toISOString(), proformaNumber: 'PROF-0001' }),
+  updateProforma: () => {},
+  deleteProforma: () => {},
+  convertProformaToAppointment: () => ({} as any),
+  convertProformaToSale: () => ({} as any),
+  getProformaByAppointmentId: () => undefined,
+  addSale: (sale) => ({ ...sale, id: 'temp-' + Date.now(), invoiceNumber: 'INV-0001' }),
+  updateSale: () => {},
+  deleteSale: () => {},
+  addExpense: (exp) => ({ ...exp, id: 'temp-' + Date.now() }),
+  deleteExpense: () => {},
+  addArtist: () => {},
+  updateArtist: () => {},
+  toggleArtistStatus: () => {},
+  settleArtistCommissions: () => {},
+  addInventoryItem: () => {},
+  updateInventoryItem: () => {},
+  adjustStock: () => {},
+  deleteInventoryItem: () => {},
+  addKardexMovement: () => {},
+  addClient: (cli) => ({ ...cli, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updateClient: () => {},
+  deleteClient: () => {},
+  upsertClient: (cli) => ({ ...cli, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() } as any),
+  addManualJournalEntry: () => {},
+  deleteManualJournalEntry: () => {},
+  openCashShift: () => {},
+  closeCashShift: () => {},
+  updateSettings: () => {},
+  formatMoney: (val) => `$${Number(val || 0).toFixed(2)}`,
+  resetToDemo: () => {},
+  clearAllData: () => {},
+  exportBackup: () => {},
+  importBackup: () => false,
+  filteredSales: INITIAL_SALES,
+  filteredExpenses: INITIAL_EXPENSES,
+};
+
+export const useStudio = (): StudioContextType => {
   const context = useContext(StudioContext);
   if (!context) {
-    throw new Error('useStudio must be used within a StudioProvider');
+    console.warn(
+      '[useStudio] Hook ejecutado sin Provider activo o durante recarga en caliente (HMR). Usando contexto seguro por defecto.'
+    );
+    return FALLBACK_STUDIO_CONTEXT;
   }
   return context;
 };

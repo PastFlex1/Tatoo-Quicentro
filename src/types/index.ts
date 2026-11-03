@@ -71,6 +71,10 @@ export interface ExpenseRecord {
   paymentMethod: 'cash' | 'bank_transfer' | 'credit_card';
   invoiceReference?: string;
   notes?: string;
+  supplierRuc?: string;
+  sriAccessKey?: string;
+  subtotal?: number;
+  taxRate?: number;
 }
 
 export interface Artist {
@@ -187,16 +191,101 @@ export interface CashShift {
   notes?: string;
 }
 
-export interface StudioSettings {
+export type SriRegimenTributario =
+  | 'RIMPE_EMPRENDEDOR'
+  | 'RIMPE_NEGOCIO_POPULAR'
+  | 'GENERAL'
+  | 'REGIMEN GENERAL';
+
+export type SriAmbiente = '1' | '2' | 'PRUEBAS' | 'PRODUCCION';
+
+export type SriDocumentType = '01' | '02' | '03' | '04' | '05' | '06' | '07';
+
+export type IdentificationType = '04' | '05' | '06' | '07' | '08';
+// 04 = RUC, 05 = Cédula, 06 = Pasaporte, 07 = Consumidor Final, 08 = Identificación Exterior
+
+export type SriTaxRegime =
+  | 'GENERAL'
+  | 'RIMPE_EMPRENDEDOR'
+  | 'RIMPE_NEGOCIO_POPULAR'
+  | 'ARTESANO_CALIFICADO';
+
+export type TaxRegime = SriTaxRegime;
+
+export type SriEnvironment = '1' | '2'; // 1 = Pruebas, 2 = Producción
+export type SriEmissionType = '1'; // 1 = Normal
+
+export type VatRateType = 15 | 5 | 0 | 'NO_OBJETO' | 'EXENTO';
+
+export type SriPaymentMethod = '01' | '16' | '19' | '20' | '21';
+
+export type AccountCategory = 'ACTIVO' | 'PASIVO' | 'PATRIMONIO' | 'INGRESOS' | 'COSTOS' | 'GASTOS';
+export type AccountType = AccountCategory;
+export type AccountNature = 'DEUDORA' | 'ACREEDORA';
+
+export interface Account {
+  id: string;
+  codigo: string;
+  nombre: string;
+  nivel: number;
+  tipo: AccountCategory;
+  naturaleza: AccountNature;
+  padreId?: string;
+  permiteMovimiento?: boolean;
+  esNIIF?: boolean;
+
+  // Backwards compatibility aliases
+  code?: string;
+  name?: string;
+  level?: number;
+  category?: AccountCategory;
+  nature?: AccountNature;
+  parentCode?: string;
+  isAssignable?: boolean;
+  balance?: number;
+}
+
+export interface CompanyConfig {
+  ruc?: string;
+  razonSocial?: string;
+  nombreComercial?: string;
+  dirMatriz?: string;
+  dirEstablecimiento?: string;
+  codigoEstablecimiento?: string; // ej: "001"
+  puntoEmision?: string; // ej: "001"
+  obligadoContabilidad?: 'SI' | 'NO';
+  regimenTributario?: SriTaxRegime | SriRegimenTributario | string;
+  contribuyenteEspecial?: string; // Número de resolución si aplica
+  agenteRetencion?: string; // Número de resolución si aplica (o 'SI' | 'NO')
+  ambiente?: SriEnvironment | SriAmbiente;
+  tipoEmision?: SriEmissionType | 'NORMAL' | '1';
+  email?: string;
+  telefono?: string;
+  logoUrl?: string;
+  tarifaIvaPredeterminada?: VatRateType; // Permite elegir entre 15, 5, 0, etc. como predeterminado
+  // Firma Electrónica (.p12 / .pfx) y Base64
+  firmaElectronicaBase64?: string;
+  firmaElectronicaNombre?: string;
+  firmaElectronicaNombreArchivo?: string;
+  firmaElectronicaTamanio?: number; // en bytes
+  firmaElectronicaClave?: string; // Contraseña del certificado digital
+  firmaElectronicaFechaCarga?: string;
+  firmaElectronicaEmisor?: string; // Entidad Certificadora (BCE, Security Data, ANFAC, etc.)
+  firmaElectronicaFechaExpiracion?: string;
+  firmaElectronicaFechaCaducidad?: string;
+  firmaElectronicaValida?: boolean;
+}
+
+export interface StudioSettings extends CompanyConfig {
   studioName: string;
-  taxId: string; // CIF / NIF / RFC / RUT
+  taxId: string; // RUC del Contribuyente en Ecuador
   address: string;
   phone: string;
   email: string;
   website: string;
-  currency: string; // '$', '€', 'MXN', 'COP'
-  currencyCode: string;
-  defaultTaxRate: number; // e.g. 16, 21, or 0
+  currency: string; // '$' Dólar estadounidense (USD)
+  currencyCode: string; // 'USD'
+  defaultTaxRate: number; // e.g. 15 (%)
   defaultArtistCommission: number; // e.g. 60%
   receiptFooterMessage: string;
   healthSanitaryRegistration: string; // N° registro sanitario de la clínica/estudio
@@ -257,9 +346,16 @@ export interface ClientProfile {
   emergencyContact?: string;
   notes?: string;
   createdAt: string;
+  // Metadatos SRI & Facturación Electrónica Ecuador
+  tradeName?: string;
+  taxpayerType?: string;
+  taxpayerRegime?: string; // GENERAL, RIMPE - Emprendedor, RIMPE - Negocio Popular
+  sriStatus?: string; // ACTIVO, SUSPENDIDO
+  sriVerified?: boolean;
+  address?: string;
 }
 
-export type ProformaStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'expired';
+export type ProformaStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'invoiced' | 'expired';
 
 export interface ProformaItem {
   id: string;
@@ -301,6 +397,616 @@ export interface Proforma {
   appointmentId?: string; // Si se originó al agendar cita o generó una cita
   appointmentDate?: string;
   appointmentTime?: string;
+  saleId?: string; // ID de la venta/factura si fue convertida en factura
+  invoiceNumber?: string; // N° de factura / comprobante generado
   status: ProformaStatus;
   createdAt: string;
 }
+
+// ============================================================================
+// COMPROBANTES ELECTRÓNICOS SRI, CLIENTES, PROVEEDORES & RETENCIONES
+// ============================================================================
+
+export interface CustomerOrSupplier {
+  id: string;
+  tipoIdentificacion: IdentificationType;
+  identificacion: string;
+  razonSocial: string;
+  nombreComercial?: string;
+  direccion: string;
+  telefono: string;
+  email: string;
+  tipoContribuyente: SriTaxRegime | 'CONTRIBUYENTE_ESPECIAL' | 'SOCIEDAD' | 'PERSONA_NATURAL';
+  esCliente: boolean;
+  esProveedor: boolean;
+}
+
+export interface InvoiceItem {
+  id: string;
+  codigoPrincipal: string;
+  codigoAuxiliar?: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  descuento: number;
+  tarifaIva: VatRateType;
+  precioTotalSinImpuesto: number;
+  valorIva: number;
+  valorTotal: number;
+  cuentaVentasId?: string; // Cuenta contable vinculada
+}
+
+export interface PaymentDetail {
+  formaPago: SriPaymentMethod;
+  total: number;
+  plazo?: number;
+  unidadTiempo?: 'DIAS' | 'MESES' | 'ANIOS';
+  numeroTransferencia?: string;
+}
+
+export interface ElectronicInvoice {
+  id: string;
+  tipoDocumento: '01'; // Factura
+  establecimiento: string; // '001'
+  puntoEmision: string; // '001'
+  secuencial: string; // '000000001'
+  numeroComprobante: string; // '001-001-000000001'
+  claveAcceso: string;
+  fechaEmision: string; // YYYY-MM-DD
+  cliente: CustomerOrSupplier;
+  items: InvoiceItem[];
+  subtotal15: number;
+  subtotal5: number;
+  subtotal0: number;
+  subtotalNoObjeto: number;
+  subtotalExento: number;
+  totalDescuento: number;
+  subtotalSinImpuestos: number;
+  totalIva: number;
+  propina: number;
+  importeTotal: number;
+  pagos: PaymentDetail[];
+  estado: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  numeroAutorizacion?: string;
+  fechaAutorizacion?: string;
+  asientoId?: string;
+  observaciones?: string;
+  xml?: string;
+}
+
+export interface SaleNoteItem {
+  id: string;
+  codigoPrincipal?: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  valorTotal: number;
+  productoId?: string;
+}
+
+export interface SaleNote {
+  id: string;
+  tipoDocumento: '02'; // 02 = Nota de Venta SRI
+  establecimiento: string; // '001'
+  puntoEmision: string; // '001'
+  secuencial: string; // '000000001'
+  numeroComprobante: string; // '001-001-000000001'
+  autorizacionSri?: string;
+  claveAcceso?: string;
+  fechaEmision: string; // YYYY-MM-DD
+  cliente: CustomerOrSupplier;
+  items: SaleNoteItem[];
+  total: number;
+  formaPago: SriPaymentMethod;
+  estado: 'EMITIDA' | 'PAGADA' | 'ANULADA';
+  regimenLeyenda: string; // 'CONTRIBUYENTE RÉGIMEN RIMPE - NEGOCIO POPULAR'
+  asientoId?: string;
+  observaciones?: string;
+  esElectronica?: boolean;
+  numeroTransferencia?: string;
+}
+
+export interface CreditNoteItem {
+  id: string;
+  codigoPrincipal: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  descuento: number;
+  tarifaIva: VatRateType;
+  precioTotalSinImpuesto: number;
+  valorIva: number;
+  valorTotal: number;
+  productoId?: string;
+  cuentaContableId?: string;
+}
+
+export type CreditNoteReasonType =
+  | 'DEVOLUCION_MERCADERIA'
+  | 'DESCUENTO_BONIFICACION'
+  | 'ANULACION_OPERACION'
+  | 'AJUSTE_PRECIO'
+  | 'OTRO';
+
+export interface CreditNote {
+  id: string;
+  tipoDocumento: '04'; // 04 = Nota de Crédito SRI
+  establecimiento: string; // '001'
+  puntoEmision: string; // '001'
+  secuencial: string; // '000000001'
+  numeroComprobante: string; // '001-001-000000001'
+  claveAcceso: string;
+  fechaEmision: string; // YYYY-MM-DD
+  cliente: CustomerOrSupplier;
+  documentoModificado: {
+    tipo: '01'; // Factura
+    numero: string; // '001-001-000000001'
+    fechaEmision: string; // YYYY-MM-DD
+    facturaId?: string;
+  };
+  motivo: string; // Motivo SRI (e.g. "Devolución parcial de mercaderías")
+  tipoMotivo: CreditNoteReasonType;
+  items: CreditNoteItem[];
+  subtotal15: number;
+  subtotal5: number;
+  subtotal0: number;
+  subtotalNoObjeto: number;
+  subtotalExento: number;
+  totalDescuento: number;
+  subtotalSinImpuestos: number;
+  totalIva: number;
+  valorModificacion: number; // Importe Total de la Nota de Crédito
+  estado: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  numeroAutorizacion?: string;
+  fechaAutorizacion?: string;
+  asientoId?: string;
+  movimientoStockId?: string;
+  reingresarInventario?: boolean;
+  bodegaId?: string;
+  observaciones?: string;
+  xml?: string;
+}
+
+export interface RetentionFuenteItem {
+  codigoSri: string; // ej. "312", "303", "304", "343", "320"
+  descripcion: string;
+  baseImponible: number;
+  porcentaje: number;
+  valorRetenido: number;
+}
+export type RetentionFuenteDetail = RetentionFuenteItem;
+
+export interface RetentionIvaItem {
+  codigoSri: string; // "1" (30%), "2" (70%), "3" (100%), "7" (20%), "8" (50%), "9" (10%)
+  porcentaje: number;
+  baseImponibleIva: number;
+  valorRetenido: number;
+}
+export type RetentionIvaDetail = RetentionIvaItem;
+
+export interface RetentionDocument {
+  id: string;
+  tipoDocumento: '07'; // Comprobante de Retención
+  establecimiento: string;
+  puntoEmision: string;
+  secuencial: string;
+  numeroComprobante: string;
+  claveAcceso: string;
+  fechaEmision: string;
+  proveedor: CustomerOrSupplier;
+  ejercicioFiscal: string; // MM/YYYY ej. "09/2026"
+  documentoSustento: {
+    tipo: '01' | '03' | '05'; // 01 Factura, 03 Liquidación, 05 Nota Débito
+    numero: string; // 001-001-000123456
+    fechaEmision: string;
+    totalFactura: number;
+  };
+  retencionesFuente: RetentionFuenteItem[];
+  retencionesIva: RetentionIvaItem[];
+  totalRetenidoFuente: number;
+  totalRetenidoIva: number;
+  totalRetenido: number;
+  estado: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  asientoId?: string;
+  xml?: string;
+}
+
+export interface PurchaseInvoice {
+  id: string;
+  tipoDocumento: '01' | '02' | '03' | '04' | '05';
+  numeroComprobante: string; // '001-002-000045612'
+  autorizacionSri: string;
+  claveAcceso?: string;
+  fechaEmision: string;
+  fechaRegistro: string;
+  proveedor: CustomerOrSupplier;
+  sustentoTributario: string; // '01' = Crédito Tributario para IVA y Costo/Gasto
+  descripcion: string;
+  subtotal15: number;
+  subtotal5: number;
+  subtotal0: number;
+  subtotalSinImpuestos: number;
+  totalIva: number;
+  total: number;
+  retencionId?: string;
+  retencionAplicada?: {
+    totalFuente: number;
+    totalIva: number;
+    totalRetenido: number;
+  };
+  cuentaGastoId: string;
+  asientoId?: string;
+  pagado: boolean;
+  estado?: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+}
+
+export interface JournalEntryLine {
+  id: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  debe: number;
+  haber: number;
+  detalle?: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  numero: number;
+  fecha: string; // YYYY-MM-DD
+  concepto: string;
+  tipo: 'VENTA' | 'COMPRA' | 'RETENCION' | 'NOTA_CREDITO' | 'PAGO' | 'COBRO' | 'NOMINA' | 'AJUSTE' | 'APERTURA' | 'CIERRE' | 'MANUAL';
+  documentoReferencia?: string; // ej: "FAC-001-001-000000001"
+  lineas: JournalEntryLine[];
+  totalDebe: number;
+  totalHaber: number;
+  esCuadrado: boolean;
+  creadoAutomatico: boolean;
+  createdAt: string;
+}
+
+export interface SriRetentionCatalogItem {
+  codigo: string;
+  descripcion: string;
+  porcentaje: number;
+  tipo: 'RENTA' | 'IVA';
+  aplicaA: string;
+}
+
+// ============================================================================
+// INVENTARIOS & BODEGAS
+// ============================================================================
+
+export interface Warehouse {
+  id: string;
+  codigo: string;
+  nombre: string;
+  ubicacion: string;
+  ciudad: string;
+  responsable: string;
+  telefono?: string;
+  esPrincipal: boolean;
+}
+
+export interface ProductStockByWarehouse {
+  warehouseId: string;
+  warehouseName: string;
+  cantidad: number;
+  ubicacionFisica?: string;
+}
+
+export type UnitOfMeasure =
+  | 'UNIDAD'
+  | 'CAJA'
+  | 'DOCENA'
+  | 'KG'
+  | 'LITRO'
+  | 'METRO'
+  | 'PAQUETE'
+  | 'SERVICIO'
+  | 'GRAMO'
+  | 'LIBRA'
+  | 'MILILITRO'
+  | 'CENTIMETRO'
+  | 'HORA'
+  | 'DIA'
+  | 'MES'
+  | 'QUINTAL'
+  | 'TONELADA'
+  | 'BULTO'
+  | 'PIEZA'
+  | 'GALON'
+  | 'ONZA'
+  | 'FRASCO'
+  | 'BOTELLA'
+  | 'LATA'
+  | 'ROLLO'
+  | 'SACO';
+
+export interface ProductItem {
+  id: string;
+  codigoPrincipal: string; // SKU / Código SRI
+  codigoAuxiliar?: string; // Código de barras
+  nombre: string;
+  descripcion?: string;
+  categoria: string;
+  unidadMedida: UnitOfMeasure;
+  tarifaIva: VatRateType;
+  costoPromedio: number; // Costo Promedio Ponderado NIIF
+  ultimoCosto: number;
+  precioVenta: number; // PVP 1 sin IVA
+  precioVenta2?: number; // PVP 2 sin IVA
+  precioVenta3?: number; // PVP 3 sin IVA
+  stockMinimo: number;
+  stockMaximo?: number;
+  stockActual: number;
+  stockPorBodega: ProductStockByWarehouse[];
+  cuentaInventarioId?: string; // '1.1.04.01'
+  cuentaCostoVentaId?: string; // '5.1.01'
+  cuentaVentaId?: string; // '4.1.01'
+  permiteInventario: boolean;
+  estado: 'ACTIVO' | 'INACTIVO';
+  proveedor?: string;
+  diaServicio?: string;
+  responsable?: string;
+}
+
+export type StockMovementType =
+  | 'ENTRADA_COMPRA'
+  | 'ENTRADA_AJUSTE'
+  | 'ENTRADA_TRANSFERENCIA'
+  | 'ENTRADA_INICIAL'
+  | 'ENTRADA_DEVOLUCION'
+  | 'SALIDA_VENTA'
+  | 'SALIDA_AJUSTE'
+  | 'SALIDA_TRANSFERENCIA'
+  | 'SALIDA_MERMA'
+  | 'SALIDA_CONSUMO_INTERNO';
+
+export interface StockMovement {
+  id: string;
+  fecha: string;
+  tipo: StockMovementType;
+  tipoNombre: string;
+  productoId: string;
+  productoNombre: string;
+  productoCodigo: string;
+  bodegaOrigenId?: string;
+  bodegaOrigenNombre?: string;
+  bodegaDestinoId?: string;
+  bodegaDestinoNombre?: string;
+  cantidad: number;
+  costoUnitario: number;
+  costoTotal: number;
+  precioVentaUnitario?: number;
+  stockAnterior: number;
+  stockNuevo: number;
+  costoPromedioNuevo: number;
+  documentoReferencia?: string;
+  motivo: string;
+  responsable: string;
+  asientoId?: string;
+}
+
+export interface KardexRow {
+  id: string;
+  fecha: string;
+  tipoComprobante: string;
+  numeroComprobante: string;
+  detalle: string;
+  tipoOperacion: 'ENTRADA' | 'SALIDA' | 'SALDO_INICIAL';
+  entradaCantidad: number;
+  entradaCostoUnitario: number;
+  entradaCostoTotal: number;
+  salidaCantidad: number;
+  salidaCostoUnitario: number;
+  salidaCostoTotal: number;
+  saldoCantidad: number;
+  saldoCostoUnitario: number;
+  saldoCostoTotal: number;
+}
+
+// ============================================================================
+// NÓMINA, TALENTO HUMANO & ROL DE PAGOS (IESS / ECUADOR)
+// ============================================================================
+
+export interface Employee {
+  id: string;
+  identificacion: string;
+  nombres: string;
+  apellidos: string;
+  cargo: string;
+  empresa: string;
+  departamento: string;
+  tipoContrato: string;
+  sueldoBase: number;
+  fechaIngreso: string;
+  estado: 'ACTIVO' | 'RETIRADO' | 'NO_AFILIADO' | 'NUEVO_TRABAJADOR';
+}
+
+export interface PayrollSettings {
+  iessPersonal: number;
+  iessPatronal: number;
+  salarioBasico: number;
+  recargoSuplementario: number;
+  recargoExtraordinario: number;
+  recargoNocturno: number;
+}
+
+export interface PayrollSlip {
+  id: string;
+  employeeId: string;
+  fechaEmision: string; // YYYY-MM
+  diasTrabajados: number;
+  horasTrabajadas: number;
+  sueldoBase: number;
+  
+  // Cálculo de fechas trabajadas y antigüedad
+  fechaInicioCalculo?: string; // Primera fecha (ej. fecha de ingreso o inicio de período)
+  fechaFinCalculo?: string;    // Fecha actual / corte de cálculo
+  diasTotalesAntiguedad?: number; // Días acumulados en la empresa hasta la fecha
+  antiguedadTexto?: string;    // Ej. "8 meses y 12 días"
+  
+  // Ingresos Reportables
+  sueldoGanado: number; // Proporcional
+  bonosReportables: number;
+  comisiones: number;
+  horasSuplementarias: number; // Cantidad de horas
+  valorHorasSuplementarias: number;
+  horasExtraordinarias: number; // Cantidad de horas
+  valorHorasExtraordinarias: number;
+  horasRecargo25: number;
+  valorHorasRecargo25: number;
+  totalIngresosReportables: number;
+  
+  // Ingresos No Reportables
+  transporte: number;
+  alimentacion: number;
+  bonosNoReportables: number;
+  otrosBeneficios: number;
+  totalIngresosNoReportables: number;
+  
+  totalIngresos: number;
+  
+  // Descuentos
+  aporteIess: number;
+  anticipos: number;
+  prestamosQuian: number;
+  multas: number;
+  descuentosAutorizados: number;
+  impuestoRenta: number;
+  ausencias: number;
+  horasNoTrabajadas: number;
+  totalEgresos: number;
+  
+  // Provisiones (Informativo / Contable)
+  aportePatronal: number;
+  decimoTercero: number;
+  decimoCuarto: number;
+  vacaciones: number;
+  fondosReserva: number;
+  
+  netoRecibir: number;
+  asientoId?: string;
+}
+
+export interface SystemUser {
+  id: string;
+  cedula: string;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  rol: 'ADMINISTRADOR' | 'CONTADOR' | 'VENDEDOR' | 'CAJERO';
+  estado: 'ACTIVO' | 'INACTIVO';
+  pin?: string;
+  createdAt: string;
+}
+
+// ============================================================================
+// COMPROBANTES RECIBIDOS DEL SRI (XML COMPRAS & RETENCIONES)
+// ============================================================================
+
+export type EstadoComprobanteRecibido =
+  | 'PENDIENTE_REVISION'
+  | 'REVISADO'
+  | 'CONTABILIZADO'
+  | 'DUPLICADO'
+  | 'ANULADO'
+  | 'ERROR';
+
+export interface ItemComprobanteRecibido {
+  codigoPrincipal: string;
+  codigoAuxiliar: string;
+  descripcion: string;
+  cantidad: number;
+  precioUnitario: number;
+  descuento: number;
+  baseImponible: number;
+  porcentajeIva: number;
+  valorIva: number;
+  totalItem: number;
+}
+
+export interface ComprobanteRecibido {
+  id: string;
+  claveAcceso: string;
+  tipoComprobante: string;
+  rucEmisor: string;
+  razonSocialProveedor: string;
+  fechaEmision: string;
+  establecimiento: string;
+  puntoEmision: string;
+  secuencial: string;
+  numeroCompleto: string;
+  subtotalTarifa0: number;
+  subtotalGravado: number;
+  descuento: number;
+  iva: number;
+  ice: number;
+  propina: number;
+  total: number;
+  formaPago: string;
+  xmlOriginal: string;
+  estado: EstadoComprobanteRecibido;
+  items: ItemComprobanteRecibido[];
+  fechaImportacion: string;
+}
+
+export interface BitacoraSincronizacion {
+  id: string;
+  fechaHora: string;
+  empresaRuc: string;
+  periodoConsultado: string;
+  cantidadEncontrada: number;
+  cantidadNueva: number;
+  cantidadDuplicada: number;
+  cantidadError: number;
+}
+
+export interface ComprobantesRecibidosProvider {
+  sincronizar(ruc: string, password: string, year: string, month: string): Promise<ComprobanteRecibido[]>;
+}
+
+// ============================================================================
+// CONFIGURACIÓN INICIAL DE EJEMPLO Y ESTUDIO
+// ============================================================================
+
+export const INITIAL_COMPANY: CompanyConfig = {
+  ruc: '1792345678001',
+  razonSocial: 'CORPORACION CONTABLE & TRIBUTARIA DEL ECUADOR S.A.S.',
+  nombreComercial: 'CORPCONTABLE ECUADOR',
+  dirMatriz: 'Av. Amazonas N34-120 y Av. República, Edificio Las Cámaras, Piso 5, Quito - Ecuador',
+  dirEstablecimiento: 'Av. Amazonas N34-120 y Av. República, Quito - Ecuador',
+  codigoEstablecimiento: '001',
+  puntoEmision: '001',
+  obligadoContabilidad: 'SI',
+  regimenTributario: 'GENERAL',
+  agenteRetencion: 'NAC-DNCRASC20-00000001',
+  contribuyenteEspecial: '',
+  ambiente: '1', // 1 = Pruebas, 2 = Producción
+  tipoEmision: '1', // 1 = Normal
+  email: 'tributacion@corpcontable.ec',
+  telefono: '+593 2 298 7654',
+  logoUrl: '',
+  tarifaIvaPredeterminada: 15,
+};
+
+export const DEVOLUTION_INK_COMPANY: CompanyConfig = {
+  ruc: '1792847102001',
+  razonSocial: 'DEVOLUTION INK TATTOO STUDIO S.A.S.',
+  nombreComercial: 'Devolution Ink Tattoo Studio',
+  dirMatriz: 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito, Ecuador',
+  dirEstablecimiento: 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Local 214, Quito, Ecuador',
+  codigoEstablecimiento: '001',
+  puntoEmision: '001',
+  obligadoContabilidad: 'NO',
+  regimenTributario: 'RIMPE_EMPRENDEDOR',
+  agenteRetencion: 'NO',
+  contribuyenteEspecial: '',
+  ambiente: '1',
+  tipoEmision: '1',
+  email: 'contacto@devolutionink.com',
+  telefono: '+593 99 123 4567',
+  logoUrl: '',
+  tarifaIvaPredeterminada: 15,
+};

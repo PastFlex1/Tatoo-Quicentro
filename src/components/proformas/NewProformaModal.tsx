@@ -8,9 +8,13 @@ import {
   Calendar,
   Sparkles,
   Percent,
+  RefreshCw,
+  Building2,
+  CheckCircle2,
 } from 'lucide-react';
 import { ServiceCategory, Proforma, ProformaItem } from '../../types';
 import { useStudio } from '../../context/StudioContext';
+import { consultarIdentificacion } from '../../services/sriService';
 
 interface NewProformaModalProps {
   isOpen: boolean;
@@ -29,7 +33,39 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientDni, setClientDni] = useState('');
   const [clientInstagram, setClientInstagram] = useState('');
+  const [isSearchingSri, setIsSearchingSri] = useState(false);
+  const [sriNotice, setSriNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleLookupClientSri = async () => {
+    const clean = clientDni.trim().replace(/\D/g, '');
+    if (!clean) return;
+    setIsSearchingSri(true);
+    setSriNotice(null);
+    try {
+      const res = await consultarIdentificacion(clean);
+      if (res.found && res.nombre) {
+        setClientName(res.nombre);
+        const existing = clients.find(c => c.dni && c.dni.replace(/\D/g, '') === clean);
+        if (existing) {
+          if (existing.phone && !clientPhone) setClientPhone(existing.phone);
+          if (existing.email && !clientEmail) setClientEmail(existing.email);
+          if (existing.instagram && !clientInstagram) setClientInstagram(existing.instagram);
+        }
+        setSriNotice({
+          text: `✓ ${res.nombre} (${res.regimen ? `Régimen ${res.regimen}` : 'SRI / Registro Civil Verificado'})`,
+          type: 'success',
+        });
+      } else {
+        setSriNotice({ text: res.error || 'No registrado en SRI ni Registro Civil.', type: 'error' });
+      }
+    } catch {
+      setSriNotice({ text: 'Error consultando al SRI.', type: 'error' });
+    } finally {
+      setIsSearchingSri(false);
+    }
+  };
   const [artistId, setArtistId] = useState(artists[0]?.id || '');
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
@@ -69,6 +105,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
       if (found.phone) setClientPhone(found.phone);
       if (found.email) setClientEmail(found.email);
       if (found.instagram) setClientInstagram(found.instagram);
+      if (found.dni) setClientDni(found.dni);
     }
   };
 
@@ -127,6 +164,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim() || undefined,
       clientEmail: clientEmail.trim() || undefined,
+      clientDni: clientDni.trim() || undefined,
       clientInstagram: clientInstagram.trim() || undefined,
       artistId,
       artistName: selectedArtist?.name || 'Artista del Estudio',
@@ -228,12 +266,63 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 
           {/* Client Information */}
           <div className="space-y-3 bg-[#18181D] p-4 rounded-2xl border border-[#24242A]">
-            <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
-              <User className="w-3.5 h-3.5 text-[#FF3366]" />
-              <span>Datos del Cliente</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
+                <User className="w-3.5 h-3.5 text-[#FF3366]" />
+                <span>Datos del Cliente</span>
+              </div>
+              <span className="text-[10px] text-neutral-400">
+                Consulta Catastro SRI / Registro Civil
+              </span>
             </div>
 
+            {/* SRI Notice */}
+            {sriNotice && (
+              <div className={`p-2 rounded-xl border text-xs flex items-center gap-2 ${
+                sriNotice.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+              }`}>
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px]">{sriNotice.text}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] text-neutral-400 mb-1">
+                  Cédula / RUC (SRI)
+                </label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={clientDni}
+                    onChange={e => {
+                      setClientDni(e.target.value);
+                      setSriNotice(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleLookupClientSri();
+                      }
+                    }}
+                    placeholder="10 díg. Cédula / 13 díg. RUC"
+                    className="flex-1 bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookupClientSri}
+                    disabled={isSearchingSri || !clientDni.trim()}
+                    className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 disabled:opacity-40"
+                    title="Consultar datos en el SRI"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                    <span>SRI</span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[11px] text-neutral-400 mb-1">
                   Nombre Completo *
@@ -262,7 +351,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                   type="tel"
                   value={clientPhone}
                   onChange={e => setClientPhone(e.target.value)}
-                  placeholder="+34 600 000 000"
+                  placeholder="+593 99 000 0000"
                   className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]"
                 />
               </div>

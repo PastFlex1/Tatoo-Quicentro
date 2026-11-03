@@ -22,9 +22,15 @@ import {
   Download,
   Eye,
   FileCheck,
+  Building2,
+  RefreshCw,
+  CheckCircle2,
+  Globe,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ClientProfile, SaleRecord } from '../../types';
+import { consultarIdentificacion } from '../../services/sriService';
+import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
 
 interface ClientsViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -67,6 +73,15 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const [formNotes, setFormNotes] = useState('');
   const [formConsent, setFormConsent] = useState(true);
   const [formTags, setFormTags] = useState('Frecuente');
+
+  // Metadatos SRI
+  const [formTradeName, setFormTradeName] = useState('');
+  const [formRegimen, setFormRegimen] = useState('');
+  const [formTaxpayerType, setFormTaxpayerType] = useState('');
+  const [formSriStatus, setFormSriStatus] = useState('');
+  const [formSriVerified, setFormSriVerified] = useState(false);
+  const [isSearchingSri, setIsSearchingSri] = useState(false);
+  const [sriMessage, setSriMessage] = useState<{ text: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
   // Unified dynamic clients list (includes registered clients + discovers any client names in sales/appointments)
   const unifiedClients = useMemo(() => {
@@ -236,6 +251,12 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setFormNotes('');
     setFormConsent(true);
     setFormTags('Nuevo');
+    setFormTradeName('');
+    setFormRegimen('');
+    setFormTaxpayerType('');
+    setFormSriStatus('');
+    setFormSriVerified(false);
+    setSriMessage(null);
     setIsModalOpen(true);
   };
 
@@ -255,7 +276,90 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setFormNotes(client.notes || '');
     setFormConsent(client.consentSigned);
     setFormTags(client.tags?.join(', ') || 'Frecuente');
+    setFormTradeName(client.tradeName || '');
+    setFormRegimen(client.taxpayerRegime || '');
+    setFormTaxpayerType(client.taxpayerType || '');
+    setFormSriStatus(client.sriStatus || '');
+    setFormSriVerified(client.sriVerified || false);
+    setSriMessage(null);
     setIsModalOpen(true);
+  };
+
+  // Consulta en tiempo real al SRI / Registro Civil
+  const handleLookupSri = async (dniValue?: string) => {
+    const targetDni = (dniValue || formDni || '').trim();
+    if (!targetDni) {
+      setSriMessage({ text: 'Ingresa un número de cédula o RUC para consultar.', type: 'warning' });
+      return;
+    }
+
+    setIsSearchingSri(true);
+    setSriMessage(null);
+
+    try {
+      const res = await consultarIdentificacion(targetDni);
+      if (res.found && res.nombre) {
+        setFormName(res.nombre);
+        if (res.nombreComercial) {
+          setFormTradeName(res.nombreComercial);
+        }
+        if (res.regimen) {
+          setFormRegimen(res.regimen);
+        }
+        if (res.tipoPersona || res.tipoContribuyente) {
+          setFormTaxpayerType(res.tipoPersona || res.tipoContribuyente || '');
+        }
+        setFormSriStatus(res.estado || 'ACTIVO');
+        setFormSriVerified(true);
+
+        const sourceLabel = res.source === 'SRI_CATASTRO' ? 'Catastro SRI' :
+                            res.source === 'SRI_PERSONA' ? 'Persona SRI' :
+                            res.source === 'REGISTRO_CIVIL' ? 'Registro Civil' : 'SRI Móvil';
+
+        setSriMessage({
+          text: `✓ Identificación verificada (${sourceLabel}): ${res.nombre}${res.regimen ? ` · Régimen ${res.regimen}` : ''}`,
+          type: 'success',
+        });
+      } else {
+        setSriMessage({
+          text: res.error || 'No se encontraron registros para esta identificación en el SRI ni Registro Civil.',
+          type: 'error',
+        });
+      }
+    } catch {
+      setSriMessage({
+        text: 'Error de conexión al consultar los servicios del SRI.',
+        type: 'error',
+      });
+    } finally {
+      setIsSearchingSri(false);
+    }
+  };
+
+  // Actualizar un cliente seleccionado directamente desde el panel de detalle
+  const handleSyncCurrentClientWithSri = async () => {
+    if (!currentClient || !currentClient.dni) return;
+    setIsSearchingSri(true);
+    try {
+      const res = await consultarIdentificacion(currentClient.dni);
+      if (res.found && res.nombre) {
+        updateClient(currentClient.id, {
+          name: res.nombre,
+          tradeName: res.nombreComercial || currentClient.tradeName,
+          taxpayerRegime: res.regimen || currentClient.taxpayerRegime,
+          taxpayerType: res.tipoPersona || res.tipoContribuyente || currentClient.taxpayerType,
+          sriStatus: res.estado || 'ACTIVO',
+          sriVerified: true,
+        });
+        alert(`✓ Ficha actualizada con el SRI: ${res.nombre} (Régimen: ${res.regimen || 'GENERAL'})`);
+      } else {
+        alert(res.error || 'No se encontró información tributaria actualizada en el SRI.');
+      }
+    } catch {
+      alert('Error de conexión con el SRI.');
+    } finally {
+      setIsSearchingSri(false);
+    }
   };
 
   const handleSaveClient = (e: React.FormEvent) => {
@@ -282,6 +386,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
       notes: formNotes.trim() || undefined,
       consentSigned: formConsent,
       tags: parsedTags.length > 0 ? parsedTags : ['Frecuente'],
+      tradeName: formTradeName.trim() || undefined,
+      taxpayerRegime: formRegimen.trim() || undefined,
+      taxpayerType: formTaxpayerType.trim() || undefined,
+      sriStatus: formSriStatus || undefined,
+      sriVerified: formSriVerified,
     };
 
     if (editingClient) {
@@ -314,9 +423,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     if (!currentClient) return;
     const lines = [
       `"EXPEDIENTE CLÍNICO & HISTORIAL DE CLIENTE - ${currentClient.name.toUpperCase()}"`,
-      `"Generado: ${new Date().toLocaleString('es-ES')}"`,
+      `"Generado: ${new Date().toLocaleString('es-EC')}"`,
       `"Teléfono: ${currentClient.phone || 'N/A'}"`,
-      `"DNI / Cédula: ${currentClient.dni || 'N/A'}"`,
+      `"Cédula / RUC / Pasaporte: ${currentClient.dni || 'N/A'}"`,
       `"Email: ${currentClient.email || 'N/A'}"`,
       `"Instagram: ${currentClient.instagram || 'N/A'}"`,
       `"Ficha Consentimiento Firmada: ${currentClient.consentSigned ? 'SÍ' : 'NO'}"`,
@@ -389,7 +498,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
             <div className="relative">
               <input
                 type="text"
-                placeholder="Buscar por nombre, teléfono, DNI o email..."
+                placeholder="Buscar por nombre, teléfono, cédula, RUC o email..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-3.5 pr-9 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"
@@ -522,7 +631,16 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                           {currentClient.phone}
                         </span>
                       )}
-                      {currentClient.dni && <span>DNI: {currentClient.dni}</span>}
+                      {currentClient.dni && (
+                        <span className="flex items-center gap-1 text-neutral-300">
+                          <span className="text-neutral-500">ID:</span> {currentClient.dni}
+                        </span>
+                      )}
+                      {currentClient.taxpayerRegime && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                          ✓ SRI: {currentClient.taxpayerRegime}
+                        </span>
+                      )}
                       {currentClient.email && (
                         <span className="flex items-center gap-1 text-neutral-300">
                           <Mail className="w-3 h-3 text-[#FF3366]" />
@@ -538,6 +656,18 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
 
                 {/* Profile Actions */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {currentClient.dni && (
+                    <button
+                      onClick={handleSyncCurrentClientWithSri}
+                      disabled={isSearchingSri}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1C1C24] border border-[#2B2B36] hover:border-emerald-500/50 text-neutral-200 hover:text-emerald-400 text-xs font-semibold transition-colors disabled:opacity-50"
+                      title="Sincronizar y verificar datos con el SRI y Registro Civil de Ecuador"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                      <span className="hidden sm:inline">Verificar SRI</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={handleCobrarEnPos}
                     className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_10px_rgba(255,51,102,0.3)]"
@@ -960,36 +1090,127 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
             </div>
 
             <form onSubmit={handleSaveClient} className="space-y-3.5 text-xs">
+              {/* SRI Notification banner */}
+              {sriMessage && (
+                <div
+                  className={`p-2.5 rounded-xl border flex items-start gap-2 text-xs ${
+                    sriMessage.type === 'success'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : sriMessage.type === 'warning'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      : 'bg-red-500/10 border-red-500/30 text-red-300'
+                  }`}
+                >
+                  {sriMessage.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 text-[11px] leading-relaxed">
+                    {sriMessage.text}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSriMessage(null)}
+                    className="text-neutral-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Nombre Completo *</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-neutral-300">Cédula / RUC / Pasaporte</label>
+                    {formDni.trim() && (
+                      <span className={`text-[10px] font-mono ${
+                        validarIdentificacionEcuador(formDni).isValid ? 'text-emerald-400' : 'text-neutral-400'
+                      }`}>
+                        {validarIdentificacionEcuador(formDni).label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="Cédula 10 díg. / RUC 13 díg."
+                      value={formDni}
+                      onChange={e => {
+                        setFormDni(e.target.value);
+                        setSriMessage(null);
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleLookupSri();
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleLookupSri()}
+                      disabled={isSearchingSri || !formDni.trim()}
+                      className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold flex items-center gap-1.5 transition-all text-xs shrink-0 disabled:opacity-40"
+                      title="Consultar en servicios web del SRI y Registro Civil de Ecuador"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                      <span>{isSearchingSri ? 'Buscando...' : 'SRI'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    Nombre o Razón Social *
+                    {formSriVerified && (
+                      <span className="ml-2 text-[10px] text-emerald-400 font-normal">
+                        ✓ Verificado SRI
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Mateo Morales"
+                    placeholder="Ej. Mateo Morales / CORPORACION..."
                     value={formName}
                     onChange={e => setFormName(e.target.value)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
                   />
                 </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">DNI / Cédula</label>
-                  <input
-                    type="text"
-                    placeholder="Identificación"
-                    value={formDni}
-                    onChange={e => setFormDni(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono"
-                  />
-                </div>
               </div>
+
+              {/* Datos tributarios adicionales si fueron detectados */}
+              {(formTradeName || formRegimen || formTaxpayerType) && (
+                <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+                  {formTradeName && (
+                    <div>
+                      <span className="text-neutral-500 block text-[10px]">Nombre Comercial</span>
+                      <span className="font-semibold text-neutral-200">{formTradeName}</span>
+                    </div>
+                  )}
+                  {formRegimen && (
+                    <div>
+                      <span className="text-neutral-500 block text-[10px]">Régimen Tributario</span>
+                      <span className="font-semibold text-emerald-400">{formRegimen}</span>
+                    </div>
+                  )}
+                  {formTaxpayerType && (
+                    <div>
+                      <span className="text-neutral-500 block text-[10px]">Tipo Contribuyente</span>
+                      <span className="font-semibold text-neutral-300">{formTaxpayerType}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1">Teléfono / WhatsApp</label>
                   <input
                     type="text"
-                    placeholder="+34 600 000 000"
+                    placeholder="+593 99 000 0000"
                     value={formPhone}
                     onChange={e => setFormPhone(e.target.value)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"

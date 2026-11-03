@@ -13,9 +13,12 @@ import {
   Sparkles,
   MapPin,
   CheckCircle2,
+  RefreshCw,
+  Building2,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, ServiceCategory, PaymentMethod } from '../../types';
+import { consultarIdentificacion } from '../../services/sriService';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -32,14 +35,50 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   initialArtistId,
   onAppointmentCreated,
 }) => {
-  const { artists, addAppointment, formatMoney, settings } = useStudio();
+  const { artists, clients, addAppointment, formatMoney, settings } = useStudio();
 
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientDni, setClientDni] = useState('');
   const [clientInstagram, setClientInstagram] = useState('');
+  const [isSearchingSri, setIsSearchingSri] = useState(false);
+  const [sriNotice, setSriNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const handleLookupClientSri = async () => {
+    const clean = clientDni.trim().replace(/\D/g, '');
+    if (!clean) return;
+    setIsSearchingSri(true);
+    setSriNotice(null);
+    try {
+      const res = await consultarIdentificacion(clean);
+      if (res.found && res.nombre) {
+        setClientName(res.nombre);
+        // Look up known client
+        const existing = clients.find(c => c.dni && c.dni.replace(/\D/g, '') === clean);
+        if (existing) {
+          if (existing.phone && !clientPhone) setClientPhone(existing.phone);
+          if (existing.email && !clientEmail) setClientEmail(existing.email);
+          if (existing.instagram && !clientInstagram) setClientInstagram(existing.instagram);
+        }
+        setSriNotice({
+          text: `✓ ${res.nombre} (${res.regimen ? `Régimen ${res.regimen}` : 'SRI / Registro Civil Verificado'})`,
+          type: 'success',
+        });
+      } else {
+        setSriNotice({
+          text: res.error || 'No registrado en SRI ni Registro Civil.',
+          type: 'error',
+        });
+      }
+    } catch {
+      setSriNotice({ text: 'Error consultando catastro SRI.', type: 'error' });
+    } finally {
+      setIsSearchingSri(false);
+    }
+  };
   const [artistId, setArtistId] = useState(initialArtistId || (artists[0]?.id || ''));
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
@@ -189,10 +228,61 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 
           {/* Section 2: Client Details */}
           <div className="space-y-3 p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-            <span className="text-[11px] font-bold text-white uppercase tracking-wider block">
-              2. Datos del Cliente
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-white uppercase tracking-wider block">
+                2. Datos del Cliente
+              </span>
+              <span className="text-[10px] text-neutral-400">
+                Consulta directa SRI / Registro Civil
+              </span>
+            </div>
+
+            {/* SRI Notice */}
+            {sriNotice && (
+              <div className={`p-2 rounded-xl border text-xs flex items-center gap-2 ${
+                sriNotice.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+              }`}>
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[11px]">{sriNotice.text}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Cédula / RUC with SRI search */}
+              <div>
+                <label className="text-[11px] text-neutral-400 block mb-1">Cédula / RUC</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={clientDni}
+                    onChange={e => {
+                      setClientDni(e.target.value);
+                      setSriNotice(null);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleLookupClientSri();
+                      }
+                    }}
+                    placeholder="10 díg. Cédula / 13 díg. RUC"
+                    className="flex-1 bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white font-mono placeholder-neutral-600 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookupClientSri}
+                    disabled={isSearchingSri || !clientDni.trim()}
+                    className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 disabled:opacity-40"
+                    title="Buscar datos del cliente en el SRI"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
+                    <span>SRI</span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Nombre Completo *</label>
                 <div className="relative">

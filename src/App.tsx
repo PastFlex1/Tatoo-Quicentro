@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StudioProvider, useStudio } from './context/StudioContext';
+import { AlertModalProvider } from './context/AlertModalContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -60,7 +62,7 @@ const MainLayout: React.FC = () => {
       case 'appointments':
         return <AppointmentsView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'proformas':
-        return <ProformasView />;
+        return <ProformasView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'sales':
         return (
           <SalesView
@@ -132,8 +134,12 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <StudioProvider>
-      <MainLayout />
-    </StudioProvider>
+    <ErrorBoundary>
+      <StudioProvider>
+        <AlertModalProvider>
+          <MainLayout />
+        </AlertModalProvider>
+      </StudioProvider>
+    </ErrorBoundary>
   );
 }

@@ -68,7 +68,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => 
               {settings.studioName}
             </h2>
             <p className="text-[11px] text-neutral-600 mt-0.5">{settings.address}</p>
-            <p className="text-[11px] text-neutral-600">NIF/CIF: {settings.taxId} · Tel: {settings.phone}</p>
+            <p className="text-[11px] text-neutral-600">RUC: {settings.ruc || settings.taxId} · Tel: {settings.phone}</p>
             <p className="text-[10px] text-neutral-500 mt-1">
               Registro Sanitario: <span className="font-mono">{settings.healthSanitaryRegistration}</span>
             </p>

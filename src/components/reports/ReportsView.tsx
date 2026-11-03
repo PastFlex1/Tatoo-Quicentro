@@ -416,9 +416,9 @@ export const ReportsView: React.FC = () => {
         <div className="border-b-2 border-black pb-4 mb-4 text-center">
           <h1 className="text-xl font-bold uppercase">{settings.studioName}</h1>
           <p className="text-xs">{settings.address} · Tel: {settings.phone}</p>
-          <p className="text-xs">Tax ID / NIF: {settings.taxId} · Registro Sanitario: {settings.healthSanitaryRegistration}</p>
+          <p className="text-xs">RUC: {settings.ruc || settings.taxId} · Registro Sanitario: {settings.healthSanitaryRegistration}</p>
           <h2 className="text-sm font-bold uppercase mt-3 tracking-wider">INFORME EJECUTIVO DE CONTABILIDAD Y RESULTADOS</h2>
-          <p className="text-[11px] text-neutral-600">Período: {dateFilter} · Fecha: {new Date().toLocaleDateString('es-ES')}</p>
+          <p className="text-[11px] text-neutral-600">Período: {dateFilter} · Fecha: {new Date().toLocaleDateString('es-EC')}</p>
         </div>
 
         <div className="space-y-4">

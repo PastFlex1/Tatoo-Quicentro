@@ -48,7 +48,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
       'Factura',
       'Fecha',
       'Cliente',
-      'DNI',
+      'Cédula / RUC',
       'Teléfono',
       'Servicio',
       'Categoría',

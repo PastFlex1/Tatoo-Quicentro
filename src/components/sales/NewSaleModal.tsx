@@ -207,11 +207,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                DNI / Identificación Sanitaria
+                Cédula / RUC / Pasaporte
               </label>
               <input
                 type="text"
-                placeholder="Ej. 12345678Z"
+                placeholder="Ej. 1718293041"
                 value={clientDni}
                 onChange={e => setClientDni(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"
@@ -219,11 +219,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
             </div>
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                Teléfono
+                Teléfono / WhatsApp
               </label>
               <input
                 type="text"
-                placeholder="+34 600 000 000"
+                placeholder="+593 99 000 0000"
                 value={clientPhone}
                 onChange={e => setClientPhone(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"

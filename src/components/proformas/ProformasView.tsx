@@ -11,20 +11,34 @@ import {
   User,
   Clock,
   ArrowRight,
+  Receipt,
+  FileCheck,
+  CheckCircle2,
+  CreditCard,
+  Banknote,
+  Building2,
+  X,
+  ShieldCheck,
 } from 'lucide-react';
-import { Proforma, ProformaStatus, ServiceCategory } from '../../types';
+import { Proforma, ProformaStatus, ServiceCategory, SaleRecord, PaymentMethod } from '../../types';
 import { useStudio } from '../../context/StudioContext';
 import { ProformaModal } from './ProformaModal';
 import { NewProformaModal } from './NewProformaModal';
 
-export const ProformasView: React.FC = () => {
+interface ProformasViewProps {
+  onOpenReceipt?: (sale: SaleRecord) => void;
+}
+
+export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) => {
   const {
     proformas,
     artists,
+    sales,
     formatMoney,
     deleteProforma,
     updateProforma,
     convertProformaToAppointment,
+    convertProformaToSale,
     setActiveTab,
   } = useStudio();
 
@@ -37,6 +51,14 @@ export const ProformasView: React.FC = () => {
   // Modals state
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedProforma, setSelectedProforma] = useState<Proforma | null>(null);
+
+  // Billing Modal state (Facturación directa de proforma)
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [billingProforma, setBillingProforma] = useState<Proforma | null>(null);
+  const [billingPaymentMethod, setBillingPaymentMethod] = useState<PaymentMethod>('card');
+  const [billingTipAmount, setBillingTipAmount] = useState<number>(0);
+  const [billingFinalPrice, setBillingFinalPrice] = useState<number>(0);
+  const [billingSuccessNotice, setBillingSuccessNotice] = useState<string | null>(null);
 
   // Filtered List
   const filteredProformas = useMemo(() => {
@@ -63,7 +85,13 @@ export const ProformasView: React.FC = () => {
   const convertedCount = proformas.filter(p => p.status === 'converted').length;
   const totalCotizado = proformas.reduce((acc, p) => acc + p.total, 0);
 
-  const getStatusBadge = (status: ProformaStatus) => {
+  const getStatusBadge = (status: ProformaStatus, invoiceNumber?: string) => {
+    if (invoiceNumber || status === 'invoiced') {
+      return {
+        label: `Facturada (${invoiceNumber ? '#' + invoiceNumber : 'POS'})`,
+        className: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+      };
+    }
     switch (status) {
       case 'accepted':
         return {
@@ -100,6 +128,35 @@ export const ProformasView: React.FC = () => {
     setActiveTab('appointments');
   };
 
+  const handleOpenBillingModal = (prof: Proforma) => {
+    setBillingProforma(prof);
+    setBillingFinalPrice(prof.total);
+    setBillingTipAmount(0);
+    setBillingPaymentMethod('card');
+    setIsBillingModalOpen(true);
+  };
+
+  const handleProcessBilling = () => {
+    if (!billingProforma) return;
+    try {
+      const sale = convertProformaToSale(
+        billingProforma.id,
+        billingPaymentMethod,
+        billingTipAmount,
+        billingFinalPrice
+      );
+      setIsBillingModalOpen(false);
+      setBillingSuccessNotice(`¡Factura #${sale.invoiceNumber} emitida exitosamente para ${sale.clientName}!`);
+      setTimeout(() => setBillingSuccessNotice(null), 5000);
+
+      if (onOpenReceipt) {
+        onOpenReceipt(sale);
+      }
+    } catch (err: any) {
+      alert('Error al facturar proforma: ' + (err.message || 'Error desconocido'));
+    }
+  };
+
   const handleShareWhatsApp = (p: Proforma) => {
     const cleanPhone = (p.clientPhone || '').replace(/\D/g, '');
     const message = encodeURIComponent(
@@ -118,6 +175,14 @@ export const ProformasView: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Billing Success Notification */}
+      {billingSuccessNotice && (
+        <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl flex items-center gap-3 text-emerald-300 text-xs font-semibold animate-in fade-in duration-200 shadow-lg shadow-emerald-500/10">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span>{billingSuccessNotice}</span>
+        </div>
+      )}
+
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -277,7 +342,7 @@ export const ProformasView: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredProformas.map(proforma => {
-            const badge = getStatusBadge(proforma.status);
+            const badge = getStatusBadge(proforma.status, proforma.invoiceNumber);
 
             return (
               <div
@@ -397,14 +462,42 @@ export const ProformasView: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {proforma.status !== 'converted' && (
+                    {/* Facturar / Ver Factura */}
+                    {proforma.invoiceNumber ? (
+                      <button
+                        onClick={() => {
+                          const linkedSale = sales.find(s => s.id === proforma.saleId || s.invoiceNumber === proforma.invoiceNumber);
+                          if (linkedSale && onOpenReceipt) {
+                            onOpenReceipt(linkedSale);
+                          } else {
+                            setSelectedProforma(proforma);
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+                        title="Ver comprobante de factura emitida"
+                      >
+                        <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Factura #{proforma.invoiceNumber}</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenBillingModal(proforma)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] cursor-pointer"
+                        title="Convertir esta proforma en factura oficial y cobrar"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Facturar</span>
+                      </button>
+                    )}
+
+                    {!proforma.appointmentDate && proforma.status !== 'converted' && (
                       <button
                         onClick={() => handleQuickConvert(proforma)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#FF3366]/20 text-[#FF3366] hover:bg-[#FF3366]/30 border border-[#FF3366]/40 text-xs font-bold transition-colors"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#FF3366]/20 text-[#FF3366] hover:bg-[#FF3366]/30 border border-[#FF3366]/40 text-xs font-bold transition-colors cursor-pointer"
                         title="Agendar cita en el calendario"
                       >
                         <Calendar className="w-3.5 h-3.5" />
-                        <span>Agendar Cita</span>
+                        <span className="hidden sm:inline">Agendar</span>
                       </button>
                     )}
 
@@ -414,7 +507,7 @@ export const ProformasView: React.FC = () => {
                           deleteProforma(proforma.id);
                         }
                       }}
-                      className="p-1.5 rounded-xl text-neutral-500 hover:text-red-400 hover:bg-[#22222A] transition-colors"
+                      className="p-1.5 rounded-xl text-neutral-500 hover:text-red-400 hover:bg-[#22222A] transition-colors cursor-pointer"
                       title="Eliminar cotización"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -443,7 +536,190 @@ export const ProformasView: React.FC = () => {
           setSelectedProforma(null);
           handleQuickConvert(p);
         }}
+        onConvertToInvoice={p => {
+          setSelectedProforma(null);
+          handleOpenBillingModal(p);
+        }}
       />
+
+      {/* MODAL: FACTURAR / COBRAR PROFORMA DIRECTAMENTE EN POS */}
+      {isBillingModalOpen && billingProforma && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-[#141417] border border-[#272730] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#24242A] bg-[#16161B] shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Facturar Proforma en POS
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    {billingProforma.proformaNumber} · Cliente: <span className="text-white font-semibold">{billingProforma.clientName}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBillingModalOpen(false)}
+                className="text-neutral-400 hover:text-white p-1 rounded-xl hover:bg-[#202027] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 overflow-y-auto text-xs">
+              {/* Client & Service Info Card */}
+              <div className="p-3.5 bg-[#18181D] border border-[#272730] rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Servicio Cotizado:</span>
+                  <span className="font-bold text-white text-right">{billingProforma.serviceName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">Artista Asignado:</span>
+                  <span className="font-semibold text-emerald-400">{billingProforma.artistName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-400">RUC / Cédula Cliente:</span>
+                  <span className="font-mono text-neutral-300 font-bold">{billingProforma.clientDni || '9999999999999 (Consumidor Final)'}</span>
+                </div>
+                {billingProforma.clientPhone && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-400">Teléfono:</span>
+                    <span className="font-mono text-neutral-300">{billingProforma.clientPhone}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Price adjustment if applicable */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-300 flex justify-between">
+                  <span>Total Cotizado en Proforma:</span>
+                  <span className="font-bold text-white font-mono">{formatMoney(billingProforma.total)}</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={billingFinalPrice}
+                    onChange={e => setBillingFinalPrice(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-[#18181D] border border-[#272730] rounded-xl pl-8 pr-4 py-2.5 text-white font-mono text-sm font-bold focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
+                <span className="text-[10px] text-neutral-500">
+                  Puedes ajustar el valor final facturado si hubo variaciones en la sesión.
+                </span>
+              </div>
+
+              {/* Forma de Pago SRI */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-300">
+                  Forma de Pago del Cliente (SRI Ecuador):
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBillingPaymentMethod('card')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      billingPaymentMethod === 'card'
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-bold'
+                        : 'bg-[#18181D] border-[#272730] text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5 mb-1 text-emerald-400" />
+                    <span className="text-[11px]">Tarjeta / POS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBillingPaymentMethod('cash')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      billingPaymentMethod === 'cash'
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-bold'
+                        : 'bg-[#18181D] border-[#272730] text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    <Banknote className="w-5 h-5 mb-1 text-emerald-400" />
+                    <span className="text-[11px]">Efectivo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBillingPaymentMethod('transfer')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                      billingPaymentMethod === 'transfer'
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 font-bold'
+                        : 'bg-[#18181D] border-[#272730] text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    <Building2 className="w-5 h-5 mb-1 text-emerald-400" />
+                    <span className="text-[11px]">Transferencia</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Propina Voluntaria */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-neutral-300 flex justify-between">
+                  <span>Propina voluntaria para el artista (opcional):</span>
+                  <span className="font-mono text-emerald-400 font-bold">+{formatMoney(billingTipAmount)}</span>
+                </label>
+                <div className="flex gap-2">
+                  {[0, 5, 10, 20].map(tip => (
+                    <button
+                      key={tip}
+                      type="button"
+                      onClick={() => setBillingTipAmount(tip)}
+                      className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                        billingTipAmount === tip
+                          ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                          : 'bg-[#18181D] border-[#272730] text-neutral-400 hover:text-white'
+                      }`}
+                    >
+                      {tip === 0 ? 'Sin propina' : `$${tip}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total final a cobrar */}
+              <div className="p-4 bg-[#18181D] border border-emerald-500/30 rounded-2xl flex items-baseline justify-between">
+                <div>
+                  <span className="text-xs font-bold text-white uppercase block">
+                    Importe Total a Facturar:
+                  </span>
+                  <span className="text-[10px] text-neutral-400">
+                    IVA 15% desglosado automáticamente según SRI
+                  </span>
+                </div>
+                <span className="text-2xl font-black font-mono text-emerald-400">
+                  {formatMoney(billingFinalPrice + billingTipAmount)}
+                </span>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-[#16161B] border-t border-[#24242A] flex justify-end gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsBillingModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-neutral-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleProcessBilling}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 cursor-pointer"
+              >
+                <Receipt className="w-4 h-4" />
+                <span>Emitir Factura y Cobrar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
