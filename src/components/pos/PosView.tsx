@@ -20,6 +20,8 @@ import {
   Building2,
   RefreshCw,
   AlertCircle,
+  FileText,
+  Receipt,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, InventoryItem, PaymentMethod, SaleRecord, ServiceCategory } from '../../types';
@@ -31,71 +33,6 @@ import { SelectAppointmentModal } from './SelectAppointmentModal';
 interface PosViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
 }
-
-interface QuickPreset {
-  id: string;
-  category: ServiceCategory;
-  name: string;
-  price: number;
-  hours?: number;
-  subtitle: string;
-}
-
-const QUICK_SERVICE_PRESETS: QuickPreset[] = [
-  {
-    id: 'pre-tat-flash',
-    category: 'tattoo',
-    name: 'Tatuaje Flash / Línea Fina Pequeño',
-    price: 90,
-    hours: 1,
-    subtitle: 'Hasta 5 cm · 1 hora en cabina',
-  },
-  {
-    id: 'pre-tat-mid',
-    category: 'tattoo',
-    name: 'Tatuaje Personalizado (Media Sesión)',
-    price: 250,
-    hours: 3,
-    subtitle: 'Diseño a medida · 3 horas',
-  },
-  {
-    id: 'pre-tat-full',
-    category: 'tattoo',
-    name: 'Sesión Completa Blackwork / Realismo',
-    price: 480,
-    hours: 6,
-    subtitle: 'Jornada completa · 6 horas',
-  },
-  {
-    id: 'pre-tat-deposit',
-    category: 'tattoo',
-    name: 'Seña / Reserva de Cita Tatuaje',
-    price: 100,
-    hours: 1,
-    subtitle: 'Anticipo para bloqueo de agenda',
-  },
-  {
-    id: 'pre-prc-basic',
-    category: 'piercing',
-    name: 'Piercing Nostril / Lóbulo + Joya Titanio F136',
-    price: 55,
-    subtitle: 'Incluye joya grado implante estéril',
-  },
-  {
-    id: 'pre-prc-cart',
-    category: 'piercing',
-    name: 'Piercing Cartílago (Helix / Septum / Conch)',
-    price: 65,
-    subtitle: 'Aguja americana + Labret/Clicker F136',
-  },
-  {
-    id: 'pre-prc-double',
-    category: 'piercing',
-    name: 'Combo Doble Perforación + Joyería Titanio',
-    price: 95,
-    subtitle: '2 perforaciones en misma sesión',
-  },
-];
 
 export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const {
@@ -124,7 +61,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const [pieces, setPieces] = useState<number>(1);
   const [subtotal, setSubtotal] = useState<number>(250);
   const [discount, setDiscount] = useState<number>(0);
-  const [taxRate, setTaxRate] = useState<number>(settings.defaultTaxRate);
+  const standardVatRate = (!settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12) ? 15 : settings.defaultTaxRate;
+  const [documentType, setDocumentType] = useState<'factura' | 'nota_venta'>('factura');
+  const [taxRate, setTaxRate] = useState<number>(standardVatRate);
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [tipAmount, setTipAmount] = useState<number>(0);
@@ -149,6 +88,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   // Linked Appointment or Inventory Item
   const [linkedAppointmentId, setLinkedAppointmentId] = useState<string | null>(null);
   const [linkedInventoryItemId, setLinkedInventoryItemId] = useState<string | null>(null);
+  const [consumedSupplies, setConsumedSupplies] = useState<{ itemId: string; name: string; quantity: number }[]>([]);
+  const [showCabinSupplies, setShowCabinSupplies] = useState(false);
+  const [selectedSupplyToAdd, setSelectedSupplyToAdd] = useState('');
   const [lastCreatedSale, setLastCreatedSale] = useState<SaleRecord | null>(null);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
 
@@ -241,17 +183,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setLinkedAppointmentId(null);
   };
 
-  // Load from preset
-  const handleSelectPreset = (preset: QuickPreset) => {
-    setLinkedAppointmentId(null);
-    setLinkedInventoryItemId(null);
-    setServiceCategory(preset.category);
-    setServiceName(preset.name);
-    setSubtotal(preset.price);
-    if (preset.hours) setHours(preset.hours);
-    setPieces(1);
-  };
-
   // Load from retail inventory item
   const handleSelectRetailItem = (item: InventoryItem) => {
     setLinkedAppointmentId(null);
@@ -342,6 +273,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const handleResetForm = () => {
     setLinkedAppointmentId(null);
     setLinkedInventoryItemId(null);
+    setConsumedSupplies([]);
+    setSelectedSupplyToAdd('');
     setClientName('');
     setClientPhone('');
     setClientDni('');
@@ -357,6 +290,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setPieces(1);
     setCashTendered('');
     setNotes('');
+    setDocumentType('factura');
+    setTaxRate(standardVatRate);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -371,6 +306,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
 
     const saleRecord = addSale({
       date: new Date().toISOString(),
+      documentType,
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim() || undefined,
       clientDni: clientDni.trim() || undefined,
@@ -378,6 +314,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       serviceName: serviceName.trim() || 'Servicio de Estudio',
       artistId,
       artistName,
+      inventoryItemId: linkedInventoryItemId || undefined,
+      consumedSupplies: consumedSupplies.length > 0 ? consumedSupplies : undefined,
       hours: serviceCategory === 'tattoo' ? hours : undefined,
       pieces: pieces || 1,
       subtotal,
@@ -421,18 +359,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       updateAppointment(linkedAppointmentId, {
         status: 'completed',
         saleId: saleRecord.id,
-      });
-    }
-
-    // If linked to an inventory item, automatically deduct stock in Kardex
-    if (linkedInventoryItemId) {
-      addKardexMovement({
-        itemId: linkedInventoryItemId,
-        type: 'retail_sale',
-        quantity: pieces || 1,
-        reference: saleRecord.invoiceNumber,
-        concept: `Venta POS a ${clientName.trim()} (${saleRecord.invoiceNumber})`,
-        responsible: artistName,
       });
     }
 
@@ -578,187 +504,14 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
 
       {/* Main 2-Column POS Layout */}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6 items-start">
-        {/* LEFT COLUMN (7/12 or 8/12): Quick Selectors + Service & Client Details */}
+        {/* LEFT COLUMN (7/12 or 8/12): Service & Client Details */}
         <div className="xl:col-span-7 2xl:col-span-8 space-y-4 sm:space-y-5">
-          {/* 1. Cargar Cita Agendada (1-Click Import) */}
-          {pendingAppointments.length > 0 && (
-            <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
-                  <Calendar className="w-3.5 h-3.5 text-[#FF3366]" />
-                  <span>Cargar Cliente desde Citas en Curso / Agendadas</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAppointmentModalOpen(true)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FF3366]/15 hover:bg-[#FF3366]/25 text-[#FF3366] border border-[#FF3366]/30 text-[10px] font-bold transition-all cursor-pointer"
-                  >
-                    <Search className="w-3 h-3" />
-                    <span>Ver Todas ({pendingAppointments.length})</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2.5">
-                {pendingAppointments.slice(0, 6).map(apt => {
-                  const isSelected = linkedAppointmentId === apt.id;
-                  return (
-                    <button
-                      type="button"
-                      key={apt.id}
-                      onClick={() => handleSelectAppointment(apt)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        isSelected
-                          ? 'bg-[#FF3366]/15 border-[#FF3366] shadow-[0_0_12px_rgba(255,51,102,0.25)]'
-                          : 'bg-[#121215] border-[#26262F] hover:border-[#FF3366]/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[11px] mb-1">
-                        <span className="font-bold text-white truncate">{apt.clientName}</span>
-                        <span className="font-mono text-[#FF3366] font-bold shrink-0">
-                          {formatMoney(apt.estimatedPrice)}
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-neutral-400 truncate">{apt.serviceName}</div>
-                      <div className="flex items-center justify-between text-[10px] text-neutral-500 mt-1.5 pt-1.5 border-t border-[#22222A]">
-                        <span className="truncate">{apt.artistName}</span>
-                        {apt.depositAmount > 0 && (
-                          <span className="text-emerald-400 font-mono">
-                            Seña: {formatMoney(apt.depositAmount)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 2. Catálogo Rápido de Servicios y Productos en Stock */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#24242B] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 text-[#FF3366]" />
-                <span>1. Categoría y Catálogo Rápido POS</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                {[
-                  { id: 'tattoo', label: 'Tatuajes' },
-                  { id: 'piercing', label: 'Piercings' },
-                  { id: 'jewelry', label: 'Joyería Stock' },
-                  { id: 'aftercare', label: 'Aftercare Stock' },
-                  { id: 'other', label: 'Otro / Libre' },
-                ].map(cat => {
-                  const isSelected = serviceCategory === cat.id;
-                  return (
-                    <button
-                      type="button"
-                      key={cat.id}
-                      onClick={() => {
-                        setServiceCategory(cat.id as ServiceCategory);
-                        setLinkedInventoryItemId(null);
-                      }}
-                      className={`py-1 px-3 text-xs rounded-full font-semibold transition-all whitespace-nowrap shrink-0 ${
-                        isSelected
-                          ? 'bg-[#FF3366] text-white shadow-[0_0_10px_rgba(255,51,102,0.4)]'
-                          : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick Presets or Live Inventory Cards */}
-            {(serviceCategory === 'tattoo' || serviceCategory === 'piercing') && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2.5">
-                {QUICK_SERVICE_PRESETS.filter(p => p.category === serviceCategory).map(preset => {
-                  const isActive = serviceName === preset.name && subtotal === preset.price;
-                  return (
-                    <button
-                      type="button"
-                      key={preset.id}
-                      onClick={() => handleSelectPreset(preset)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        isActive
-                          ? 'bg-[#FF3366]/15 border-[#FF3366]'
-                          : 'bg-[#121215] border-[#26262F] hover:border-[#FF3366]/40'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 text-xs font-bold text-white mb-0.5">
-                        <span className="truncate">{preset.name}</span>
-                        <span className="font-mono text-[#FF3366] shrink-0">
-                          {formatMoney(preset.price)}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-neutral-400 block truncate">
-                        {preset.subtitle}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {(serviceCategory === 'jewelry' || serviceCategory === 'aftercare') && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-neutral-400">
-                  <span className="flex items-center gap-1.5">
-                    <Boxes className="w-3.5 h-3.5 text-[#FF3366]" />
-                    Selecciona un artículo de vitrina (descuenta automáticamente del Kardex):
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2.5">
-                  {retailItems
-                    .filter(i =>
-                      serviceCategory === 'jewelry'
-                        ? i.category === 'jewelry'
-                        : i.category === 'aftercare'
-                    )
-                    .map(item => {
-                      const isSelected = linkedInventoryItemId === item.id;
-                      return (
-                        <button
-                          type="button"
-                          key={item.id}
-                          onClick={() => handleSelectRetailItem(item)}
-                          className={`p-3 rounded-xl border text-left transition-all ${
-                            isSelected
-                              ? 'bg-[#FF3366]/15 border-[#FF3366]'
-                              : 'bg-[#121215] border-[#26262F] hover:border-[#FF3366]/40'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 text-xs font-bold text-white mb-0.5">
-                            <span className="truncate">{item.name}</span>
-                            <span className="font-mono text-emerald-400 shrink-0">
-                              {formatMoney(item.priceWithVat ?? item.retailPrice ?? item.unitCost)}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] text-neutral-400">
-                            <span>{item.brand}</span>
-                            <span className="font-mono text-neutral-300">
-                              Stock: {item.currentStock} {item.unit}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3. Datos del Cliente, Artista y Detalle del Trabajo */}
+          {/* 1. Datos del Cliente, Artista y Detalle del Servicio */}
           <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
             <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
               <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
                 <User className="w-3.5 h-3.5 text-[#FF3366]" />
-                <span>2. Datos del Cliente, Artista y Sesión</span>
+                <span>1. Datos del Cliente, Artista y Servicio</span>
               </div>
               <div className="flex items-center gap-2">
                 <select
@@ -841,9 +594,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-3.5">
               {/* Cédula / RUC with Live SRI Lookup */}
-              <div className="sm:col-span-5">
+              <div className="md:col-span-5">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-neutral-300">
                     Cédula / RUC / Pasaporte
@@ -887,7 +640,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
               </div>
 
               {/* Client Name */}
-              <div className="sm:col-span-4">
+              <div className="md:col-span-4">
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-neutral-300">
                     Nombre o Razón Social <span className="text-[#FF3366]">*</span>
@@ -909,7 +662,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
               </div>
 
               {/* Phone / WhatsApp */}
-              <div className="sm:col-span-3">
+              <div className="md:col-span-3">
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                   Teléfono / WhatsApp
                 </label>
@@ -923,8 +676,40 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-              <div className="sm:col-span-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 sm:gap-3.5">
+              {/* Categoría de Servicio */}
+              <div className="sm:col-span-1 md:col-span-3">
+                <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                  Categoría
+                </label>
+                <select
+                  value={serviceCategory}
+                  onChange={e => {
+                    const newCat = e.target.value as ServiceCategory;
+                    setServiceCategory(newCat);
+                    setLinkedInventoryItemId(null);
+                    if (newCat === 'tattoo') {
+                      setServiceName('Tatuaje Personalizado');
+                    } else if (newCat === 'piercing') {
+                      setServiceName('Perforación / Body Piercing');
+                    } else if (newCat === 'jewelry') {
+                      setServiceName('Joyería Piercing Titanio');
+                    } else if (newCat === 'aftercare') {
+                      setServiceName('Crema / Cuidado Posterior');
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 font-medium"
+                >
+                  <option value="tattoo">Tatuaje</option>
+                  <option value="piercing">Piercing</option>
+                  <option value="jewelry">Joyería</option>
+                  <option value="aftercare">Aftercare</option>
+                  <option value="other">Otro / Libre</option>
+                </select>
+              </div>
+
+              {/* Tatuador / Piercer Asignado */}
+              <div className="sm:col-span-1 md:col-span-4">
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                   Tatuador / Piercer Asignado
                 </label>
@@ -941,9 +726,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                 </select>
               </div>
 
-              <div className="sm:col-span-3">
+              {/* % Comisión Artista */}
+              <div className="sm:col-span-1 md:col-span-2">
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                  % Comisión Artista
+                  % Comisión
                 </label>
                 <input
                   type="number"
@@ -951,11 +737,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   max="100"
                   value={customCommission}
                   onChange={e => setCustomCommission(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60"
+                  className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 text-center"
                 />
               </div>
 
-              <div className="sm:col-span-4">
+              {/* Horas o Piezas */}
+              <div className="sm:col-span-1 md:col-span-3">
                 <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                   {serviceCategory === 'tattoo' ? 'Horas de Sesión' : 'Cantidad / Piezas'}
                 </label>
@@ -986,6 +773,33 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                 </div>
               </div>
             </div>
+
+            {/* Vinculación opcional con Joyería o Aftercare de Vitrina */}
+            {(serviceCategory === 'jewelry' || serviceCategory === 'aftercare') && (
+              <div className="p-3 bg-[#121215] border border-[#272730] rounded-xl space-y-1.5">
+                <label className="block text-[11px] font-semibold text-neutral-400">
+                  Vincular producto de vitrina / Kardex (Opcional):
+                </label>
+                <select
+                  value={linkedInventoryItemId || ''}
+                  onChange={e => {
+                    const item = inventory.find(i => i.id === e.target.value);
+                    if (item) handleSelectRetailItem(item);
+                    else setLinkedInventoryItemId(null);
+                  }}
+                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-lg text-xs text-white"
+                >
+                  <option value="">-- Ingresar libre o seleccionar producto de vitrina --</option>
+                  {retailItems
+                    .filter(i => (serviceCategory === 'jewelry' ? i.category === 'jewelry' : i.category === 'aftercare'))
+                    .map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ({item.brand}) · Stock: {item.currentStock} {item.unit} · {formatMoney(item.priceWithVat ?? item.retailPrice ?? item.unitCost)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
@@ -1030,6 +844,138 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                 />
               </div>
             </div>
+
+            {/* Consumibles de Cabina (Kardex descarga automática) */}
+            <div className="pt-2 border-t border-[#24242B]">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCabinSupplies(prev => !prev)}
+                  className="flex items-center gap-2 text-xs font-bold text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  <Boxes className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Descarga de Insumos / Materiales de Cabina (Kardex)</span>
+                  {consumedSupplies.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold border border-emerald-500/30">
+                      {consumedSupplies.length} {consumedSupplies.length === 1 ? 'insumo' : 'insumos'}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCabinSupplies(prev => !prev)}
+                  className="text-[11px] text-[#FF3366] hover:underline cursor-pointer"
+                >
+                  {showCabinSupplies ? 'Ocultar' : '+ Añadir Insumo Usado'}
+                </button>
+              </div>
+
+              {showCabinSupplies && (
+                <div className="p-3 bg-[#121215] border border-[#272730] rounded-xl space-y-3 animate-fadeIn">
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedSupplyToAdd}
+                      onChange={e => setSelectedSupplyToAdd(e.target.value)}
+                      className="flex-1 px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-xs text-white"
+                    >
+                      <option value="">-- Seleccionar Insumo de Cabina --</option>
+                      {inventory
+                        .filter(i => i.currentStock > 0 && !consumedSupplies.some(cs => cs.itemId === i.id))
+                        .map(i => (
+                          <option key={i.id} value={i.id}>
+                            {i.name} (Stock: {i.currentStock} {i.unit})
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={!selectedSupplyToAdd}
+                      onClick={() => {
+                        const invItem = inventory.find(i => i.id === selectedSupplyToAdd);
+                        if (invItem) {
+                          setConsumedSupplies(prev => [
+                            ...prev,
+                            { itemId: invItem.id, name: invItem.name, quantity: 1 },
+                          ]);
+                          setSelectedSupplyToAdd('');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl text-xs font-bold transition-all disabled:opacity-40 cursor-pointer"
+                    >
+                      + Añadir
+                    </button>
+                  </div>
+
+                  {consumedSupplies.length > 0 && (
+                    <div className="space-y-1.5">
+                      {consumedSupplies.map(cs => {
+                        const item = inventory.find(i => i.id === cs.itemId);
+                        return (
+                          <div
+                            key={cs.itemId}
+                            className="flex items-center justify-between p-2 rounded-lg bg-[#18181D] border border-[#25252E] text-xs"
+                          >
+                            <div className="truncate mr-2">
+                              <span className="font-semibold text-white">{cs.name}</span>
+                              <span className="text-[10px] text-neutral-400 ml-2 font-mono">
+                                Stock disp: {item?.currentStock ?? 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className="flex items-center gap-1 bg-[#121215] border border-[#272730] rounded-lg px-2 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setConsumedSupplies(prev =>
+                                      prev.map(p =>
+                                        p.itemId === cs.itemId
+                                          ? { ...p, quantity: Math.max(1, p.quantity - 1) }
+                                          : p
+                                      )
+                                    );
+                                  }}
+                                  className="text-neutral-400 hover:text-white"
+                                >
+                                  -
+                                </button>
+                                <span className="font-mono font-bold text-white text-xs px-1.5">
+                                  {cs.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setConsumedSupplies(prev =>
+                                      prev.map(p =>
+                                        p.itemId === cs.itemId
+                                          ? { ...p, quantity: p.quantity + 1 }
+                                          : p
+                                      )
+                                    );
+                                  }}
+                                  className="text-neutral-400 hover:text-white"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setConsumedSupplies(prev => prev.filter(p => p.itemId !== cs.itemId))
+                                }
+                                className="text-red-400 hover:text-red-300 text-xs px-1 cursor-pointer"
+                                title="Quitar de la lista"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1038,11 +984,55 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
             <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                3. Liquidación & Terminal de Cobro
+                2. Liquidación & Terminal de Cobro
               </h3>
               <span className="text-[11px] font-mono text-[#FF3366] font-bold">
                 Ticket en Curso
               </span>
+            </div>
+
+            {/* Selector de Tipo de Comprobante SRI: Factura (01) vs Nota de Venta RIMPE (02) */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-neutral-300 uppercase tracking-wider">
+                Tipo de Comprobante a Emitir
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocumentType('factura');
+                    setTaxRate(standardVatRate);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    documentType === 'factura'
+                      ? 'bg-[#FF3366]/20 border-[#FF3366] text-white shadow-sm'
+                      : 'bg-[#121215] border-[#272730] text-neutral-400 hover:text-white hover:border-[#383846]'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#FF3366]" />
+                  <span>Factura (IVA {standardVatRate}%)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocumentType('nota_venta');
+                    setTaxRate(0);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    documentType === 'nota_venta'
+                      ? 'bg-purple-500/20 border-purple-500 text-white shadow-sm'
+                      : 'bg-[#121215] border-[#272730] text-neutral-400 hover:text-white hover:border-[#383846]'
+                  }`}
+                >
+                  <Receipt className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Nota Venta RIMPE</span>
+                </button>
+              </div>
+              {documentType === 'nota_venta' && (
+                <p className="text-[10px] text-purple-300 bg-purple-500/10 border border-purple-500/25 px-2.5 py-1.5 rounded-xl">
+                  ℹ️ Régimen RIMPE - Negocio Popular (Art. 97.6 LRTI). Tarifa 0% IVA, sin desglose tributario.
+                </p>
+              )}
             </div>
 
             {/* Numeric Inputs Grid */}
@@ -1083,9 +1073,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   type="number"
                   min="0"
                   max="100"
+                  disabled={documentType === 'nota_venta'}
                   value={taxRate}
                   onChange={e => setTaxRate(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono text-sm focus:border-[#FF3366]/60"
+                  className={`w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono text-sm focus:border-[#FF3366]/60 ${
+                    documentType === 'nota_venta' ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 />
               </div>
 

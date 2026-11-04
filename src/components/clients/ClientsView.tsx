@@ -594,10 +594,158 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
       </div>
 
       {/* =========================================================================
-          HORIZONTAL CLIENTS TABLE (DISEÑO HORIZONTAL TIPO TABLA)
+          HORIZONTAL CLIENTS TABLE (DESKTOP) + RESPONSIVE CARDS (MOBILE/TABLET)
           ========================================================================= */}
       <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        {/* MOBILE CLIENT CARDS VIEW (Visible en pantallas < md) */}
+        <div className="md:hidden divide-y divide-[#24242B]">
+          {filteredClients.length === 0 ? (
+            <div className="py-12 text-center text-neutral-500 text-xs">
+              No se encontraron clientes con los criterios de búsqueda seleccionados.
+            </div>
+          ) : (
+            filteredClients.map(({ client, totalSpent, totalVisits, favArtist }) => (
+              <div key={client.id} className="p-3.5 space-y-3 hover:bg-[#1C1C22] transition-colors">
+                {/* Header: Avatar, Nombre, Tags, DNI y LTV */}
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] font-bold text-xs flex items-center justify-center shrink-0">
+                      {client.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-white text-xs truncate">{client.name}</span>
+                        {client.tags?.map((t, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider ${
+                              t.toLowerCase() === 'vip'
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                : 'bg-[#FF3366]/15 text-[#FF3366] border border-[#FF3366]/30'
+                            }`}
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-neutral-400 font-mono">
+                        {client.dni ? (
+                          <span>ID: {client.dni}</span>
+                        ) : (
+                          <span className="text-neutral-600 italic">Sin Cédula/RUC</span>
+                        )}
+                        {client.sriVerified && (
+                          <span className="px-1.5 py-0.2 rounded font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                            ✓ SRI
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* LTV & Visitas */}
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-mono font-bold text-emerald-400 block">
+                      {formatMoney(totalSpent)}
+                    </span>
+                    <span className="text-[9px] text-neutral-500 font-mono">{totalVisits} visitas</span>
+                  </div>
+                </div>
+
+                {/* Contacto & Ficha Sanitaria */}
+                <div className="flex items-center justify-between text-xs gap-2 pt-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {client.phone && (
+                      <button
+                        type="button"
+                        onClick={() => handleWhatsAppChat(client)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                        title="Abrir WhatsApp"
+                      >
+                        <Share2 className="w-3 h-3" />
+                        <span>{client.phone}</span>
+                      </button>
+                    )}
+                    {client.consentSigned ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <ShieldCheck className="w-3 h-3" />
+                        <span>Ficha OK</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        <ShieldAlert className="w-3 h-3" />
+                        <span>Sin Ficha</span>
+                      </span>
+                    )}
+                  </div>
+                  {favArtist && favArtist !== 'Sin registro' && (
+                    <span className="text-[10px] text-neutral-400 flex items-center gap-1 shrink-0">
+                      <Sparkles className="w-3 h-3 text-[#FF3366]" />
+                      <span className="truncate max-w-[90px]">{favArtist}</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Alerta de Alergias */}
+                {client.allergies && (
+                  <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[10px] flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="truncate"><strong>Alergias:</strong> {client.allergies}</span>
+                  </div>
+                )}
+
+                {/* Barra de Acciones Móvil */}
+                <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-[#24242B]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewHistoryClient(client);
+                      setHistoryTab('sales');
+                    }}
+                    className="py-1.5 px-2 rounded-xl bg-[#252530] hover:bg-[#323240] text-white text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    title="Ver expediente clínico 360°"
+                  >
+                    <Eye className="w-3 h-3 text-[#FF3366]" />
+                    <span>Ficha</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(client)}
+                    className="py-1.5 px-2 rounded-xl bg-[#121215] hover:bg-[#1E1E26] text-blue-300 border border-[#272730] text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    title="Editar ficha"
+                  >
+                    <Edit2 className="w-3 h-3 text-blue-400" />
+                    <span>Editar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCobrarEnPos(client)}
+                    className="py-1.5 px-2 rounded-xl bg-[#FF3366]/15 hover:bg-[#FF3366]/25 text-[#FF3366] border border-[#FF3366]/30 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    title="Cobrar en Terminal POS"
+                  >
+                    <CreditCard className="w-3 h-3" />
+                    <span>POS</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteClient(client)}
+                    className="py-1.5 px-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    title="Eliminar cliente"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Borrar</span>
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* TABLA HORIZONTAL (Visible en pantallas >= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
@@ -917,10 +1065,10 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
             })()}
 
             {/* Sub-Tabs: Ventas, Citas, Ficha Médica */}
-            <div className="flex items-center gap-2 border-b border-[#25252E] pb-2 shrink-0">
+            <div className="flex items-center gap-2 border-b border-[#25252E] pb-2.5 shrink-0 overflow-x-auto whitespace-nowrap no-scrollbar">
               <button
                 onClick={() => setHistoryTab('sales')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   historyTab === 'sales'
                     ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -931,7 +1079,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
               </button>
               <button
                 onClick={() => setHistoryTab('appointments')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   historyTab === 'appointments'
                     ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -942,7 +1090,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
               </button>
               <button
                 onClick={() => setHistoryTab('medical')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                   historyTab === 'medical'
                     ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -961,7 +1109,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                 return (
                   <button
                     onClick={() => setHistoryTab('gallery')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                       historyTab === 'gallery'
                         ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
                         : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
@@ -977,7 +1125,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
             {/* Tab Contents */}
             <div className="overflow-y-auto flex-1 custom-scrollbar">
               {historyTab === 'sales' && (
-                <div>
+                <div className="overflow-x-auto rounded-xl border border-[#24242B]">
                   {(() => {
                     const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
                     const sList = matched ? matched.clientSales : [];
@@ -1044,7 +1192,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
               )}
 
               {historyTab === 'appointments' && (
-                <div>
+                <div className="overflow-x-auto rounded-xl border border-[#24242B]">
                   {(() => {
                     const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
                     const aList = matched ? matched.clientAppointments : [];

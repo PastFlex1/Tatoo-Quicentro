@@ -9,9 +9,11 @@ import {
   ChevronRight,
   X,
   Menu,
+  User,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { DateFilterRange } from '../../types';
+import { UserSwitcherModal } from '../users/UserSwitcherModal';
 
 interface HeaderProps {
   onOpenNewSale: () => void;
@@ -24,8 +26,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewExpense,
   onToggleSidebar,
 }) => {
-  const { activeTab, dateFilter, setDateFilter, theme, toggleTheme } = useStudio();
+  const { activeTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser } = useStudio();
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
   const getBreadcrumb = () => {
     switch (activeTab) {
@@ -47,6 +50,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Gastos & Compras';
       case 'suppliers':
         return 'Gestión de Proveedores & Distribuidores';
+      case 'purchase-orders':
+        return 'Órdenes de Compra & Adquisiciones';
       case 'artists':
         return 'Liquidación de Artistas';
       case 'cash':
@@ -59,6 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Libro Mayor & Plan Contable';
       case 'reports':
         return 'Centro de Reportes Financieros';
+      case 'users':
+        return 'Gestión de Usuarios, Roles & Permisos';
       case 'settings':
         return 'Ajustes del Estudio';
       default:
@@ -185,8 +192,34 @@ export const Header: React.FC<HeaderProps> = ({
               <Moon className="w-3.5 h-3.5 text-neutral-300" />
             )}
           </button>
+
+          {/* Active User Switcher Pill */}
+          <button
+            type="button"
+            onClick={() => setIsSwitcherOpen(true)}
+            className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-[#1A1A20] border border-[#2D2D36] hover:border-[#FF3366]/50 transition-all cursor-pointer shrink-0"
+            title={`Usuario conectado: ${currentUser?.nombres} (@${currentUser?.username})`}
+          >
+            <div className="w-6 h-6 rounded-full bg-[#FF3366] text-white flex items-center justify-center font-bold text-[10px]">
+              {currentUser?.nombres?.slice(0, 1) || 'U'}
+            </div>
+            <div className="hidden lg:flex flex-col text-left">
+              <span className="text-[11px] font-bold text-white leading-tight">
+                {currentUser?.nombres?.split(' ')[0] || 'Usuario'}
+              </span>
+              <span className="text-[9px] text-[#FF3366] font-mono leading-tight">
+                {currentUser?.rol || 'ADMIN'}
+              </span>
+            </div>
+          </button>
         </div>
       </div>
+
+      {/* User Switcher Modal */}
+      <UserSwitcherModal
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
+      />
 
       {/* Sub-row: Scrollable Date Filter Strip on Mobile / Tablet / Laptop (< xl) */}
       {showFilterTabs && (

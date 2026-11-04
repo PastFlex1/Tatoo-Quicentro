@@ -8,6 +8,9 @@ import {
   Filter,
   X,
   Layers,
+  RefreshCw,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { KardexMovementType } from '../../types';
@@ -19,6 +22,7 @@ export const KardexView: React.FC = () => {
     artists,
     formatMoney,
     addKardexMovement,
+    reconcileKardexInventory,
   } = useStudio();
 
   // Filters state
@@ -26,10 +30,13 @@ export const KardexView: React.FC = () => {
   const [kardexTypeFilter, setKardexTypeFilter] = useState<string>('all');
   const [kardexSearch, setKardexSearch] = useState<string>('');
   const [isKardexModalOpen, setIsKardexModalOpen] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Kardex Movement Modal Form
   const [kdxItemId, setKdxItemId] = useState<string>(inventory[0]?.id || '');
   const [kdxType, setKdxType] = useState<KardexMovementType>('cabin_out');
+  const [kdxIsAdjustmentEntry, setKdxIsAdjustmentEntry] = useState(false);
   const [kdxQty, setKdxQty] = useState<number>(1);
   const [kdxUnitCost, setKdxUnitCost] = useState<string>('');
   const [kdxRef, setKdxRef] = useState<string>('');
@@ -89,14 +96,29 @@ export const KardexView: React.FC = () => {
           ? 'Consumo de insumo en sesión de cabina'
           : kdxType === 'retail_sale'
           ? 'Salida por venta en mostrador'
-          : 'Ajuste de inventario físico'),
+          : (kdxIsAdjustmentEntry ? 'Ajuste positivo por inventario físico' : 'Baja / merma sanitaria de insumo')),
       responsible: kdxResponsible.trim() || 'Administración',
+      isEntry: kdxType === 'adjustment' ? kdxIsAdjustmentEntry : undefined,
     });
 
     setIsKardexModalOpen(false);
     setKdxQty(1);
     setKdxRef('');
     setKdxConcept('');
+  };
+
+  const handleReconcile = () => {
+    setIsSyncing(true);
+    setTimeout(() => {
+      const res = reconcileKardexInventory();
+      if (res.adjustmentsMade > 0) {
+        setSyncNotice(`¡Kardex conciliado! Se generaron ${res.adjustmentsMade} ajustes automáticos para cuadrar los saldos con la existencia en bodega.`);
+      } else {
+        setSyncNotice('¡Kardex completamente sincronizado! Todos los movimientos y saldos concuerdan al 100% con el inventario físico.');
+      }
+      setIsSyncing(false);
+      setTimeout(() => setSyncNotice(null), 5000);
+    }, 400);
   };
 
   const handleExportCSV = () => {
@@ -162,6 +184,22 @@ export const KardexView: React.FC = () => {
 
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
+      {/* Toast Banner */}
+      {syncNotice && (
+        <div className="p-4 bg-emerald-500/15 border border-emerald-500/30 rounded-2xl text-emerald-300 text-xs flex items-center justify-between shadow-lg animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span className="font-semibold">{syncNotice}</span>
+          </div>
+          <button
+            onClick={() => setSyncNotice(null)}
+            className="text-emerald-400 hover:text-white p-1 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#24242A] pb-4">
         <div>
@@ -177,6 +215,17 @@ export const KardexView: React.FC = () => {
         </div>
 
         <div className="flex items-center flex-wrap gap-2">
+          {/* Synchronize Button */}
+          <button
+            onClick={handleReconcile}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600/30 text-emerald-400 text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.2)] cursor-pointer disabled:opacity-50"
+            title="Conciliar y sincronizar los movimientos del sistema con los saldos del inventario"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>Sincronizar Kardex</span>
+          </button>
+
           <button
             onClick={() => setIsKardexModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(255,51,102,0.35)] cursor-pointer"
@@ -491,6 +540,39 @@ export const KardexView: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {kdxType === 'adjustment' && (
+                <div className="p-3 bg-[#111114] rounded-xl border border-amber-500/30 flex items-center justify-between">
+                  <div>
+                    <span className="text-neutral-300 font-semibold text-[11px] block">Sentido del Ajuste Físico:</span>
+                    <span className="text-[10px] text-neutral-500">¿Aumenta o disminuye el inventario?</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setKdxIsAdjustmentEntry(true)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        kdxIsAdjustmentEntry
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.2)]'
+                          : 'bg-[#18181D] text-neutral-500 border border-transparent'
+                      }`}
+                    >
+                      + Ingreso
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setKdxIsAdjustmentEntry(false)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        !kdxIsAdjustmentEntry
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.2)]'
+                          : 'bg-[#18181D] text-neutral-500 border border-transparent'
+                      }`}
+                    >
+                      - Salida / Merma
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>

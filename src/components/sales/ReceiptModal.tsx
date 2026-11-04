@@ -36,23 +36,19 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  if (!sale) return null;
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   // Formatted Sequential Number (001-001-000000001)
   const fullInvoiceNumber = useMemo(() => {
+    if (!sale) return '';
     const digits = sale.invoiceNumber.replace(/\D/g, '');
     const sec = (digits || '1').padStart(9, '0').slice(-9);
     const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
     const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
     return `${estab}-${pto}-${sec}`;
-  }, [sale.invoiceNumber, settings.codigoEstablecimiento, settings.puntoEmision]);
+  }, [sale?.invoiceNumber, settings.codigoEstablecimiento, settings.puntoEmision]);
 
   // Official SRI 49-digit access key
   const claveAccesoCalculada = useMemo(() => {
+    if (!sale) return '';
     try {
       const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
       const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
@@ -76,6 +72,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => 
       return '0101202601179001234500110010010000000011234567812';
     }
   }, [sale, settings]);
+
+  if (!sale) return null;
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   // SRI Totals calculation
   const subtotalSinImpuestos = Math.max(0, sale.subtotal - sale.discount);

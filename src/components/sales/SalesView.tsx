@@ -7,45 +7,139 @@ import {
   Trash2,
   ShieldCheck,
   ShieldAlert,
+  FileText,
+  Receipt,
+  RotateCcw,
+  CheckCircle2,
+  AlertCircle,
+  Share2,
+  Filter,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { SaleRecord } from '../../types';
+import { SaleRecord, CreditNoteRecord } from '../../types';
+import { NewCreditNoteModal } from './NewCreditNoteModal';
+import { CreditNotePrintModal } from './CreditNotePrintModal';
+import { SalesNotePrintModal } from './SalesNotePrintModal';
 
 interface SalesViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
   onOpenNewSale: () => void;
 }
 
-export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSale }) => {
-  const { filteredSales, deleteSale, formatMoney } = useStudio();
+type BillingTabType = 'invoices' | 'sales_notes' | 'credit_notes';
 
+export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSale }) => {
+  const {
+    filteredSales,
+    filteredCreditNotes,
+    deleteSale,
+    deleteCreditNote,
+    formatMoney,
+  } = useStudio();
+
+  // Active Billing Tab
+  const [activeSubTab, setActiveSubTab] = useState<BillingTabType>('invoices');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [methodFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const salesList = useMemo(() => {
-    return filteredSales.filter(sale => {
-      const matchesSearch =
-        sale.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.artistName.toLowerCase().includes(searchTerm.toLowerCase());
+  // Modals state
+  const [isNewCreditNoteOpen, setIsNewCreditNoteOpen] = useState(false);
+  const [creditNoteToPreselect, setCreditNoteToPreselect] = useState<SaleRecord | null>(null);
+  const [selectedCreditNoteToPrint, setSelectedCreditNoteToPrint] = useState<CreditNoteRecord | null>(null);
+  const [selectedSalesNoteToPrint, setSelectedSalesNoteToPrint] = useState<SaleRecord | null>(null);
 
-      const matchesCat = categoryFilter === 'all' || sale.serviceCategory === categoryFilter;
-      const matchesMethod = methodFilter === 'all' || sale.paymentMethod === methodFilter;
+  // 1. Facturas Electrónicas (Tipo 01)
+  const invoicesList = useMemo(() => {
+    return filteredSales
+      .filter(s => s.documentType !== 'nota_venta')
+      .filter(sale => {
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+          sale.clientName.toLowerCase().includes(q) ||
+          sale.serviceName.toLowerCase().includes(q) ||
+          sale.invoiceNumber.toLowerCase().includes(q) ||
+          sale.artistName.toLowerCase().includes(q) ||
+          (sale.clientDni && sale.clientDni.toLowerCase().includes(q));
 
-      return matchesSearch && matchesCat && matchesMethod;
+        const matchesCat = categoryFilter === 'all' || sale.serviceCategory === categoryFilter;
+        const matchesStatus =
+          statusFilter === 'all' ||
+          (statusFilter === 'cancelled' && (sale.status === 'cancelled' || Boolean(sale.creditNoteNumber))) ||
+          (statusFilter === 'active' && sale.status !== 'cancelled' && !sale.creditNoteNumber);
+
+        return matchesSearch && matchesCat && matchesStatus;
+      });
+  }, [filteredSales, searchTerm, categoryFilter, statusFilter]);
+
+  // 2. Notas de Venta RIMPE (Tipo 02)
+  const salesNotesList = useMemo(() => {
+    return filteredSales
+      .filter(s => s.documentType === 'nota_venta')
+      .filter(sale => {
+        const q = searchTerm.toLowerCase();
+        const matchesSearch =
+          sale.clientName.toLowerCase().includes(q) ||
+          sale.serviceName.toLowerCase().includes(q) ||
+          sale.invoiceNumber.toLowerCase().includes(q) ||
+          sale.artistName.toLowerCase().includes(q) ||
+          (sale.clientDni && sale.clientDni.toLowerCase().includes(q));
+
+        const matchesCat = categoryFilter === 'all' || sale.serviceCategory === categoryFilter;
+        return matchesSearch && matchesCat;
+      });
+  }, [filteredSales, searchTerm, categoryFilter]);
+
+  // 3. Notas de Crédito (Tipo 04)
+  const creditNotesList = useMemo(() => {
+    return filteredCreditNotes.filter(cn => {
+      const q = searchTerm.toLowerCase();
+      return (
+        cn.creditNoteNumber.toLowerCase().includes(q) ||
+        cn.affectedInvoiceNumber.toLowerCase().includes(q) ||
+        cn.clientName.toLowerCase().includes(q) ||
+        cn.reasonDescription.toLowerCase().includes(q) ||
+        (cn.clientDni && cn.clientDni.toLowerCase().includes(q))
+      );
     });
-  }, [filteredSales, searchTerm, categoryFilter, methodFilter]);
+  }, [filteredCreditNotes, searchTerm]);
 
-  const totalGross = salesList.reduce((acc, s) => acc + s.total, 0);
-  const totalTax = salesList.reduce((acc, s) => acc + s.taxAmount, 0);
-  const totalStudio = salesList.reduce((acc, s) => acc + s.studioShare, 0);
-  const totalArtists = salesList.reduce((acc, s) => acc + s.artistShare, 0);
+  // Totals calculations
+  const totalInvoicesGross = invoicesList.reduce((acc, s) => acc + s.total, 0);
+  const totalInvoicesTax = invoicesList.reduce((acc, s) => acc + s.taxAmount, 0);
+  const totalInvoicesStudio = invoicesList.reduce((acc, s) => acc + s.studioShare, 0);
+
+  const totalSalesNotesGross = salesNotesList.reduce((acc, s) => acc + s.total, 0);
+  const totalCreditNotesReverted = creditNotesList.reduce((acc, cn) => acc + cn.total, 0);
 
   const exportToCSV = () => {
+    if (activeSubTab === 'credit_notes') {
+      const headers = ['N° Nota Crédito', 'Fecha', 'Factura Afectada', 'Cliente', 'Cédula / RUC', 'Motivo', 'Subtotal', 'IVA', 'Total'];
+      const rows = creditNotesList.map(cn => [
+        `"${cn.creditNoteNumber}"`,
+        `"${cn.date}"`,
+        `"${cn.affectedInvoiceNumber}"`,
+        `"${cn.clientName}"`,
+        `"${cn.clientDni || ''}"`,
+        `"${cn.reasonDescription.replace(/"/g, '""')}"`,
+        cn.subtotal,
+        cn.taxAmount,
+        cn.total,
+      ]);
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `notas_credito_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    const currentData = activeSubTab === 'sales_notes' ? salesNotesList : invoicesList;
     const headers = [
-      'Factura',
+      activeSubTab === 'sales_notes' ? 'N° Nota Venta' : 'N° Factura',
       'Fecha',
       'Cliente',
       'Cédula / RUC',
@@ -53,21 +147,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
       'Servicio',
       'Categoría',
       'Artista',
-      'Horas',
       'Base Imponible',
       'IVA',
       'Total',
-      'Seña Previa',
-      'Cobrado Hoy',
       'Método Pago',
-      'Comisión Artista %',
-      'Comisión Artista Importe',
-      'Retención Estudio',
-      'Propina',
-      'Consentimiento Firmado',
+      'Estado',
     ];
 
-    const rows = salesList.map(s => [
+    const rows = currentData.map(s => [
       `"${s.invoiceNumber}"`,
       `"${s.date}"`,
       `"${s.clientName}"`,
@@ -76,37 +163,38 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
       `"${s.serviceName.replace(/"/g, '""')}"`,
       `"${s.serviceCategory}"`,
       `"${s.artistName}"`,
-      s.hours || 0,
       s.subtotal - s.discount,
       s.taxAmount,
       s.total,
-      s.depositAmount,
-      s.amountPaidNow,
       `"${s.paymentMethod}"`,
-      s.artistCommissionPercent,
-      s.artistShare,
-      s.studioShare,
-      s.tipAmount,
-      s.consentFormSigned ? 'SÍ' : 'NO',
+      s.creditNoteNumber ? `ANULADA POR NC ${s.creditNoteNumber}` : s.status === 'cancelled' ? 'ANULADA' : 'EMITIDA',
     ]);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,\uFEFF' +
-      [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `ventas_tatuajes_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `${activeSubTab === 'sales_notes' ? 'notas_de_venta' : 'facturas'}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleDelete = (id: string, invoice: string) => {
-    if (confirm(`¿Estás seguro de anular y eliminar la factura ${invoice}?`)) {
+    if (confirm(`¿Estás seguro de anular el comprobante ${invoice}?`)) {
       deleteSale(id);
     }
+  };
+
+  const handleDeleteCreditNote = (id: string, number: string) => {
+    if (confirm(`¿Estás seguro de eliminar el registro de Nota de Crédito ${number}?`)) {
+      deleteCreditNote(id);
+    }
+  };
+
+  const handleOpenEmitCreditNote = (sale?: SaleRecord) => {
+    setCreditNoteToPreselect(sale || null);
+    setIsNewCreditNoteOpen(true);
   };
 
   return (
@@ -114,46 +202,104 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
       {/* Top summary strip */}
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[10px] text-neutral-400 block mb-1">Ventas Filtradas</span>
+          <span className="text-[10px] text-neutral-400 block mb-1">Total Facturas (01)</span>
           <span className="text-lg font-bold font-mono tabular-nums text-white">
-            {formatMoney(totalGross)}
+            {formatMoney(totalInvoicesGross)}
           </span>
-          <span className="text-[10px] text-neutral-500 block mt-1">{salesList.length} operaciones</span>
+          <span className="text-[10px] text-neutral-500 block mt-1">{invoicesList.length} facturas emitidas</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[10px] text-neutral-400 block mb-1">Retención Estudio</span>
-          <span className="text-lg font-bold font-mono tabular-nums text-white">
-            {formatMoney(totalStudio)}
+          <span className="text-[10px] text-neutral-400 block mb-1">Notas de Venta RIMPE (02)</span>
+          <span className="text-lg font-bold font-mono tabular-nums text-amber-300">
+            {formatMoney(totalSalesNotesGross)}
           </span>
-          <span className="text-[10px] text-neutral-500 block mt-1">Beneficio de la casa</span>
+          <span className="text-[10px] text-neutral-500 block mt-1">{salesNotesList.length} notas populares</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[10px] text-neutral-400 block mb-1">Comisiones Artistas</span>
+          <span className="text-[10px] text-neutral-400 block mb-1">Notas de Crédito (04)</span>
           <span className="text-lg font-bold font-mono tabular-nums text-[#FF3366]">
-            {formatMoney(totalArtists)}
+            -{formatMoney(totalCreditNotesReverted)}
           </span>
-          <span className="text-[10px] text-neutral-500 block mt-1">A pagar</span>
+          <span className="text-[10px] text-neutral-500 block mt-1">{creditNotesList.length} reversos aplicados</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[10px] text-neutral-400 block mb-1">IVA / Impuestos</span>
-          <span className="text-lg font-bold font-mono tabular-nums text-neutral-200">
-            {formatMoney(totalTax)}
+          <span className="text-[10px] text-neutral-400 block mb-1">IVA Total Repercutido</span>
+          <span className="text-lg font-bold font-mono tabular-nums text-emerald-400">
+            {formatMoney(totalInvoicesTax)}
           </span>
-          <span className="text-[10px] text-neutral-500 block mt-1">Repercutido</span>
+          <span className="text-[10px] text-neutral-500 block mt-1">15% SRI facturación</span>
         </div>
 
-        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-center xs:col-span-2 lg:col-span-1">
-          <button
-            onClick={onOpenNewSale}
-            className="w-full py-2.5 px-3 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)]"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>Cobrar Servicio</span>
-          </button>
+        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col justify-center xs:col-span-2 lg:col-span-1 gap-2">
+          {activeSubTab === 'credit_notes' ? (
+            <button
+              onClick={() => handleOpenEmitCreditNote()}
+              className="w-full py-2.5 px-3 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>+ Emitir Nota Crédito</span>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenNewSale}
+              className="w-full py-2.5 px-3 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>Cobrar en POS</span>
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Main SubTab Selector: Facturas vs Notas de Venta vs Notas de Crédito */}
+      <div className="flex items-center gap-2 border-b border-[#272730] pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('invoices')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'invoices'
+              ? 'bg-[#FF3366] text-white shadow-md shadow-[#FF3366]/20'
+              : 'bg-[#18181D] text-neutral-400 hover:text-white border border-[#272730]'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Historial de Facturas (Tipo 01)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-black/20 font-mono">
+            {invoicesList.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('sales_notes')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'sales_notes'
+              ? 'bg-[#FF3366] text-white shadow-md shadow-[#FF3366]/20'
+              : 'bg-[#18181D] text-neutral-400 hover:text-white border border-[#272730]'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>Historial de Notas de Venta (Tipo 02 - RIMPE)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-black/20 font-mono">
+            {salesNotesList.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('credit_notes')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
+            activeSubTab === 'credit_notes'
+              ? 'bg-[#FF3366] text-white shadow-md shadow-[#FF3366]/20'
+              : 'bg-[#18181D] text-neutral-400 hover:text-white border border-[#272730]'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4" />
+          <span>Historial de Notas de Crédito (Tipo 04)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] bg-black/20 font-mono">
+            {creditNotesList.length}
+          </span>
+        </button>
       </div>
 
       {/* Filter and Search Bar with Tag pills */}
@@ -161,7 +307,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
         <div className="relative w-full md:w-80">
           <input
             type="text"
-            placeholder="Buscar cliente, factura o artista..."
+            placeholder={
+              activeSubTab === 'credit_notes'
+                ? 'Buscar por N° Nota Crédito, Factura o Cliente...'
+                : activeSubTab === 'sales_notes'
+                ? 'Buscar por N° Nota de Venta, Cliente...'
+                : 'Buscar por N° Factura, Cliente, RUC o Artista...'
+            }
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-4 pr-10 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
@@ -170,33 +322,57 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 w-full md:w-auto">
-          {[
-            { id: 'all', label: 'Todo' },
-            { id: 'tattoo', label: 'Tatuajes' },
-            { id: 'piercing', label: 'Piercings' },
-            { id: 'jewelry', label: 'Joyería' },
-            { id: 'aftercare', label: 'Aftercare' },
-          ].map(tag => {
-            const isActive = categoryFilter === tag.id;
-            return (
+          {activeSubTab === 'invoices' && (
+            <>
+              {[
+                { id: 'all', label: 'Todo' },
+                { id: 'tattoo', label: 'Tatuajes' },
+                { id: 'piercing', label: 'Piercings' },
+                { id: 'jewelry', label: 'Joyería' },
+                { id: 'aftercare', label: 'Aftercare' },
+              ].map(tag => (
+                <button
+                  key={tag.id}
+                  onClick={() => setCategoryFilter(tag.id)}
+                  className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    categoryFilter === tag.id
+                      ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
+                      : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                  }`}
+                >
+                  {tag.label}
+                </button>
+              ))}
+
+              <div className="h-4 w-px bg-[#272730] mx-1 shrink-0" />
+
               <button
-                key={tag.id}
-                onClick={() => setCategoryFilter(tag.id)}
-                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
+                onClick={() => setStatusFilter(prev => (prev === 'cancelled' ? 'all' : 'cancelled'))}
+                className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  statusFilter === 'cancelled'
+                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
                     : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
                 }`}
               >
-                {tag.label}
+                Con Nota de Crédito
               </button>
-            );
-          })}
+            </>
+          )}
+
+          {activeSubTab === 'credit_notes' && (
+            <button
+              onClick={() => handleOpenEmitCreditNote()}
+              className="flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>+ Nueva Nota de Crédito</span>
+            </button>
+          )}
 
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-4 py-1 rounded-full border border-[#FF3366] text-[#FF3366] hover:bg-[#FF3366]/10 text-xs font-semibold transition-all whitespace-nowrap ml-auto md:ml-2 shrink-0"
-            title="Exportar a CSV / Excel"
+            className="flex items-center gap-1.5 px-4 py-1 rounded-full border border-[#FF3366] text-[#FF3366] hover:bg-[#FF3366]/10 text-xs font-semibold transition-all whitespace-nowrap ml-auto md:ml-2 shrink-0 cursor-pointer"
+            title="Exportar listado a CSV"
           >
             <Download className="w-3.5 h-3.5" />
             <span>CSV</span>
@@ -204,115 +380,624 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
         </div>
       </div>
 
-      {/* Main Table */}
-      <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead>
-              <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                <th className="py-3.5 px-4 whitespace-nowrap">Factura</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Fecha</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Cliente</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Concepto / Servicio</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Artista</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Pago</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Artista</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Estudio</th>
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">Ficha</th>
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#222228]">
-              {salesList.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-12 text-center text-neutral-500">
-                    No se encontraron registros de ventas con los filtros actuales.
-                  </td>
-                </tr>
-              ) : (
-                salesList.map(sale => (
-                  <tr key={sale.id} className="hover:bg-[#1E1E25] transition-colors">
-                    <td className="py-3 px-4 font-mono font-bold text-[#FF3366] whitespace-nowrap">
-                      {sale.invoiceNumber}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
-                      {new Date(sale.date).toLocaleString('es-ES', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="font-semibold text-white">{sale.clientName}</div>
-                      {sale.clientPhone && (
-                        <div className="text-[10px] text-neutral-500">{sale.clientPhone}</div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 max-w-[240px] xl:max-w-[380px]">
-                      <div className="text-neutral-200 font-medium truncate">{sale.serviceName}</div>
-                      <div className="text-[10px] text-neutral-500 flex items-center gap-1">
-                        <span className="capitalize">{sale.serviceCategory}</span>
-                        {sale.hours && <span>· {sale.hours} hrs</span>}
-                        {sale.depositAmount > 0 && (
-                          <span className="text-[#FF3366]">· Seña: {formatMoney(sale.depositAmount)}</span>
+      {/* ========================================================================= */}
+      {/* TAB 1: HISTORIAL DE FACTURAS (TIPO 01) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'invoices' && (
+        <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
+          {/* Mobile Card List (md:hidden) */}
+          <div className="md:hidden divide-y divide-[#222228]">
+            {invoicesList.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500 text-xs">
+                No se encontraron facturas emitidas con los filtros actuales.
+              </div>
+            ) : (
+              invoicesList.map(sale => {
+                const hasCreditNote = Boolean(sale.creditNoteNumber);
+                const isCancelled = sale.status === 'cancelled';
+                return (
+                  <div key={`m-inv-${sale.id}`} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="font-mono font-bold text-xs text-[#FF3366]">
+                          {sale.invoiceNumber}
+                        </span>
+                        <div className="text-[10px] font-mono text-neutral-400">
+                          {new Date(sale.date).toLocaleDateString('es-EC', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        {isCancelled || hasCreditNote ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            ANULADA CON NC
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                            <span>AUTORIZADO</span>
+                          </span>
                         )}
                       </div>
-                    </td>
-                    <td className="py-3 px-4 text-neutral-300 whitespace-nowrap">
-                      {sale.artistName}
-                    </td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-mono bg-[#121215] border border-[#272730] text-neutral-300">
-                        {sale.paymentMethod === 'cash' ? 'Efectivo' : sale.paymentMethod === 'card' ? 'Tarjeta' : sale.paymentMethod === 'transfer' ? 'Transf' : 'Mixto'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
-                      {formatMoney(sale.total)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-[#FF3366] whitespace-nowrap">
-                      {formatMoney(sale.artistShare)}
-                    </td>
-                    <td className="py-3 px-4 text-right font-mono text-white whitespace-nowrap">
-                      {formatMoney(sale.studioShare)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      {sale.consentFormSigned ? (
-                        <span title="Ficha sanitaria firmada" className="inline-flex text-emerald-400">
-                          <ShieldCheck className="w-4 h-4" />
-                        </span>
-                      ) : (
-                        <span title="Sin ficha médica firmada" className="inline-flex text-neutral-600">
-                          <ShieldAlert className="w-4 h-4" />
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5">
+                    </div>
+
+                    <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-white truncate">{sale.clientName}</span>
+                        <span className="text-[10px] font-mono text-neutral-400">{sale.clientDni || 'Consumidor Final'}</span>
+                      </div>
+                      <div className="text-[11px] text-neutral-300 truncate">{sale.serviceName}</div>
+                      <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5">
+                        <span className="capitalize">{sale.serviceCategory} · {sale.artistName}</span>
+                        {hasCreditNote && (
+                          <span className="text-amber-400 font-mono">NC: {sale.creditNoteNumber}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-3 text-xs">
+                        <div>
+                          <span className="text-[9px] text-neutral-500 block uppercase">Subtotal</span>
+                          <span className="font-mono text-neutral-300">{formatMoney(sale.subtotal - (sale.discount || 0))}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-neutral-500 block uppercase">IVA 15%</span>
+                          <span className="font-mono text-emerald-400">{formatMoney(sale.taxAmount)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-neutral-400 block uppercase font-bold">Total</span>
+                          <span className="font-mono font-bold text-white text-sm">{formatMoney(sale.total)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => onOpenReceipt(sale)}
-                          className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors"
-                          title="Ver Ticket Imprimible"
+                          className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                          title="Ver / Imprimir Factura RIDE"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {!hasCreditNote && !isCancelled && (
+                          <button
+                            onClick={() => handleOpenEmitCreditNote(sale)}
+                            className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 cursor-pointer"
+                            title="Emitir Nota de Crédito para esta factura"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
+                          className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
+                          title="Anular Factura"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View (hidden md:block) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
+                  <th className="py-3.5 px-4 whitespace-nowrap">N° Factura</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Fecha Emisión</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Cliente & Cédula / RUC</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Concepto / Servicio</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Artista</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Estado SRI</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Subtotal</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">IVA (15%)</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Total</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#222228]">
+                {invoicesList.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-12 text-center text-neutral-500">
+                      No se encontraron facturas emitidas con los filtros actuales.
+                    </td>
+                  </tr>
+                ) : (
+                  invoicesList.map(sale => {
+                    const hasCreditNote = Boolean(sale.creditNoteNumber);
+                    const isCancelled = sale.status === 'cancelled';
+                    return (
+                      <tr key={sale.id} className="hover:bg-[#1E1E25] transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-[#FF3366] whitespace-nowrap">
+                          <div>{sale.invoiceNumber}</div>
+                          {hasCreditNote && (
+                            <span className="text-[9px] text-amber-400 font-mono block">
+                              NC: {sale.creditNoteNumber}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
+                          {new Date(sale.date).toLocaleDateString('es-EC', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-semibold text-white">{sale.clientName}</div>
+                          <div className="text-[10px] font-mono text-neutral-500">
+                            {sale.clientDni || 'Consumidor Final'}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 max-w-[240px] xl:max-w-[340px]">
+                          <div className="text-neutral-200 font-medium truncate">{sale.serviceName}</div>
+                          <div className="text-[10px] text-neutral-500 flex items-center gap-1">
+                            <span className="capitalize">{sale.serviceCategory}</span>
+                            {sale.hours && <span>· {sale.hours} hrs</span>}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-neutral-300 whitespace-nowrap">
+                          {sale.artistName}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          {isCancelled || hasCreditNote ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              ANULADA CON NC
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>AUTORIZADO</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
+                          {formatMoney(sale.subtotal - (sale.discount || 0))}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-emerald-400 whitespace-nowrap">
+                          {formatMoney(sale.taxAmount)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
+                          {formatMoney(sale.total)}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => onOpenReceipt(sale)}
+                              className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
+                              title="Ver / Imprimir Factura RIDE"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
+                            {!hasCreditNote && !isCancelled && (
+                              <button
+                                onClick={() => handleOpenEmitCreditNote(sale)}
+                                className="p-1.5 rounded-full text-neutral-400 hover:text-amber-400 hover:bg-[#282834] transition-colors cursor-pointer"
+                                title="Emitir Nota de Crédito para esta factura"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
+                              className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
+                              title="Anular Factura"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: HISTORIAL DE NOTAS DE VENTA (TIPO 02 - RIMPE NEGOCIO POPULAR) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'sales_notes' && (
+        <div className="space-y-3">
+          <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs text-amber-200">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>Régimen RIMPE Negocio Popular:</strong> Las Notas de Venta se emiten sin desglose de IVA (Art. 97.6 Ley de Régimen Tributario Interno).
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-amber-300">
+              Tipo Comprobante: 02
+            </span>
+          </div>
+
+          <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
+            {/* Mobile Card List (md:hidden) */}
+            <div className="md:hidden divide-y divide-[#222228]">
+              {salesNotesList.length === 0 ? (
+                <div className="p-8 text-center text-neutral-500 text-xs">
+                  No se han emitido notas de venta RIMPE en este período.
+                </div>
+              ) : (
+                salesNotesList.map(sale => (
+                  <div key={`m-nv-${sale.id}`} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="font-mono font-bold text-xs text-amber-400">
+                          {sale.invoiceNumber}
+                        </span>
+                        <div className="text-[10px] font-mono text-neutral-400">
+                          {new Date(sale.date).toLocaleDateString('es-EC', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        RIMPE POPULAR
+                      </span>
+                    </div>
+
+                    <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-white truncate">{sale.clientName}</span>
+                        <span className="text-[10px] font-mono text-neutral-400">{sale.clientDni || 'Consumidor Final'}</span>
+                      </div>
+                      <div className="text-[11px] text-neutral-300 truncate">{sale.serviceName}</div>
+                      <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5">
+                        <span className="capitalize">{sale.serviceCategory} · {sale.artistName}</span>
+                        <span className="uppercase font-mono text-neutral-400">
+                          {sale.paymentMethod === 'cash' ? 'Efectivo' : sale.paymentMethod === 'card' ? 'Tarjeta' : 'Transf'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <span className="text-[9px] text-neutral-400 block uppercase font-bold">Valor Total</span>
+                        <span className="font-mono font-bold text-white text-base">{formatMoney(sale.total)}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setSelectedSalesNoteToPrint(sale)}
+                          className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                          title="Ver / Imprimir Nota de Venta"
+                        >
+                          <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
-                          className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors"
-                          title="Anular venta"
+                          className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
+                          title="Anular Nota de Venta"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop Table View (hidden md:block) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
+                    <th className="py-3.5 px-4 whitespace-nowrap">N° Nota de Venta</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Fecha Emisión</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Cliente & Cédula / RUC</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Concepto / Servicio</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Atendido por</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Forma de Pago</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Régimen</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">Valor Total</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#222228]">
+                  {salesNotesList.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-neutral-500">
+                        No se han emitido notas de venta RIMPE en este período.
+                      </td>
+                    </tr>
+                  ) : (
+                    salesNotesList.map(sale => (
+                      <tr key={sale.id} className="hover:bg-[#1E1E25] transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-amber-400 whitespace-nowrap">
+                          {sale.invoiceNumber}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
+                          {new Date(sale.date).toLocaleDateString('es-EC', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="font-semibold text-white">{sale.clientName}</div>
+                          <div className="text-[10px] font-mono text-neutral-500">
+                            {sale.clientDni || 'Consumidor Final'}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 max-w-[260px]">
+                          <div className="text-neutral-200 font-medium truncate">{sale.serviceName}</div>
+                          <div className="text-[10px] text-neutral-500 capitalize">{sale.serviceCategory}</div>
+                        </td>
+                        <td className="py-3 px-4 text-neutral-300 whitespace-nowrap">
+                          {sale.artistName}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-[#121215] border border-[#272730] text-neutral-300">
+                            {sale.paymentMethod === 'cash' ? 'Efectivo' : sale.paymentMethod === 'card' ? 'Tarjeta' : 'Transf'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            RIMPE POPULAR
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
+                          {formatMoney(sale.total)}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => setSelectedSalesNoteToPrint(sale)}
+                              className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
+                              title="Ver / Imprimir Nota de Venta"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
+                              className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
+                              title="Anular Nota de Venta"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: HISTORIAL DE NOTAS DE CRÉDITO (TIPO 04) */}
+      {/* ========================================================================= */}
+      {activeSubTab === 'credit_notes' && (
+        <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
+          {/* Mobile Card List (md:hidden) */}
+          <div className="md:hidden divide-y divide-[#222228]">
+            {creditNotesList.length === 0 ? (
+              <div className="p-8 text-center text-neutral-500 text-xs">
+                No se han emitido notas de crédito en este período.
+              </div>
+            ) : (
+              creditNotesList.map(cn => (
+                <div key={`m-cn-${cn.id}`} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="font-mono font-bold text-xs text-[#FF3366]">
+                        {cn.creditNoteNumber}
+                      </span>
+                      <div className="text-[10px] font-mono text-neutral-400">
+                        {new Date(cn.date).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>AUTORIZADO</span>
+                    </span>
+                  </div>
+
+                  <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-xs text-white truncate">{cn.clientName}</span>
+                      <span className="text-[10px] font-mono text-neutral-400">{cn.clientDni || 'Consumidor Final'}</span>
+                    </div>
+                    <div className="text-[11px] text-neutral-300">
+                      <span className="text-neutral-500">Factura Afectada: </span>
+                      <span className="font-mono text-white font-bold">{cn.affectedInvoiceNumber}</span>
+                    </div>
+                    <div className="text-[10px] text-neutral-400 flex items-center justify-between">
+                      <span className="truncate">{cn.reasonDescription}</span>
+                      {cn.revertInventory && (
+                        <span className="text-emerald-400 font-bold shrink-0">✓ Reingreso Bodega</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-3 text-xs">
+                      <div>
+                        <span className="text-[9px] text-neutral-500 block uppercase">Subtotal</span>
+                        <span className="font-mono text-neutral-300">{formatMoney(cn.subtotal)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-neutral-500 block uppercase">IVA Revertido</span>
+                        <span className="font-mono text-emerald-400">{formatMoney(cn.taxAmount)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-neutral-400 block uppercase font-bold">Total NC</span>
+                        <span className="font-mono font-bold text-[#FF3366] text-sm">-{formatMoney(cn.total)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setSelectedCreditNoteToPrint(cn)}
+                        className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                        title="Ver / Imprimir RIDE Nota de Crédito"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCreditNote(cn.id, cn.creditNoteNumber)}
+                        className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
+                        title="Eliminar registro"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View (hidden md:block) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
+                  <th className="py-3.5 px-4 whitespace-nowrap">N° Nota Crédito</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Fecha Emisión</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Factura Afectada</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Cliente & Cédula / RUC</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Motivo Oficial SRI</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Kardex Reingresado</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Estado SRI</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Subtotal</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">IVA Revertido</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Total Acreditado</th>
+                  <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#222228]">
+                {creditNotesList.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-12 text-center text-neutral-500">
+                      No se han emitido notas de crédito en este período.
+                    </td>
+                  </tr>
+                ) : (
+                  creditNotesList.map(cn => (
+                    <tr key={cn.id} className="hover:bg-[#1E1E25] transition-colors">
+                      <td className="py-3 px-4 font-mono font-bold text-[#FF3366] whitespace-nowrap">
+                        {cn.creditNoteNumber}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
+                        {new Date(cn.date).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-white whitespace-nowrap">
+                        <div>Factura: {cn.affectedInvoiceNumber}</div>
+                        <span className="text-[10px] text-neutral-500 font-normal">
+                          Emisión: {cn.affectedInvoiceDate}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="font-semibold text-white">{cn.clientName}</div>
+                        <div className="text-[10px] font-mono text-neutral-500">
+                          {cn.clientDni || 'Consumidor Final'}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 max-w-[240px]">
+                        <div className="text-neutral-200 font-medium truncate">{cn.reasonDescription}</div>
+                        <span className="text-[10px] text-[#FF3366] font-mono uppercase">
+                          {cn.reason}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        {cn.revertInventory ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                            ✓ Sí (Bodega)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-neutral-500">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span>AUTORIZADO</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
+                        {formatMoney(cn.subtotal)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-emerald-400 whitespace-nowrap">
+                        {formatMoney(cn.taxAmount)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-[#FF3366] whitespace-nowrap">
+                        -{formatMoney(cn.total)}
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedCreditNoteToPrint(cn)}
+                            className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
+                            title="Ver / Imprimir RIDE Nota de Crédito"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCreditNote(cn.id, cn.creditNoteNumber)}
+                            className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
+                            title="Eliminar registro"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EMITIR NOTA DE CRÉDITO */}
+      <NewCreditNoteModal
+        isOpen={isNewCreditNoteOpen}
+        onClose={() => {
+          setIsNewCreditNoteOpen(false);
+          setCreditNoteToPreselect(null);
+        }}
+        preselectedSale={creditNoteToPreselect}
+      />
+
+      {/* MODAL: VER / IMPRIMIR NOTA DE CRÉDITO RIDE */}
+      <CreditNotePrintModal
+        creditNote={selectedCreditNoteToPrint}
+        onClose={() => setSelectedCreditNoteToPrint(null)}
+      />
+
+      {/* MODAL: VER / IMPRIMIR NOTA DE VENTA */}
+      <SalesNotePrintModal
+        sale={selectedSalesNoteToPrint}
+        onClose={() => setSelectedSalesNoteToPrint(null)}
+      />
     </div>
   );
 };

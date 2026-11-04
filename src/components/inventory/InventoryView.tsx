@@ -20,6 +20,7 @@ import { InventoryCategory, InventoryItem, VatRateType } from '../../types';
 export const InventoryView: React.FC = () => {
   const {
     inventory,
+    suppliers,
     addInventoryItem,
     updateInventoryItem,
     adjustStock,
@@ -53,14 +54,18 @@ export const InventoryView: React.FC = () => {
   const [location, setLocation] = useState('');
   const [sku, setSku] = useState('');
 
-  // Extract existing supplier names for quick datalist autocomplete
+  // Extract registered and existing supplier names for quick datalist autocomplete
   const existingSuppliers = useMemo(() => {
     const set = new Set<string>();
+    suppliers.forEach(s => {
+      if (s.nombreComercial) set.add(s.nombreComercial.trim());
+      if (s.razonSocial) set.add(s.razonSocial.trim());
+    });
     inventory.forEach(i => {
       if (i.supplier && i.supplier.trim()) set.add(i.supplier.trim());
     });
     return Array.from(set).sort();
-  }, [inventory]);
+  }, [inventory, suppliers]);
 
   const getVatPercentage = (rate: VatRateType): number => {
     if (rate === 15) return 15;
@@ -379,9 +384,122 @@ export const InventoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* Inventory Table */}
+      {/* Inventory Table & Mobile Cards */}
       <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile Card List (md:hidden) */}
+        <div className="md:hidden divide-y divide-[#222228]">
+          {filteredItems.length === 0 ? (
+            <div className="p-8 text-center text-neutral-500 text-xs">
+              No hay insumos registrados con los criterios seleccionados.
+            </div>
+          ) : (
+            filteredItems.map(item => {
+              const isCritical = item.currentStock <= item.minStockAlert;
+              const pvpConIva = item.priceWithVat ?? item.retailPrice;
+              return (
+                <div key={`m-inv-${item.id}`} className={`p-4 space-y-3 ${isCritical ? 'bg-[#25151D]/30' : ''}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-xs text-white flex items-center gap-1.5">
+                        {isCritical && (
+                          <AlertTriangle className="w-3.5 h-3.5 text-[#FF3366] shrink-0" />
+                        )}
+                        <span>{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10px] text-neutral-400">
+                        {item.brand && <span>{item.brand}</span>}
+                        {item.sku && (
+                          <span className="font-mono bg-[#121215] px-1 py-0.2 rounded border border-[#272730] text-neutral-400">
+                            {item.sku}
+                          </span>
+                        )}
+                        <span>· {getCatLabel(item.category)}</span>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`font-mono font-bold px-2 py-0.5 rounded-full text-[10px] shrink-0 ${
+                        isCritical
+                          ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/40'
+                          : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      }`}
+                    >
+                      {item.currentStock} {item.unit}
+                    </span>
+                  </div>
+
+                  <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-neutral-400">Proveedor:</span>
+                      <span className="text-neutral-200 font-medium truncate max-w-[200px]">
+                        {item.supplier || 'Sin proveedor'}
+                      </span>
+                    </div>
+                    {item.location && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-neutral-400">Ubicación:</span>
+                        <span className="text-neutral-300 font-mono">{item.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#1C1C22]">
+                      <span className="text-neutral-400">Costo Unit.:</span>
+                      <span className="text-neutral-200 font-mono">{formatMoney(item.unitCost)}</span>
+                    </div>
+                    {pvpConIva && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-emerald-400 font-semibold">PVP Venta (IVA inc.):</span>
+                        <span className="text-emerald-400 font-mono font-bold">{formatMoney(pvpConIva)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    {/* Stepper adjustment */}
+                    <div className="flex items-center gap-2 bg-[#121215] px-2.5 py-1 rounded-xl border border-[#272730]">
+                      <button
+                        onClick={() => adjustStock(item.id, -1)}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white bg-[#1A1A22] active:scale-95 cursor-pointer"
+                        title="Restar 1"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="font-mono font-bold text-xs px-2 text-white">
+                        {item.currentStock}
+                      </span>
+                      <button
+                        onClick={() => adjustStock(item.id, 1)}
+                        className="w-6 h-6 rounded-lg flex items-center justify-center text-white bg-[#FF3366] active:scale-95 cursor-pointer"
+                        title="Sumar 1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                        title="Editar insumo"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id, item.name)}
+                        className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
+                        title="Eliminar insumo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table View (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">

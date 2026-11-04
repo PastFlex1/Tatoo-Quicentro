@@ -17,9 +17,13 @@ import {
   Layers,
   Camera,
   Truck,
+  ClipboardList,
+  ShieldCheck,
+  User,
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
+import { UserSwitcherModal } from '../users/UserSwitcherModal';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -27,10 +31,25 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
-  const { activeTab, setActiveTab, currentShift, inventory, appointments, proformas, settings, formatMoney } = useStudio();
+  const {
+    activeTab,
+    setActiveTab,
+    currentShift,
+    inventory,
+    appointments,
+    proformas,
+    purchaseOrders,
+    currentUser,
+    canAccessTab,
+    settings,
+    formatMoney,
+  } = useStudio();
+
+  const [isSwitcherOpen, setIsSwitcherOpen] = React.useState(false);
 
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockAlert).length;
   const pendingProformasCount = proformas.filter(p => p.status === 'pending').length;
+  const pendingPurchaseOrdersCount = purchaseOrders.filter(p => p.status === 'sent' || p.status === 'draft').length;
   const todayStr = new Date().toISOString().split('T')[0];
   const todayUpcomingAppointmentsCount = appointments.filter(
     a => a.date === todayStr && (a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress')
@@ -43,17 +62,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { id: 'gallery', label: 'Galería de Fotos', icon: Camera },
     { id: 'appointments', label: 'Agenda de Citas', icon: Calendar },
     { id: 'proformas', label: 'Cotizaciones & Proformas', icon: FileText },
-    { id: 'sales', label: 'Ventas & Servicios', icon: ReceiptText },
-    { id: 'expenses', label: 'Gastos & Compras', icon: WalletCards },
+    { id: 'sales', label: 'Facturación & Comprobantes', icon: ReceiptText },
+    { id: 'expenses', label: 'Gastos & Compras (SRI)', icon: WalletCards },
     { id: 'suppliers', label: 'Gestión Proveedores', icon: Truck },
+    { id: 'purchase-orders', label: 'Órdenes de Compra', icon: ClipboardList },
     { id: 'artists', label: 'Liquidación Artistas', icon: Users },
     { id: 'cash', label: 'Arqueo de Caja', icon: BadgeDollarSign },
     { id: 'inventory', label: 'Inventario & Joyería', icon: Boxes },
     { id: 'kardex', label: 'Kardex de Insumos', icon: Layers },
     { id: 'ledger', label: 'Libro Mayor Contable', icon: BookOpen },
     { id: 'reports', label: 'Centro de Reportes', icon: FileSpreadsheet },
+    { id: 'users', label: 'Usuarios & Roles', icon: ShieldCheck },
     { id: 'settings', label: 'Configuración', icon: SlidersHorizontal },
   ];
+
+  const visibleNavItems = navItems.filter(item => canAccessTab(item.id));
 
   const handleSelectTab = (id: string) => {
     setActiveTab(id);
@@ -111,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
 
           {/* Navigation list (scrollable on short viewports) */}
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {navItems.map(item => {
+            {visibleNavItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
@@ -141,6 +164,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
                   {item.id === 'proformas' && pendingProformasCount > 0 && (
                     <span className="text-[10px] font-mono text-amber-300 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
                       {pendingProformasCount}
+                    </span>
+                  )}
+                  {item.id === 'purchase-orders' && pendingPurchaseOrdersCount > 0 && (
+                    <span className="text-[10px] font-mono text-blue-300 bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold shrink-0">
+                      {pendingPurchaseOrdersCount}
                     </span>
                   )}
                   {item.id === 'inventory' && lowStockCount > 0 && (
@@ -190,8 +218,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
               <span className="truncate">{lowStockCount} insumo(s) con stock bajo</span>
             </button>
           )}
+
+          {/* User Account / Role Switcher Card */}
+          <button
+            type="button"
+            onClick={() => setIsSwitcherOpen(true)}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#141419] hover:bg-[#1A1A22] border border-[#2B2B38] transition-all text-left cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/30 flex items-center justify-center font-bold text-[#FF3366] text-xs shrink-0">
+                {currentUser?.nombres?.slice(0, 1) || 'U'}
+                {currentUser?.apellidos?.slice(0, 1) || ''}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate group-hover:text-[#FF3366] transition-colors">
+                  {currentUser?.nombres || 'Usuario'} {currentUser?.apellidos || ''}
+                </p>
+                <p className="text-[10px] text-neutral-400 truncate">
+                  Rol: {currentUser?.rol || 'ADMIN'}
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] text-neutral-500 font-semibold px-1.5 py-0.5 rounded bg-[#1C1C24] border border-[#2B2B38]">
+              Cambiar
+            </span>
+          </button>
         </div>
       </aside>
+
+      {/* User Switcher Modal */}
+      <UserSwitcherModal
+        isOpen={isSwitcherOpen}
+        onClose={() => setIsSwitcherOpen(false)}
+      />
     </>
   );
 };

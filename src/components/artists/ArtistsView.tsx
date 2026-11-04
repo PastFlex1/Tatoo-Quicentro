@@ -56,7 +56,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   // Modal 2: Ajustar Porcentaje de Comisión
   const [commissionArtist, setCommissionArtist] = useState<Artist | null>(null);
-  const [newCommissionRate, setNewCommissionRate] = useState<number>(60);
+  const [newCommissionRate, setNewCommissionRate] = useState<number>(80);
 
   // Modal 3: Liquidar (Pagar)
   const [settleArtist, setSettleArtist] = useState<Artist | null>(null);
@@ -71,7 +71,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   const [nickname, setNickname] = useState('');
   const [role, setRole] = useState<'Tatuador' | 'Tatuadora' | 'Piercer' | 'Residente' | 'Invitado / Guest'>('Tatuador');
   const [specialty, setSpecialty] = useState('');
-  const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(60);
+  const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(80);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
 
@@ -237,7 +237,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   // Handler: Open Commission Adjustment Modal
   const handleOpenCommissionModal = (art: Artist) => {
     setCommissionArtist(art);
-    setNewCommissionRate(art.defaultCommissionRate || 60);
+    setNewCommissionRate(art.defaultCommissionRate || 80);
   };
 
   // Handler: Save Commission Adjustment

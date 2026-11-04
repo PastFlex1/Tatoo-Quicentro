@@ -11,7 +11,7 @@ interface NewExpenseModalProps {
 }
 
 export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClose }) => {
-  const { addExpense, formatMoney, settings } = useStudio();
+  const { addExpense, formatMoney, settings, suppliers, inventory, addKardexMovement } = useStudio();
 
   const [category, setCategory] = useState<ExpenseCategory>('supplies_tattoo');
   const [description, setDescription] = useState('');
@@ -28,9 +28,18 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
   const [isSearchingSri, setIsSearchingSri] = useState(false);
   const [sriSupplierStatus, setSriSupplierStatus] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Kardex Sync State
+  const [syncWithKardex, setSyncWithKardex] = useState(false);
+  const [kardexItemId, setKardexItemId] = useState('');
+  const [kardexQuantity, setKardexQuantity] = useState(1);
+  const [sriStatus, setSriStatus] = useState<'AUTORIZADO' | 'PENDIENTE'>('AUTORIZADO');
+
   if (!isOpen) return null;
 
-  const defaultTaxRate = settings.defaultTaxRate || 15;
+  const defaultTaxRate =
+    !settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12
+      ? 15
+      : settings.defaultTaxRate;
 
   const handleAmountChange = (val: number) => {
     setAmount(val);
@@ -59,6 +68,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
       setCategory(parsed.suggestedCategory);
       setDescription(parsed.summaryDescription);
       setSriAccessKey(parsed.accessKey);
+      setSriStatus('AUTORIZADO');
       setNotes(`Factura SRI Autorizada. RUC: ${parsed.supplierRuc} · Clave de Acceso: ${parsed.accessKey}`);
 
       setSriLoadedNotice(
@@ -74,6 +84,19 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
   const handleLookupSupplierRuc = async () => {
     const clean = supplierRuc.trim().replace(/\D/g, '');
     if (!clean) return;
+
+    // Check registered suppliers first
+    const matchedSup = suppliers.find(s => s.ruc === clean);
+    if (matchedSup) {
+      setSupplier(matchedSup.nombreComercial ? `${matchedSup.nombreComercial} (${matchedSup.razonSocial})` : matchedSup.razonSocial);
+      setTaxDeductible(matchedSup.estado === 'ACTIVO');
+      setSriSupplierStatus({
+        text: `✓ Proveedor verificado en catálogo: ${matchedSup.razonSocial}`,
+        type: 'success',
+      });
+      return;
+    }
+
     setIsSearchingSri(true);
     setSriSupplierStatus(null);
     try {
@@ -117,8 +140,24 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
       invoiceReference: invoiceReference.trim() || undefined,
       supplierRuc: supplierRuc.trim() || undefined,
       sriAccessKey: sriAccessKey.trim() || undefined,
+      sriStatus,
       notes: notes.trim() || undefined,
     });
+
+    // Si se activó ingreso a Kardex de insumos
+    if (syncWithKardex && kardexItemId && kardexQuantity > 0) {
+      const inv = inventory.find(i => i.id === kardexItemId);
+      const costPerUnit = Math.round((amount / kardexQuantity) * 100) / 100;
+      addKardexMovement({
+        itemId: kardexItemId,
+        type: 'purchase_in',
+        quantity: kardexQuantity,
+        unitCost: costPerUnit > 0 ? costPerUnit : inv?.unitCost || 0,
+        reference: invoiceReference.trim() || `COMP-${Date.now().toString().slice(-4)}`,
+        concept: `Compra / Reposición: ${description.trim()} - Proveedor: ${supplier.trim() || 'General'}`,
+        responsible: supplier.trim() || 'Administración',
+      });
+    }
 
     onClose();
   };
@@ -200,6 +239,64 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
             </select>
           </div>
 
+          {/* Insumos Kardex Link (se muestra cuando la categoría es un insumo o mercadería) */}
+          {['supplies_tattoo', 'supplies_piercing', 'jewelry_restock', 'hygiene_sanitary'].includes(category) && (
+            <div className="p-3.5 bg-[#141419] rounded-2xl border border-emerald-500/30 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-300">
+                  <input
+                    type="checkbox"
+                    checked={syncWithKardex}
+                    onChange={e => {
+                      setSyncWithKardex(e.target.checked);
+                      if (e.target.checked && !kardexItemId && inventory.length > 0) {
+                        setKardexItemId(inventory[0].id);
+                      }
+                    }}
+                    className="w-4 h-4 rounded text-emerald-500 bg-[#18181D] border-[#272730]"
+                  />
+                  <span>📦 Ingresar insumos al Kardex e Inventario</span>
+                </label>
+                <span className="text-[10px] text-neutral-400">Entrada Bodega</span>
+              </div>
+
+              {syncWithKardex && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 animate-fadeIn">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-semibold text-neutral-400 mb-1">
+                      Insumo o Joyería a Reponer
+                    </label>
+                    <select
+                      value={kardexItemId}
+                      onChange={e => setKardexItemId(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs"
+                    >
+                      <option value="">-- Seleccionar Insumo --</option>
+                      {inventory.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} (Stock: {item.currentStock} {item.unit})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-neutral-400 mb-1">
+                      Cantidad Recibida
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={kardexQuantity}
+                      onChange={e => setKardexQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-3 py-1.5 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs font-mono font-bold text-right"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block font-semibold text-neutral-300 mb-1.5">
               Descripción del Gasto <span className="text-[#FF3366]">*</span>
@@ -261,11 +358,30 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
               <input
                 type="text"
                 required
-                placeholder="Ej. Distribuidora Tattoo Ecuador"
+                list="suppliers-modal-datalist"
+                placeholder="Ej. Kwadron Ecuador, Dynamic Ink..."
                 value={supplier}
-                onChange={e => setSupplier(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setSupplier(val);
+                  const matched = suppliers.find(
+                    s => s.razonSocial.toLowerCase() === val.toLowerCase() ||
+                         s.nombreComercial?.toLowerCase() === val.toLowerCase()
+                  );
+                  if (matched) {
+                    setSupplierRuc(matched.ruc);
+                    setTaxDeductible(matched.estado === 'ACTIVO');
+                  }
+                }}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"
               />
+              <datalist id="suppliers-modal-datalist">
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.nombreComercial || s.razonSocial}>
+                    {s.ruc} - {s.razonSocial}
+                  </option>
+                ))}
+              </datalist>
             </div>
           </div>
 
@@ -352,6 +468,42 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                 IVA: {formatMoney(taxAmount)}
               </span>
             )}
+          </div>
+
+          {/* Estado SRI del Comprobante */}
+          <div className="p-3 bg-[#121215] rounded-xl border border-[#272730] flex items-center justify-between">
+            <div className="flex flex-col">
+              <label className="font-semibold text-neutral-300 text-xs">
+                Estado del Comprobante en el SRI
+              </label>
+              <span className="text-[10px] text-neutral-500">
+                Verificación de autorización para crédito tributario
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-[#17171C] p-1 rounded-xl border border-[#272730]">
+              <button
+                type="button"
+                onClick={() => setSriStatus('AUTORIZADO')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  sriStatus === 'AUTORIZADO'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                ✓ AUTORIZADO
+              </button>
+              <button
+                type="button"
+                onClick={() => setSriStatus('PENDIENTE')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                  sriStatus === 'PENDIENTE'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
+              >
+                ⏳ PENDIENTE
+              </button>
+            </div>
           </div>
 
           <div>

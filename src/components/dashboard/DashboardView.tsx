@@ -443,7 +443,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Card List (md:hidden) */}
+        <div className="md:hidden divide-y divide-[#222228]">
+          {recentSales.map(sale => (
+            <div key={`m-recent-${sale.id}`} className="py-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold text-[#FF3366]">
+                  {sale.invoiceNumber}
+                </span>
+                <span className="font-mono text-[10px] text-neutral-400">
+                  {new Date(sale.date).toLocaleDateString('es-ES', {
+                    day: '2-digit',
+                    month: 'short',
+                  })}
+                </span>
+              </div>
+
+              <div className="bg-[#121215] p-2 rounded-xl border border-[#24242C] space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-white truncate">{sale.clientName}</span>
+                  <span className="font-mono font-bold text-white">{formatMoney(sale.total)}</span>
+                </div>
+                <div className="text-[11px] text-neutral-400 truncate">{sale.serviceName}</div>
+                <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5">
+                  <span>Artista: {sale.artistName}</span>
+                  <span className="text-[#FF3366] font-mono">Art: {formatMoney(sale.artistShare)}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-0.5">
+                <span className="text-[10px] text-neutral-400 font-mono">
+                  Estudio: {formatMoney(sale.studioShare)}
+                </span>
+                <button
+                  onClick={() => onOpenReceipt(sale)}
+                  className="px-2.5 py-1 rounded-lg bg-[#24242C] text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1 cursor-pointer"
+                  title="Ver e imprimir ticket"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Ver Ticket</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
               <tr className="border-b border-[#24242B] text-neutral-400 font-medium">

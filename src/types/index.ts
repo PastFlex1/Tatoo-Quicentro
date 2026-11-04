@@ -40,9 +40,48 @@ export interface SaleRecord {
   artistShare: number; // (total - insumos/tax) * %
   studioShare: number;
   materialCostDeducted?: number; // Insumos cobrados al artista si aplica
+  inventoryItemId?: string; // ID del producto de inventario vendido directamente
+  consumedSupplies?: { itemId: string; name: string; quantity: number }[]; // Consumibles descargados en cabina
   status: SaleStatus;
   consentFormSigned: boolean; // Consentimiento informado de salud
+  documentType?: 'factura' | 'nota_venta'; // Factura (Tipo 01) o Nota de Venta RIMPE (Tipo 02)
+  sriStatus?: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  sriAccessKey?: string;
+  sriAuthorizationDate?: string;
+  creditNoteId?: string;
+  creditNoteNumber?: string;
   notes?: string;
+}
+
+export type CreditNoteReason =
+  | 'ANULACION_TOTAL'
+  | 'DEVOLUCION_MERCADERIA'
+  | 'DESCUENTO_BONIFICACION'
+  | 'ERROR_DATOS';
+
+export interface CreditNoteRecord {
+  id: string;
+  creditNoteNumber: string; // ej. 001-001-000000001
+  date: string;
+  affectedInvoiceId: string;
+  affectedInvoiceNumber: string;
+  affectedInvoiceDate: string;
+  clientName: string;
+  clientDni?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  reason: CreditNoteReason;
+  reasonDescription: string;
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  sriAccessKey?: string;
+  sriStatus: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  sriAuthorizationDate?: string;
+  revertInventory?: boolean;
+  notes?: string;
+  createdAt: string;
 }
 
 export type ExpenseCategory =
@@ -73,6 +112,9 @@ export interface ExpenseRecord {
   notes?: string;
   supplierRuc?: string;
   sriAccessKey?: string;
+  sriStatus?: 'AUTORIZADO' | 'PENDIENTE' | 'RECHAZADO' | 'ANULADO';
+  sriAuthorizationDate?: string;
+  documentType?: 'factura' | 'nota_venta' | 'liquidacion_compra';
   subtotal?: number;
   taxRate?: number;
 }
@@ -105,6 +147,49 @@ export interface Supplier {
   retencionRentaPorcentaje?: number; // 1.75, 2.75, 8%
   estado: 'ACTIVO' | 'INACTIVO';
   notas?: string;
+  createdAt: string;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'cancelled';
+
+export interface PurchaseOrderItem {
+  id: string;
+  inventoryItemId?: string;
+  code?: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  subtotal: number;
+  taxRate: number; // e.g. 15 or 0
+  taxAmount: number;
+  total: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  orderNumber: string; // ej. OC-2026-0001
+  date: string; // YYYY-MM-DD
+  expectedDate?: string;
+  supplierId: string;
+  supplierName: string;
+  supplierRuc: string;
+  supplierEmail?: string;
+  supplierPhone?: string;
+  supplierAddress?: string;
+  items: PurchaseOrderItem[];
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  status: PurchaseOrderStatus;
+  paymentTerms?: string; // Contado, Crédito 15 días, Crédito 30 días
+  paymentMethod?: 'bank_transfer' | 'cash' | 'credit_card';
+  notes?: string;
+  receivedAt?: string;
+  receivedBy?: string;
+  invoiceReference?: string;
   createdAt: string;
 }
 
@@ -953,16 +1038,29 @@ export interface PayrollSlip {
   asientoId?: string;
 }
 
+export type UserRole =
+  | 'ADMIN'             // Administrador General / Propietario del Estudio
+  | 'CAJERO_RECEPCION'  // Recepcionista, Cajero & Coordinador de Citas
+  | 'ARTISTA'           // Tatuador / Piercer Residente o Invitado
+  | 'BODEGA'            // Bodeguero / Administrador de Insumos y Kardex
+  | 'CONTADOR';         // Contador / Auditor Fiscal Externo
+
 export interface SystemUser {
   id: string;
-  cedula: string;
+  cedula?: string;
   nombres: string;
   apellidos: string;
+  username: string;
   email: string;
-  rol: 'ADMINISTRADOR' | 'CONTADOR' | 'VENDEDOR' | 'CAJERO';
+  telefono?: string;
+  rol: UserRole;
   estado: 'ACTIVO' | 'INACTIVO';
-  pin?: string;
+  pin?: string;          // PIN numérico de 4 dígitos para cambio rápido
+  artistId?: string;     // Vinculación a un artista de INITIAL_ARTISTS si rol === 'ARTISTA'
+  avatar?: string;
+  allowedTabs?: string[]; // Personalización granular opcional de módulos
   createdAt: string;
+  lastLogin?: string;
 }
 
 // ============================================================================

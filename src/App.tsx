@@ -11,6 +11,7 @@ import { GalleryView } from './components/gallery/GalleryView';
 import { SalesView } from './components/sales/SalesView';
 import { ExpensesView } from './components/expenses/ExpensesView';
 import { SuppliersView } from './components/suppliers/SuppliersView';
+import { PurchaseOrdersView } from './components/purchase-orders/PurchaseOrdersView';
 import { ArtistsView } from './components/artists/ArtistsView';
 import { CashRegisterView } from './components/cash/CashRegisterView';
 import { InventoryView } from './components/inventory/InventoryView';
@@ -20,12 +21,15 @@ import { ReportsView } from './components/reports/ReportsView';
 import { AppointmentsView } from './components/appointments/AppointmentsView';
 import { ProformasView } from './components/proformas/ProformasView';
 import { SettingsView } from './components/settings/SettingsView';
+import { UsersView } from './components/users/UsersView';
 import { NewExpenseModal } from './components/expenses/NewExpenseModal';
 import { ReceiptModal } from './components/sales/ReceiptModal';
+import { SalesNotePrintModal } from './components/sales/SalesNotePrintModal';
 import { SaleRecord } from './types';
+import { ShieldAlert } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
-  const { activeTab, setActiveTab } = useStudio();
+  const { activeTab, setActiveTab, currentUser, canAccessTab } = useStudio();
 
   // Global modals & responsive sidebar state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -48,6 +52,28 @@ const MainLayout: React.FC = () => {
   }, []);
 
   const renderActiveTab = () => {
+    if (!canAccessTab(activeTab)) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-4 animate-fadeIn">
+          <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="max-w-md space-y-1.5">
+            <h3 className="text-lg font-bold text-white">Módulo de Acceso Restringido</h3>
+            <p className="text-xs text-neutral-400">
+              El usuario conectado <strong>@{currentUser?.username}</strong> con rol <strong>{currentUser?.rol}</strong> no cuenta con los permisos necesarios para acceder al módulo <code className="text-[#FF3366] font-mono">{activeTab}</code>.
+            </p>
+          </div>
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="px-5 py-2.5 rounded-xl bg-[#FF3366] hover:bg-[#e02958] text-white text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,51,102,0.3)] cursor-pointer"
+          >
+            Volver a Mi Tablero
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'dashboard':
         return (
@@ -76,6 +102,10 @@ const MainLayout: React.FC = () => {
         );
       case 'expenses':
         return <ExpensesView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
+      case 'suppliers':
+        return <SuppliersView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
+      case 'purchase-orders':
+        return <PurchaseOrdersView />;
       case 'artists':
         return <ArtistsView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'cash':
@@ -88,6 +118,8 @@ const MainLayout: React.FC = () => {
         return <GeneralLedgerView />;
       case 'reports':
         return <ReportsView />;
+      case 'users':
+        return <UsersView />;
       case 'settings':
         return <SettingsView />;
       default:
@@ -128,10 +160,19 @@ const MainLayout: React.FC = () => {
         onClose={() => setIsExpenseModalOpen(false)}
       />
 
-      <ReceiptModal
-        sale={receiptSale}
-        onClose={() => setReceiptSale(null)}
-      />
+      {receiptSale && (
+        receiptSale.documentType === 'nota_venta' ? (
+          <SalesNotePrintModal
+            sale={receiptSale}
+            onClose={() => setReceiptSale(null)}
+          />
+        ) : (
+          <ReceiptModal
+            sale={receiptSale}
+            onClose={() => setReceiptSale(null)}
+          />
+        )
+      )}
     </div>
   );
 };

@@ -5,6 +5,7 @@ import {
   CashShift,
   DateFilterRange,
   ExpenseRecord,
+  ExpenseCategory,
   InventoryItem,
   SaleRecord,
   StudioSettings,
@@ -19,6 +20,10 @@ import {
   ProformaItem,
   GalleryPhoto,
   Supplier,
+  PurchaseOrder,
+  SystemUser,
+  UserRole,
+  CreditNoteRecord,
 } from '../types';
 import {
   INITIAL_ARTISTS,
@@ -26,6 +31,7 @@ import {
   INITIAL_EXPENSES,
   INITIAL_INVENTORY,
   INITIAL_SALES,
+  INITIAL_CREDIT_NOTES,
   INITIAL_SETTINGS,
   INITIAL_APPOINTMENTS,
   INITIAL_KARDEX,
@@ -33,7 +39,11 @@ import {
   INITIAL_PROFORMAS,
   INITIAL_GALLERY_PHOTOS,
   INITIAL_SUPPLIERS,
+  INITIAL_PURCHASE_ORDERS,
+  INITIAL_USERS,
+  getDefaultTabsForRole,
 } from '../data/initialData';
+import { generateSriClaveAcceso } from '../utils/sriCalculations';
 
 interface StudioContextType {
   // Data
@@ -49,6 +59,10 @@ interface StudioContextType {
   proformas: Proforma[];
   galleryPhotos: GalleryPhoto[];
   suppliers: Supplier[];
+  purchaseOrders: PurchaseOrder[];
+  creditNotes: CreditNoteRecord[];
+  users: SystemUser[];
+  currentUser: SystemUser;
   currentShift: CashShift;
   pastShifts: CashShift[];
   settings: StudioSettings;
@@ -97,8 +111,13 @@ interface StudioContextType {
   updateSale: (id: string, updated: Partial<SaleRecord>) => void;
   deleteSale: (id: string) => void;
 
+  // Actions - Credit Notes / Notas de Crédito
+  addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt'>) => CreditNoteRecord;
+  deleteCreditNote: (id: string) => void;
+
   // Actions - Expenses
   addExpense: (expense: Omit<ExpenseRecord, 'id'>) => ExpenseRecord;
+  updateExpense: (id: string, updated: Partial<ExpenseRecord>) => void;
   deleteExpense: (id: string) => void;
 
   // Actions - Artists & Settlements
@@ -128,7 +147,9 @@ interface StudioContextType {
     concept: string;
     responsible?: string;
     date?: string;
+    isEntry?: boolean;
   }) => void;
+  reconcileKardexInventory: () => { reconciledCount: number; adjustmentsMade: number };
 
   // Actions - Clients & History
   addClient: (client: Omit<ClientProfile, 'id' | 'createdAt'>) => ClientProfile;
@@ -145,6 +166,27 @@ interface StudioContextType {
   addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => Supplier;
   updateSupplier: (id: string, updated: Partial<Supplier>) => void;
   deleteSupplier: (id: string) => void;
+
+  // Actions - Purchase Orders / Órdenes de Compra
+  addPurchaseOrder: (po: Omit<PurchaseOrder, 'id' | 'createdAt'>) => PurchaseOrder;
+  updatePurchaseOrder: (id: string, updated: Partial<PurchaseOrder>) => void;
+  deletePurchaseOrder: (id: string) => void;
+  receivePurchaseOrder: (
+    id: string,
+    details?: {
+      receivedBy?: string;
+      invoiceReference?: string;
+      updateInventoryStock?: boolean;
+      registerExpense?: boolean;
+    }
+  ) => void;
+
+  // Actions - Users & Roles / Gestión de Usuarios y Permisos
+  switchUser: (userId: string, pin?: string) => boolean;
+  addUser: (user: Omit<SystemUser, 'id' | 'createdAt'>) => SystemUser;
+  updateUser: (id: string, updated: Partial<SystemUser>) => void;
+  deleteUser: (id: string) => void;
+  canAccessTab: (tabId: string) => boolean;
 
   // Actions - General Ledger Manual Entries
   addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id'>) => void;
@@ -164,6 +206,7 @@ interface StudioContextType {
 
   // Computed / Filtered
   filteredSales: SaleRecord[];
+  filteredCreditNotes: CreditNoteRecord[];
   filteredExpenses: ExpenseRecord[];
 }
 
@@ -198,6 +241,10 @@ const STORAGE_KEYS = {
   PROFORMAS: 'inkledger_proformas_v1',
   GALLERY: 'inkledger_gallery_v1',
   SUPPLIERS: 'inkledger_suppliers_v1',
+  PURCHASE_ORDERS: 'inkledger_purchase_orders_v1',
+  CREDIT_NOTES: 'inkledger_credit_notes_v1',
+  USERS: 'inkledger_users_v1',
+  CURRENT_USER: 'inkledger_current_user_v1',
   CURRENT_SHIFT: 'inkledger_curr_shift_v1',
   PAST_SHIFTS: 'inkledger_past_shifts_v1',
   SETTINGS: 'inkledger_settings_v1',
@@ -214,9 +261,16 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     safeLoadFromStorage(STORAGE_KEYS.EXPENSES, INITIAL_EXPENSES)
   );
 
-  const [artists, setArtists] = useState<Artist[]>(() =>
-    safeLoadFromStorage(STORAGE_KEYS.ARTISTS, INITIAL_ARTISTS)
-  );
+  const [artists, setArtists] = useState<Artist[]>(() => {
+    const loaded = safeLoadFromStorage<Artist[]>(STORAGE_KEYS.ARTISTS, INITIAL_ARTISTS);
+    return loaded.map(art => ({
+      ...art,
+      defaultCommissionRate:
+        art.defaultCommissionRate && [50, 60, 65, 70].includes(art.defaultCommissionRate)
+          ? 80
+          : (art.defaultCommissionRate ?? 80),
+    }));
+  });
 
   const [settlements, setSettlements] = useState<ArtistSettlement[]>(() =>
     safeLoadFromStorage(STORAGE_KEYS.SETTLEMENTS, [])
@@ -254,6 +308,24 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     safeLoadFromStorage(STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS)
   );
 
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.PURCHASE_ORDERS, INITIAL_PURCHASE_ORDERS)
+  );
+
+  const [creditNotes, setCreditNotes] = useState<CreditNoteRecord[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.CREDIT_NOTES, INITIAL_CREDIT_NOTES)
+  );
+
+  const [users, setUsers] = useState<SystemUser[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.USERS, INITIAL_USERS)
+  );
+
+  const [currentUser, setCurrentUser] = useState<SystemUser>(() => {
+    const saved = safeLoadFromStorage<SystemUser | null>(STORAGE_KEYS.CURRENT_USER, null);
+    if (saved && saved.id) return saved;
+    return INITIAL_USERS[0];
+  });
+
   const [currentShift, setCurrentShift] = useState<CashShift>(() =>
     safeLoadFromStorage(STORAGE_KEYS.CURRENT_SHIFT, INITIAL_CASH_SHIFT)
   );
@@ -270,6 +342,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // En Ecuador la moneda oficial es el Dólar estadounidense ($ USD)
         parsed.currency = '$';
         parsed.currencyCode = 'USD';
+        // En Ecuador la tarifa general vigente de IVA por ley del SRI es del 15%
+        if (!parsed.defaultTaxRate || parsed.defaultTaxRate === 8 || parsed.defaultTaxRate === 12) {
+          parsed.defaultTaxRate = 15;
+        }
+        // Reparto oficial del estudio: 80% artista / 20% retención empresa
+        if (!parsed.defaultArtistCommission || [50, 60, 65, 70].includes(parsed.defaultArtistCommission)) {
+          parsed.defaultArtistCommission = 80;
+        }
         if (
           !parsed.studioName ||
           parsed.studioName === 'Black Lotus Tattoo & Piercing Atelier' ||
@@ -285,6 +365,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return {
           ...INITIAL_SETTINGS,
           ...parsed,
+          defaultTaxRate: (!parsed.defaultTaxRate || parsed.defaultTaxRate === 8 || parsed.defaultTaxRate === 12) ? 15 : parsed.defaultTaxRate,
+          defaultArtistCommission: (!parsed.defaultArtistCommission || [50, 60, 65, 70].includes(parsed.defaultArtistCommission)) ? 80 : parsed.defaultArtistCommission,
           ruc: parsed.ruc || parsed.taxId || INITIAL_SETTINGS.ruc,
           razonSocial: parsed.razonSocial || INITIAL_SETTINGS.razonSocial,
           nombreComercial: parsed.nombreComercial || parsed.studioName || INITIAL_SETTINGS.nombreComercial,
@@ -367,6 +449,22 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [suppliers]);
 
   useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PURCHASE_ORDERS, JSON.stringify(purchaseOrders));
+  }, [purchaseOrders]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CREDIT_NOTES, JSON.stringify(creditNotes));
+  }, [creditNotes]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SHIFT, JSON.stringify(currentShift));
   }, [currentShift]);
 
@@ -429,6 +527,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const filteredSales = useMemo(() => {
     return sales.filter(s => isDateInFilter(s.date, dateFilter));
   }, [sales, dateFilter]);
+
+  const filteredCreditNotes = useMemo(() => {
+    return creditNotes.filter(cn => isDateInFilter(cn.date, dateFilter));
+  }, [creditNotes, dateFilter]);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => isDateInFilter(e.date, dateFilter));
@@ -590,6 +692,221 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const deleteSupplier = (id: string) => {
     setSuppliers(prev => prev.filter(s => s.id !== id));
+  };
+
+  // Purchase Order Operations / Órdenes de Compra
+  const addPurchaseOrder = (poData: Omit<PurchaseOrder, 'id' | 'createdAt'>): PurchaseOrder => {
+    const newPO: PurchaseOrder = {
+      ...poData,
+      id: `po-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setPurchaseOrders(prev => [newPO, ...prev]);
+    return newPO;
+  };
+
+  const updatePurchaseOrder = (id: string, updated: Partial<PurchaseOrder>) => {
+    setPurchaseOrders(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
+  };
+
+  const deletePurchaseOrder = (id: string) => {
+    setPurchaseOrders(prev => prev.filter(p => p.id !== id));
+  };
+
+  const receivePurchaseOrder = (
+    id: string,
+    details?: {
+      receivedBy?: string;
+      invoiceReference?: string;
+      updateInventoryStock?: boolean;
+      registerExpense?: boolean;
+    }
+  ) => {
+    const po = purchaseOrders.find(p => p.id === id);
+    if (!po || po.status === 'received') return;
+
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    const receiver = details?.receivedBy || 'Administrador';
+    const invRef = details?.invoiceReference || po.invoiceReference || '';
+    const shouldUpdateStock = details?.updateInventoryStock ?? true;
+    const shouldRegisterExpense = details?.registerExpense ?? true;
+
+    // 1. Marcar estado de orden como 'received'
+    setPurchaseOrders(prev =>
+      prev.map(p =>
+        p.id === id
+          ? {
+              ...p,
+              status: 'received' as const,
+              receivedAt: now,
+              receivedBy: receiver,
+              invoiceReference: invRef || p.invoiceReference,
+            }
+          : p
+      )
+    );
+
+    // 2. Si se solicita, actualizar stock de inventario y registrar movimientos en Kardex
+    if (shouldUpdateStock && po.items.length > 0) {
+      setInventory(prevInventory => {
+        const updatedInv = [...prevInventory];
+        const newMovements: KardexMovement[] = [];
+
+        po.items.forEach(item => {
+          const targetIndex = updatedInv.findIndex(
+            i =>
+              (item.inventoryItemId && i.id === item.inventoryItemId) ||
+              (item.code && i.sku && i.sku.toLowerCase() === item.code.toLowerCase()) ||
+              i.name.toLowerCase() === item.name.toLowerCase()
+          );
+
+          if (targetIndex >= 0) {
+            const invItem = updatedInv[targetIndex];
+            const qty = item.quantity;
+            const costPerUnit = item.unitCost > 0 ? item.unitCost : invItem.unitCost;
+            const prevVal = invItem.currentStock * invItem.unitCost;
+            const entryVal = qty * costPerUnit;
+            const newBalanceQty = invItem.currentStock + qty;
+            const newUnitCost =
+              newBalanceQty > 0
+                ? Math.round(((prevVal + entryVal) / newBalanceQty) * 100) / 100
+                : costPerUnit;
+
+            updatedInv[targetIndex] = {
+              ...invItem,
+              currentStock: newBalanceQty,
+              unitCost: newUnitCost,
+            };
+
+            newMovements.push({
+              id: `kdx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              date: now,
+              itemId: invItem.id,
+              itemName: invItem.name,
+              itemSku: invItem.sku,
+              unit: invItem.unit,
+              type: 'purchase_in',
+              reference: po.orderNumber,
+              concept: `Recepción Orden de Compra ${po.orderNumber} - Proveedor: ${po.supplierName}`,
+              responsible: receiver,
+              quantityIn: qty,
+              unitCostIn: costPerUnit,
+              totalIn: Math.round(qty * costPerUnit * 100) / 100,
+              quantityOut: 0,
+              unitCostOut: 0,
+              totalOut: 0,
+              balanceQty: newBalanceQty,
+              balanceUnitCost: newUnitCost,
+              balanceTotal: Math.round(newBalanceQty * newUnitCost * 100) / 100,
+            });
+          }
+        });
+
+        if (newMovements.length > 0) {
+          setKardexMovements(prevKardex => [...newMovements, ...prevKardex]);
+        }
+
+        return updatedInv;
+      });
+    }
+
+    // 3. Registrar gasto contable si aplica
+    if (shouldRegisterExpense && po.total > 0) {
+      let expenseCat: ExpenseCategory = 'supplies_tattoo';
+      const hasPiercing = po.items.some(i => i.category === 'piercing');
+      const hasJewelry = po.items.some(i => i.category === 'jewelry' || i.name.toLowerCase().includes('titanio') || i.name.toLowerCase().includes('joya'));
+      const hasHygiene = po.items.some(i => i.category === 'supplies' || i.category === 'aftercare' || i.name.toLowerCase().includes('guantes') || i.name.toLowerCase().includes('dermalize'));
+
+      if (hasJewelry) {
+        expenseCat = 'jewelry_restock';
+      } else if (hasPiercing) {
+        expenseCat = 'supplies_piercing';
+      } else if (hasHygiene) {
+        expenseCat = 'hygiene_sanitary';
+      }
+
+      addExpense({
+        date: today,
+        category: expenseCat,
+        description: `Compra Suministros OC ${po.orderNumber} - ${po.supplierName} ${invRef ? `(Fac: ${invRef})` : ''}`.trim(),
+        amount: po.total,
+        subtotal: po.subtotal,
+        taxRate: po.taxRate,
+        taxAmount: po.taxAmount,
+        paymentMethod: po.paymentMethod || 'bank_transfer',
+        invoiceReference: invRef || po.orderNumber,
+        supplier: po.supplierName,
+        supplierRuc: po.supplierRuc,
+        taxDeductible: true,
+        notes: `Generado automáticamente por recepción de OC ${po.orderNumber}. Recibido por: ${receiver}.`,
+      });
+    }
+  };
+
+  // User & Role Operations / Gestión de Usuarios y Permisos
+  const switchUser = (userId: string, pin?: string): boolean => {
+    const targetUser = users.find(u => u.id === userId && u.estado === 'ACTIVO');
+    if (!targetUser) return false;
+
+    if (targetUser.pin && pin !== undefined && pin !== targetUser.pin) {
+      return false;
+    }
+
+    const updated: SystemUser = {
+      ...targetUser,
+      lastLogin: new Date().toISOString(),
+    };
+
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => (u.id === userId ? updated : u)));
+
+    // Redirect if current tab is not accessible
+    const allowed = targetUser.allowedTabs && targetUser.allowedTabs.length > 0
+      ? targetUser.allowedTabs
+      : getDefaultTabsForRole(targetUser.rol);
+
+    if (!allowed.includes(activeTab)) {
+      setActiveTab(allowed[0] || 'dashboard');
+    }
+
+    return true;
+  };
+
+  const addUser = (userData: Omit<SystemUser, 'id' | 'createdAt'>): SystemUser => {
+    const newUser: SystemUser = {
+      ...userData,
+      id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setUsers(prev => [...prev, newUser]);
+    return newUser;
+  };
+
+  const updateUser = (id: string, updated: Partial<SystemUser>) => {
+    setUsers(prev => prev.map(u => (u.id === id ? { ...u, ...updated } : u)));
+    if (currentUser.id === id) {
+      setCurrentUser(prev => ({ ...prev, ...updated }));
+    }
+  };
+
+  const deleteUser = (id: string) => {
+    if (users.length <= 1) return;
+    setUsers(prev => prev.filter(u => u.id !== id));
+    if (currentUser.id === id) {
+      const fallback = users.find(u => u.id !== id) || INITIAL_USERS[0];
+      setCurrentUser(fallback);
+    }
+  };
+
+  const canAccessTab = (tabId: string): boolean => {
+    if (!currentUser) return true;
+    if (currentUser.rol === 'ADMIN') return true;
+    if (currentUser.allowedTabs && currentUser.allowedTabs.length > 0) {
+      return currentUser.allowedTabs.includes(tabId);
+    }
+    const defaultTabs = getDefaultTabsForRole(currentUser.rol);
+    return defaultTabs.includes(tabId);
   };
 
   // Appointment Operations
@@ -943,33 +1260,77 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Sale Operations
   const addSale = (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): SaleRecord => {
+    const isNotaVenta = saleData.documentType === 'nota_venta';
     // Código de serie SRI (Establecimiento y Punto de Emisión)
     const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
     const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
 
-    // Secuencial oficial de 9 dígitos configurado en settings
-    const currentSeqNum =
-      parseInt(settings.secuencialFactura?.replace(/\D/g, '') || '', 10) ||
-      (sales.length + 183);
-    const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
+    let invoiceNumber = '';
+    let currentSeqNum = 1;
 
-    // Formato oficial SRI de factura: 001-001-000000001
-    const invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
+    if (isNotaVenta) {
+      currentSeqNum =
+        parseInt(settings.secuencialNotaVenta?.replace(/\D/g, '') || '', 10) ||
+        (sales.filter(s => s.documentType === 'nota_venta').length + 46);
+      const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
+      invoiceNumber = `NV-${estab}-${pto}-${secuencialPadded}`;
+
+      // Incrementar secuencialNotaVenta
+      const nextSecuencialPadded = String(currentSeqNum + 1).padStart(9, '0').slice(-9);
+      setSettings(prev => ({
+        ...prev,
+        secuencialNotaVenta: nextSecuencialPadded,
+      }));
+    } else {
+      currentSeqNum =
+        parseInt(settings.secuencialFactura?.replace(/\D/g, '') || '', 10) ||
+        (sales.filter(s => s.documentType !== 'nota_venta').length + 184);
+      const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
+      invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
+
+      // Incrementar secuencialFactura
+      const nextSecuencialPadded = String(currentSeqNum + 1).padStart(9, '0').slice(-9);
+      setSettings(prev => ({
+        ...prev,
+        secuencialFactura: nextSecuencialPadded,
+      }));
+    }
+
+    const rucLimpio = (settings.ruc || settings.taxId || '1792847102001')
+      .replace(/\D/g, '')
+      .padEnd(13, '0')
+      .slice(0, 13);
+
+    const now = new Date();
+    let sriAccessKey = saleData.sriAccessKey;
+    if (!isNotaVenta && !sriAccessKey) {
+      try {
+        const sec9 = String(currentSeqNum).padStart(9, '0').slice(-9);
+        sriAccessKey = generateSriClaveAcceso({
+          fechaEmision: now,
+          tipoComprobante: '01',
+          ruc: rucLimpio,
+          ambiente: settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1',
+          serie: `${estab}${pto}`,
+          secuencial: sec9,
+          codigoNumerico: '12345678',
+          tipoEmision: '1',
+        });
+      } catch {
+        sriAccessKey = undefined;
+      }
+    }
 
     const newSale: SaleRecord = {
       ...saleData,
       id: `sale-${Date.now()}`,
       invoiceNumber,
+      documentType: isNotaVenta ? 'nota_venta' : 'factura',
+      sriStatus: isNotaVenta ? undefined : 'AUTORIZADO',
+      sriAccessKey,
+      sriAuthorizationDate: isNotaVenta ? undefined : now.toISOString(),
     };
     setSales(prev => [newSale, ...prev]);
-
-    // Incrementar automáticamente el siguiente secuencial en settings
-    const nextSeqNum = currentSeqNum + 1;
-    const nextSecuencialPadded = String(nextSeqNum).padStart(9, '0').slice(-9);
-    setSettings(prev => ({
-      ...prev,
-      secuencialFactura: nextSecuencialPadded,
-    }));
 
     // Ensure client profile is synced in client directory
     if (saleData.clientName) {
@@ -982,6 +1343,110 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       });
     }
 
+    // Sincronización automática de inventario y Kardex
+    const itemsToDeduct: { itemId: string; name: string; sku?: string; qty: number; type: KardexMovementType; concept: string }[] = [];
+
+    // 1. Si se especificó un ítem directo de inventario (venta mostrador / retail)
+    if (saleData.inventoryItemId) {
+      const invItem = inventory.find(i => i.id === saleData.inventoryItemId);
+      if (invItem) {
+        itemsToDeduct.push({
+          itemId: invItem.id,
+          name: invItem.name,
+          sku: invItem.sku,
+          qty: saleData.pieces || 1,
+          type: 'retail_sale',
+          concept: `Venta mostrador (${invoiceNumber}) - Cliente: ${saleData.clientName}`,
+        });
+      }
+    } else if (saleData.serviceCategory === 'jewelry' || saleData.serviceCategory === 'aftercare') {
+      // Búsqueda inteligente por nombre o SKU si fue ingresado en POS
+      const invItem = inventory.find(
+        i =>
+          i.name.toLowerCase() === saleData.serviceName.toLowerCase() ||
+          saleData.serviceName.toLowerCase().includes(i.name.toLowerCase()) ||
+          (i.sku && saleData.serviceName.toLowerCase().includes(i.sku.toLowerCase()))
+      );
+      if (invItem) {
+        itemsToDeduct.push({
+          itemId: invItem.id,
+          name: invItem.name,
+          sku: invItem.sku,
+          qty: saleData.pieces || 1,
+          type: 'retail_sale',
+          concept: `Venta mostrador (${invoiceNumber}) - Cliente: ${saleData.clientName}`,
+        });
+      }
+    }
+
+    // 2. Si se especificaron consumibles de cabina usados en la sesión de tatuaje o piercing
+    if (saleData.consumedSupplies && saleData.consumedSupplies.length > 0) {
+      saleData.consumedSupplies.forEach(cs => {
+        const invItem = inventory.find(i => i.id === cs.itemId || i.name.toLowerCase() === cs.name.toLowerCase());
+        if (invItem && cs.quantity > 0) {
+          itemsToDeduct.push({
+            itemId: invItem.id,
+            name: invItem.name,
+            sku: invItem.sku,
+            qty: cs.quantity,
+            type: 'cabin_out',
+            concept: `Consumo en cabina servicio ${saleData.serviceName} (${invoiceNumber}) - Artista: ${saleData.artistName}`,
+          });
+        }
+      });
+    }
+
+    // Ejecutar deducción atómica en inventario y kardex
+    if (itemsToDeduct.length > 0) {
+      setInventory(prevInv => {
+        const updatedInv = [...prevInv];
+        const newMovements: KardexMovement[] = [];
+
+        itemsToDeduct.forEach(d => {
+          const idx = updatedInv.findIndex(i => i.id === d.itemId);
+          if (idx >= 0) {
+            const item = updatedInv[idx];
+            const newStock = Math.max(0, item.currentStock - d.qty);
+            const totalOut = Math.round(d.qty * item.unitCost * 100) / 100;
+            const balanceTotal = Math.round(newStock * item.unitCost * 100) / 100;
+
+            updatedInv[idx] = {
+              ...item,
+              currentStock: newStock,
+            };
+
+            newMovements.push({
+              id: `kdx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              date: new Date().toISOString(),
+              itemId: item.id,
+              itemName: item.name,
+              itemSku: item.sku,
+              unit: item.unit,
+              type: d.type,
+              reference: invoiceNumber,
+              concept: d.concept,
+              responsible: saleData.artistName || currentUser?.nombres || 'Operador POS',
+              quantityIn: 0,
+              unitCostIn: 0,
+              totalIn: 0,
+              quantityOut: d.qty,
+              unitCostOut: item.unitCost,
+              totalOut,
+              balanceQty: newStock,
+              balanceUnitCost: item.unitCost,
+              balanceTotal,
+            });
+          }
+        });
+
+        if (newMovements.length > 0) {
+          setKardexMovements(prevKdx => [...newMovements, ...prevKdx]);
+        }
+
+        return updatedInv;
+      });
+    }
+
     return newSale;
   };
 
@@ -990,7 +1455,186 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const deleteSale = (id: string) => {
+    const saleToDelete = sales.find(s => s.id === id);
+    if (!saleToDelete) return;
+
+    // Buscar movimientos de Kardex asociados a esta factura para revertir
+    const relatedMovements = kardexMovements.filter(
+      m => m.reference === saleToDelete.invoiceNumber
+    );
+
+    if (relatedMovements.length > 0) {
+      setInventory(prevInv => {
+        const updatedInv = [...prevInv];
+        const reversalMovements: KardexMovement[] = [];
+
+        relatedMovements.forEach(rm => {
+          const idx = updatedInv.findIndex(i => i.id === rm.itemId);
+          if (idx >= 0 && rm.quantityOut > 0) {
+            const item = updatedInv[idx];
+            const restoredStock = item.currentStock + rm.quantityOut;
+            const totalIn = Math.round(rm.quantityOut * item.unitCost * 100) / 100;
+            const balanceTotal = Math.round(restoredStock * item.unitCost * 100) / 100;
+
+            updatedInv[idx] = {
+              ...item,
+              currentStock: restoredStock,
+            };
+
+            reversalMovements.push({
+              id: `kdx-rev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              date: new Date().toISOString(),
+              itemId: item.id,
+              itemName: item.name,
+              itemSku: item.sku,
+              unit: item.unit,
+              type: 'adjustment',
+              reference: `ANUL-${saleToDelete.invoiceNumber}`,
+              concept: `Reverso de stock por anulación de Factura ${saleToDelete.invoiceNumber} (${saleToDelete.clientName})`,
+              responsible: currentUser?.nombres || 'Administración',
+              quantityIn: rm.quantityOut,
+              unitCostIn: item.unitCost,
+              totalIn,
+              quantityOut: 0,
+              unitCostOut: 0,
+              totalOut: 0,
+              balanceQty: restoredStock,
+              balanceUnitCost: item.unitCost,
+              balanceTotal,
+            });
+          }
+        });
+
+        if (reversalMovements.length > 0) {
+          setKardexMovements(prevKdx => [...reversalMovements, ...prevKdx]);
+        }
+
+        return updatedInv;
+      });
+    }
+
     setSales(prev => prev.filter(s => s.id !== id));
+  };
+
+  // Credit Note Operations / Notas de Crédito
+  const addCreditNote = (
+    cnData: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt'>
+  ): CreditNoteRecord => {
+    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
+    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
+    const currentSeqNum = creditNotes.length + 1;
+    const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
+    const creditNoteNumber = `${estab}-${pto}-${secuencialPadded}`;
+
+    const rucLimpio = (settings.ruc || settings.taxId || '1792847102001')
+      .replace(/\D/g, '')
+      .padEnd(13, '0')
+      .slice(0, 13);
+
+    const now = new Date();
+    let sriAccessKey = cnData.sriAccessKey;
+    if (!sriAccessKey) {
+      try {
+        sriAccessKey = generateSriClaveAcceso({
+          fechaEmision: now,
+          tipoComprobante: '04', // 04 = Nota de Crédito SRI
+          ruc: rucLimpio,
+          ambiente: settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1',
+          serie: `${estab}${pto}`,
+          secuencial: secuencialPadded,
+          codigoNumerico: '12345678',
+          tipoEmision: '1',
+        });
+      } catch {
+        sriAccessKey = '0101202604179284710200110010010000000011234567814';
+      }
+    }
+
+    const newCN: CreditNoteRecord = {
+      ...cnData,
+      id: `cn-${Date.now()}`,
+      creditNoteNumber,
+      sriAccessKey,
+      sriStatus: 'AUTORIZADO',
+      sriAuthorizationDate: now.toISOString(),
+      createdAt: now.toISOString(),
+    };
+
+    setCreditNotes(prev => [newCN, ...prev]);
+
+    // 1. Modificar la factura afectada
+    if (cnData.affectedInvoiceId) {
+      setSales(prev =>
+        prev.map(s => {
+          if (s.id === cnData.affectedInvoiceId) {
+            return {
+              ...s,
+              status: cnData.reason === 'ANULACION_TOTAL' ? 'cancelled' : s.status,
+              creditNoteId: newCN.id,
+              creditNoteNumber: newCN.creditNoteNumber,
+            };
+          }
+          return s;
+        })
+      );
+    }
+
+    // 2. Si se solicitó reingresar a Kardex / inventario por devolución de producto
+    if (cnData.revertInventory && cnData.affectedInvoiceId) {
+      const targetSale = sales.find(s => s.id === cnData.affectedInvoiceId);
+      if (targetSale) {
+        const relatedKdx = kardexMovements.filter(m => m.reference === targetSale.invoiceNumber);
+        if (relatedKdx.length > 0) {
+          setInventory(prevInv => {
+            const updatedInv = [...prevInv];
+            const revMovements: KardexMovement[] = [];
+
+            relatedKdx.forEach(rm => {
+              const idx = updatedInv.findIndex(i => i.id === rm.itemId);
+              if (idx >= 0 && rm.quantityOut > 0) {
+                const item = updatedInv[idx];
+                const newStock = item.currentStock + rm.quantityOut;
+                updatedInv[idx] = { ...item, currentStock: newStock };
+
+                revMovements.push({
+                  id: `kdx-nc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  date: now.toISOString(),
+                  itemId: item.id,
+                  itemName: item.name,
+                  itemSku: item.sku,
+                  unit: item.unit,
+                  type: 'adjustment',
+                  reference: newCN.creditNoteNumber,
+                  concept: `Reingreso a bodega por Nota de Crédito ${newCN.creditNoteNumber} (Fac. ${targetSale.invoiceNumber})`,
+                  responsible: currentUser?.nombres || 'Administración',
+                  quantityIn: rm.quantityOut,
+                  unitCostIn: item.unitCost,
+                  totalIn: Math.round(rm.quantityOut * item.unitCost * 100) / 100,
+                  quantityOut: 0,
+                  unitCostOut: 0,
+                  totalOut: 0,
+                  balanceQty: newStock,
+                  balanceUnitCost: item.unitCost,
+                  balanceTotal: Math.round(newStock * item.unitCost * 100) / 100,
+                });
+              }
+            });
+
+            if (revMovements.length > 0) {
+              setKardexMovements(prev => [...revMovements, ...prev]);
+            }
+
+            return updatedInv;
+          });
+        }
+      }
+    }
+
+    return newCN;
+  };
+
+  const deleteCreditNote = (id: string) => {
+    setCreditNotes(prev => prev.filter(cn => cn.id !== id));
   };
 
   // Expense Operations
@@ -998,9 +1642,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const newExpense: ExpenseRecord = {
       ...expenseData,
       id: `exp-${Date.now()}`,
+      sriStatus: expenseData.sriStatus || (expenseData.sriAccessKey ? 'AUTORIZADO' : expenseData.taxDeductible ? 'AUTORIZADO' : 'PENDIENTE'),
     };
     setExpenses(prev => [newExpense, ...prev]);
     return newExpense;
+  };
+
+  const updateExpense = (id: string, updated: Partial<ExpenseRecord>) => {
+    setExpenses(prev => prev.map(e => (e.id === id ? { ...e, ...updated } : e)));
   };
 
   const deleteExpense = (id: string) => {
@@ -1129,11 +1778,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     concept: string;
     responsible?: string;
     date?: string;
+    isEntry?: boolean;
   }) => {
     const item = inventory.find(i => i.id === params.itemId);
     if (!item || params.quantity <= 0) return;
 
-    const isEntry = params.type === 'purchase_in' || params.type === 'initial';
+    const isEntry = params.isEntry !== undefined
+      ? params.isEntry
+      : (params.type === 'purchase_in' || params.type === 'initial');
     const qty = params.quantity;
     const costPerUnit = params.unitCost !== undefined && params.unitCost > 0 ? params.unitCost : item.unitCost;
 
@@ -1165,7 +1817,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       type: params.type,
       reference: params.reference || `KDX-${Date.now().toString().slice(-5)}`,
       concept: params.concept,
-      responsible: params.responsible || 'Administración',
+      responsible: params.responsible || currentUser?.nombres || 'Administración',
       quantityIn: isEntry ? qty : 0,
       unitCostIn: isEntry ? costPerUnit : 0,
       totalIn: isEntry ? totalMovement : 0,
@@ -1201,20 +1853,20 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const balanceTotal = Math.round(newStock * item.unitCost * 100) / 100;
 
     const movement: KardexMovement = {
-      id: `kdx-${Date.now()}`,
+      id: `kdx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       date: new Date().toISOString(),
       itemId: item.id,
       itemName: item.name,
       itemSku: item.sku,
       unit: item.unit,
-      type: isEntry ? 'purchase_in' : 'cabin_out',
+      type: 'adjustment',
       reference: `AJU-${Date.now().toString().slice(-5)}`,
       concept:
         reason ||
         (isEntry
-          ? 'Ingreso rápido de stock desde inventario'
-          : 'Salida / consumo en cabina registrado desde inventario'),
-      responsible: 'Operador de Estudio',
+          ? 'Ajuste positivo por inventario físico en bodega'
+          : 'Baja / merma sanitaria de insumo en bodega'),
+      responsible: currentUser?.nombres || 'Operador de Estudio',
       quantityIn: isEntry ? absQty : 0,
       unitCostIn: isEntry ? item.unitCost : 0,
       totalIn: isEntry ? totalMov : 0,
@@ -1232,7 +1884,86 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setKardexMovements(prev => [movement, ...prev]);
   };
 
+  const reconcileKardexInventory = (): { reconciledCount: number; adjustmentsMade: number } => {
+    let adjustmentsMade = 0;
+    const newMovements: KardexMovement[] = [];
+    const now = new Date().toISOString();
+
+    inventory.forEach(item => {
+      const itemMovements = kardexMovements.filter(m => m.itemId === item.id);
+      const sumIn = itemMovements.reduce((acc, m) => acc + (m.quantityIn || 0), 0);
+      const sumOut = itemMovements.reduce((acc, m) => acc + (m.quantityOut || 0), 0);
+      const kardexCalculatedStock = sumIn - sumOut;
+
+      if (kardexCalculatedStock !== item.currentStock) {
+        const delta = item.currentStock - kardexCalculatedStock;
+        const isEntry = delta > 0;
+        const absQty = Math.abs(delta);
+        const totalVal = Math.round(absQty * item.unitCost * 100) / 100;
+        const balanceTotal = Math.round(item.currentStock * item.unitCost * 100) / 100;
+
+        newMovements.push({
+          id: `kdx-sync-${Date.now()}-${item.id.slice(-4)}-${Math.random().toString(36).slice(2, 5)}`,
+          date: now,
+          itemId: item.id,
+          itemName: item.name,
+          itemSku: item.sku,
+          unit: item.unit,
+          type: 'adjustment',
+          reference: `SYNC-${Date.now().toString().slice(-5)}`,
+          concept: `Conciliación y sincronización de Kardex con inventario físico (${isEntry ? 'Cuadre positivo +' : 'Cuadre merma -'})`,
+          responsible: currentUser?.nombres || 'Sistema Automático',
+          quantityIn: isEntry ? absQty : 0,
+          unitCostIn: isEntry ? item.unitCost : 0,
+          totalIn: isEntry ? totalVal : 0,
+          quantityOut: !isEntry ? absQty : 0,
+          unitCostOut: !isEntry ? item.unitCost : 0,
+          totalOut: !isEntry ? totalVal : 0,
+          balanceQty: item.currentStock,
+          balanceUnitCost: item.unitCost,
+          balanceTotal,
+        });
+        adjustmentsMade++;
+      }
+    });
+
+    if (newMovements.length > 0) {
+      setKardexMovements(prev => [...newMovements, ...prev]);
+    }
+
+    return {
+      reconciledCount: inventory.length,
+      adjustmentsMade,
+    };
+  };
+
   const deleteInventoryItem = (id: string) => {
+    const item = inventory.find(i => i.id === id);
+    if (item && item.currentStock > 0) {
+      const totalMov = Math.round(item.currentStock * item.unitCost * 100) / 100;
+      const movement: KardexMovement = {
+        id: `kdx-del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        date: new Date().toISOString(),
+        itemId: item.id,
+        itemName: item.name,
+        itemSku: item.sku,
+        unit: item.unit,
+        type: 'adjustment',
+        reference: `BAJA-${item.id.slice(-4)}`,
+        concept: `Baja definitiva del insumo / eliminación del catálogo (${item.name})`,
+        responsible: currentUser?.nombres || 'Administración',
+        quantityIn: 0,
+        unitCostIn: 0,
+        totalIn: 0,
+        quantityOut: item.currentStock,
+        unitCostOut: item.unitCost,
+        totalOut: totalMov,
+        balanceQty: 0,
+        balanceUnitCost: item.unitCost,
+        balanceTotal: 0,
+      };
+      setKardexMovements(prev => [movement, ...prev]);
+    }
     setInventory(prev => prev.filter(i => i.id !== id));
   };
 
@@ -1306,6 +2037,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setProformas(INITIAL_PROFORMAS);
     setGalleryPhotos(INITIAL_GALLERY_PHOTOS);
     setSuppliers(INITIAL_SUPPLIERS);
+    setPurchaseOrders(INITIAL_PURCHASE_ORDERS);
+    setUsers(INITIAL_USERS);
+    setCurrentUser(INITIAL_USERS[0]);
     setCurrentShift(INITIAL_CASH_SHIFT);
     setSettlements([]);
     setSettings(INITIAL_SETTINGS);
@@ -1323,6 +2057,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setProformas([]);
     setGalleryPhotos([]);
     setSuppliers([]);
+    setPurchaseOrders([]);
+    setUsers([INITIAL_USERS[0]]);
+    setCurrentUser(INITIAL_USERS[0]);
     const freshShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -1356,6 +2093,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       proformas,
       galleryPhotos,
       suppliers,
+      purchaseOrders,
+      users,
+      currentUser,
       settlements,
       pastShifts,
       currentShift,
@@ -1383,6 +2123,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.proformas && Array.isArray(parsed.proformas)) setProformas(parsed.proformas);
       if (parsed.galleryPhotos && Array.isArray(parsed.galleryPhotos)) setGalleryPhotos(parsed.galleryPhotos);
       if (parsed.suppliers && Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
+      if (parsed.purchaseOrders && Array.isArray(parsed.purchaseOrders)) setPurchaseOrders(parsed.purchaseOrders);
+      if (parsed.users && Array.isArray(parsed.users)) setUsers(parsed.users);
+      if (parsed.currentUser && parsed.currentUser.id) setCurrentUser(parsed.currentUser);
       if (parsed.settlements && Array.isArray(parsed.settlements)) setSettlements(parsed.settlements);
       if (parsed.settings) setSettings(parsed.settings);
       if (parsed.currentShift) setCurrentShift(parsed.currentShift);
@@ -1408,6 +2151,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         proformas,
         galleryPhotos,
         suppliers,
+        purchaseOrders,
+        creditNotes,
+        users,
+        currentUser,
         currentShift,
         pastShifts,
         settings,
@@ -1431,7 +2178,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         addSale,
         updateSale,
         deleteSale,
+        addCreditNote,
+        deleteCreditNote,
         addExpense,
+        updateExpense,
         deleteExpense,
         addArtist,
         updateArtist,
@@ -1442,6 +2192,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         adjustStock,
         deleteInventoryItem,
         addKardexMovement,
+        reconcileKardexInventory,
         addClient,
         updateClient,
         deleteClient,
@@ -1452,6 +2203,15 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         addSupplier,
         updateSupplier,
         deleteSupplier,
+        addPurchaseOrder,
+        updatePurchaseOrder,
+        deletePurchaseOrder,
+        receivePurchaseOrder,
+        switchUser,
+        addUser,
+        updateUser,
+        deleteUser,
+        canAccessTab,
         addManualJournalEntry,
         deleteManualJournalEntry,
         openCashShift,
@@ -1463,6 +2223,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         exportBackup,
         importBackup,
         filteredSales,
+        filteredCreditNotes,
         filteredExpenses,
       }}
     >
@@ -1484,6 +2245,10 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   proformas: INITIAL_PROFORMAS,
   galleryPhotos: INITIAL_GALLERY_PHOTOS,
   suppliers: INITIAL_SUPPLIERS,
+  purchaseOrders: INITIAL_PURCHASE_ORDERS,
+  creditNotes: INITIAL_CREDIT_NOTES,
+  users: INITIAL_USERS,
+  currentUser: INITIAL_USERS[0],
   currentShift: INITIAL_CASH_SHIFT,
   pastShifts: [],
   settings: INITIAL_SETTINGS,
@@ -1507,7 +2272,10 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   addSale: (sale) => ({ ...sale, id: 'temp-' + Date.now(), invoiceNumber: 'INV-0001' }),
   updateSale: () => {},
   deleteSale: () => {},
+  addCreditNote: (cn) => ({ ...cn, id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
+  deleteCreditNote: () => {},
   addExpense: (exp) => ({ ...exp, id: 'temp-' + Date.now() }),
+  updateExpense: () => {},
   deleteExpense: () => {},
   addArtist: () => {},
   updateArtist: () => {},
@@ -1518,6 +2286,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   adjustStock: () => {},
   deleteInventoryItem: () => {},
   addKardexMovement: () => {},
+  reconcileKardexInventory: () => ({ reconciledCount: 0, adjustmentsMade: 0 }),
   addClient: (cli) => ({ ...cli, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
   updateClient: () => {},
   deleteClient: () => {},
@@ -1528,6 +2297,15 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   addSupplier: (sup) => ({ ...sup, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
   updateSupplier: () => {},
   deleteSupplier: () => {},
+  addPurchaseOrder: (po) => ({ ...po, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updatePurchaseOrder: () => {},
+  deletePurchaseOrder: () => {},
+  receivePurchaseOrder: () => {},
+  switchUser: () => true,
+  addUser: (u) => ({ ...u, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updateUser: () => {},
+  deleteUser: () => {},
+  canAccessTab: () => true,
   addManualJournalEntry: () => {},
   deleteManualJournalEntry: () => {},
   openCashShift: () => {},
@@ -1539,6 +2317,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   exportBackup: () => {},
   importBackup: () => false,
   filteredSales: INITIAL_SALES,
+  filteredCreditNotes: INITIAL_CREDIT_NOTES,
   filteredExpenses: INITIAL_EXPENSES,
 };
 

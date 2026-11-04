@@ -77,8 +77,16 @@ export const SettingsView: React.FC = () => {
   const [website, setWebsite] = useState(settings.website || 'www.devolutionink.com');
   const [currency, setCurrency] = useState(settings.currency || '$');
   const [currencyCode, setCurrencyCode] = useState(settings.currencyCode || 'USD');
-  const [defaultTaxRate, setDefaultTaxRate] = useState<number>(settings.defaultTaxRate ?? 15);
-  const [defaultArtistCommission, setDefaultArtistCommission] = useState<number>(settings.defaultArtistCommission ?? 60);
+  const [defaultTaxRate, setDefaultTaxRate] = useState<number>(
+    (!settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12)
+      ? 15
+      : settings.defaultTaxRate
+  );
+  const [defaultArtistCommission, setDefaultArtistCommission] = useState<number>(
+    (!settings.defaultArtistCommission || [50, 60, 65, 70].includes(settings.defaultArtistCommission))
+      ? 80
+      : settings.defaultArtistCommission
+  );
   const [receiptFooterMessage, setReceiptFooterMessage] = useState(settings.receiptFooterMessage || '');
   const [healthSanitaryRegistration, setHealthSanitaryRegistration] = useState(settings.healthSanitaryRegistration || 'REG-SAN-ARCSA-2026');
 
@@ -1248,7 +1256,7 @@ export const SettingsView: React.FC = () => {
                   className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
                 />
                 <span className="text-[10px] text-neutral-500 mt-1 block">
-                  Comisión sugerida para nuevos tatuadores
+                  80% para el artista / 20% retención del estudio
                 </span>
               </div>
 

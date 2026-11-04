@@ -226,8 +226,8 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
     }
 
     const rucVal = validarRucEcuatoriano(cleanRuc);
-    if (!rucVal.valido) {
-      setSriNotice({ text: rucVal.mensaje || 'RUC inválido según algoritmo SRI.', type: 'error' });
+    if (!rucVal.isValid) {
+      setSriNotice({ text: rucVal.message || 'RUC inválido según algoritmo SRI.', type: 'error' });
       return;
     }
 
@@ -236,16 +236,14 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
 
     try {
       const data = await consultarIdentificacion(cleanRuc);
-      if (data && data.razonSocial) {
-        setFormRazonSocial(data.razonSocial.toUpperCase());
+      if (data && (data.razonSocial || data.nombre)) {
+        const legalName = (data.razonSocial || data.nombre || '').toUpperCase();
+        setFormRazonSocial(legalName);
         if (data.nombreComercial) {
           setFormNombreComercial(data.nombreComercial.toUpperCase());
         }
-        if (data.direccion) {
-          setFormDireccion(data.direccion);
-        }
         setSriNotice({
-          text: `✓ RUC verificado en catastro SRI: ${data.razonSocial}`,
+          text: `✓ RUC verificado en catastro SRI: ${legalName}`,
           type: 'success',
         });
       } else {
@@ -457,10 +455,135 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
       </div>
 
       {/* =========================================================================
-          TABLA HORIZONTAL MODERNA DE PROVEEDORES
+          TABLA HORIZONTAL MODERNA & TARJETAS MÓVILES DE PROVEEDORES
           ========================================================================= */}
       <div className="bg-[#141417] border border-[#24242A] rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto custom-scrollbar">
+        {/* Mobile Card List (md:hidden) */}
+        <div className="md:hidden divide-y divide-[#202026]">
+          {filteredList.length === 0 ? (
+            <div className="p-8 text-center text-neutral-500 text-xs">
+              <Truck className="w-8 h-8 mx-auto mb-2 opacity-40 text-neutral-400" />
+              <p className="font-semibold text-white">No se encontraron proveedores</p>
+              <p className="text-[11px] text-neutral-400 mt-1">
+                {searchQuery
+                  ? `No hay proveedores que coincidan con "${searchQuery}".`
+                  : 'No hay proveedores registrados con los filtros seleccionados.'}
+              </p>
+            </div>
+          ) : (
+            filteredList.map(({ supplier: sup, totalPurchases, purchasesCount, itemsCount }) => {
+              const badge = getCategoryBadge(sup.categoria);
+              return (
+                <div key={`m-sup-${sup.id}`} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-white text-xs block leading-snug">
+                        {sup.nombreComercial || sup.razonSocial}
+                      </span>
+                      {sup.nombreComercial && (
+                        <span className="text-[11px] text-neutral-400 block truncate max-w-xs">
+                          {sup.razonSocial}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="font-mono text-[10px] text-neutral-300 bg-[#1A1A22] px-1.5 py-0.5 rounded border border-[#272730]">
+                          {sup.ruc}
+                        </span>
+                        <span className="text-[10px] text-neutral-500">{sup.ciudad || 'Quito'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                      <span
+                        className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase ${
+                          sup.estado === 'ACTIVO'
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
+                        }`}
+                      >
+                        {sup.estado}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#1A1A20] p-2.5 rounded-xl border border-[#2B2B36] space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-neutral-400">Contacto:</span>
+                      <span className="text-neutral-200 font-medium">{sup.contactoNombre || 'Ventas'}</span>
+                    </div>
+                    {sup.telefono && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-neutral-400">Teléfono:</span>
+                        <div className="flex items-center gap-2">
+                          <a href={`tel:${sup.telefono}`} className="text-neutral-200 font-mono hover:underline">
+                            {sup.telefono}
+                          </a>
+                          <a
+                            href={`https://wa.me/593${sup.telefono.replace(/\D/g, '').replace(/^0/, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-bold hover:bg-emerald-500/25 transition-colors"
+                          >
+                            WhatsApp
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                    {sup.bancoNombre && (
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#23232C]">
+                        <span className="text-neutral-400">Transferencia:</span>
+                        <span className="text-neutral-300 font-mono text-[10px] truncate max-w-[190px]">
+                          {sup.bancoNombre} ({sup.bancoNumeroCuenta})
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div>
+                      <span className="text-[9px] text-neutral-400 uppercase font-bold block">Compras Acumuladas</span>
+                      <span className="font-mono font-bold text-white text-sm">{formatMoney(totalPurchases)}</span>
+                      <span className="text-[10px] text-neutral-500 block">{purchasesCount} facturas · {itemsCount} insumos</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setViewingSupplier(sup)}
+                        className="p-2 rounded-xl bg-[#1A1A22] text-[#FF3366] border border-[#272730] hover:bg-[#252530] transition-colors cursor-pointer"
+                        title="Ver detalle"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(sup)}
+                        className="p-2 rounded-xl bg-[#1A1A22] text-blue-400 border border-[#272730] hover:bg-[#252530] transition-colors cursor-pointer"
+                        title="Editar"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSupplier(sup)}
+                        className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 hover:bg-rose-500/20 transition-colors cursor-pointer"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table View (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto custom-scrollbar">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-[#24242A] bg-[#18181D] text-neutral-400 uppercase font-semibold text-[10px] tracking-wider whitespace-nowrap">
@@ -1201,7 +1324,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                         <tbody className="divide-y divide-[#202026]">
                           {matchedItems.map(item => (
                             <tr key={item.id} className="hover:bg-[#1A1A20]">
-                              <td className="py-2.5 px-3 font-mono text-neutral-400">{item.code || item.sku || 'N/A'}</td>
+                              <td className="py-2.5 px-3 font-mono text-neutral-400">{item.sku || 'N/A'}</td>
                               <td className="py-2.5 px-3 font-bold text-white">{item.name}</td>
                               <td className="py-2.5 px-3 text-neutral-400 capitalize">{item.category}</td>
                               <td className="py-2.5 px-3 font-mono font-bold text-center text-emerald-400">
@@ -1211,7 +1334,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                                 {formatMoney(item.unitCost)}
                               </td>
                               <td className="py-2.5 px-3 font-mono font-bold text-white text-right">
-                                {formatMoney(item.salePrice)}
+                                {formatMoney(item.retailPrice || item.priceWithVat || item.unitCost)}
                               </td>
                             </tr>
                           ))}

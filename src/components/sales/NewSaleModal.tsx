@@ -23,7 +23,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
   const [pieces, setPieces] = useState<number>(1);
   const [subtotal, setSubtotal] = useState<number>(200);
   const [discount, setDiscount] = useState<number>(0);
-  const [taxRate, setTaxRate] = useState<number>(settings.defaultTaxRate);
+  const [taxRate, setTaxRate] = useState<number>(
+    (!settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12)
+      ? 15
+      : settings.defaultTaxRate
+  );
   const [depositAmount, setDepositAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [tipAmount, setTipAmount] = useState<number>(0);
