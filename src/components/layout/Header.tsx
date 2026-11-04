@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'kardex':
         return 'Kardex Valorizado de Insumos';
       case 'ledger':
-        return 'Libro Mayor & Plan Contable';
+        return 'Asientos Contables & Libro Diario';
       case 'reports':
         return 'Centro de Reportes Financieros';
       case 'users':

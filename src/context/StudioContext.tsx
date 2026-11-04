@@ -41,6 +41,7 @@ import {
   INITIAL_SUPPLIERS,
   INITIAL_PURCHASE_ORDERS,
   INITIAL_USERS,
+  INITIAL_JOURNAL_ENTRIES,
   getDefaultTabsForRole,
 } from '../data/initialData';
 import { generateSriClaveAcceso } from '../utils/sriCalculations';
@@ -190,6 +191,7 @@ interface StudioContextType {
 
   // Actions - General Ledger Manual Entries
   addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id'>) => void;
+  updateManualJournalEntry: (id: string, updates: Partial<ManualJournalEntry>) => void;
   deleteManualJournalEntry: (id: string) => void;
 
   // Actions - Cash Shift
@@ -284,9 +286,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     safeLoadFromStorage(STORAGE_KEYS.KARDEX, INITIAL_KARDEX)
   );
 
-  const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() =>
-    safeLoadFromStorage(STORAGE_KEYS.JOURNAL, [])
-  );
+  const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() => {
+    const loaded = safeLoadFromStorage<ManualJournalEntry[]>(STORAGE_KEYS.JOURNAL, INITIAL_JOURNAL_ENTRIES);
+    return loaded && loaded.length > 0 ? loaded : INITIAL_JOURNAL_ENTRIES;
+  });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() =>
     safeLoadFromStorage(STORAGE_KEYS.APPOINTMENTS, INITIAL_APPOINTMENTS)
@@ -1967,13 +1970,23 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setInventory(prev => prev.filter(i => i.id !== id));
   };
 
-  // Manual Journal Entries for General Ledger
+  // Manual Journal Entries for General Ledger & Libro Diario
   const addManualJournalEntry = (entryData: Omit<ManualJournalEntry, 'id'>) => {
+    const year = new Date().getFullYear();
+    const nextNumber = entryData.entryNumber || `ASI-${year}-${String(manualJournalEntries.length + 1).padStart(4, '0')}`;
     const newEntry: ManualJournalEntry = {
       ...entryData,
       id: `jrnl-${Date.now()}`,
+      entryNumber: nextNumber,
+      status: entryData.status || 'cuadrado',
     };
     setManualJournalEntries(prev => [newEntry, ...prev]);
+  };
+
+  const updateManualJournalEntry = (id: string, updates: Partial<ManualJournalEntry>) => {
+    setManualJournalEntries(prev =>
+      prev.map(entry => (entry.id === id ? { ...entry, ...updates } : entry))
+    );
   };
 
   const deleteManualJournalEntry = (id: string) => {
@@ -2031,7 +2044,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setArtists(INITIAL_ARTISTS);
     setInventory(INITIAL_INVENTORY);
     setKardexMovements(INITIAL_KARDEX);
-    setManualJournalEntries([]);
+    setManualJournalEntries(INITIAL_JOURNAL_ENTRIES);
     setAppointments(INITIAL_APPOINTMENTS);
     setClients(INITIAL_CLIENTS);
     setProformas(INITIAL_PROFORMAS);
@@ -2213,6 +2226,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         deleteUser,
         canAccessTab,
         addManualJournalEntry,
+        updateManualJournalEntry,
         deleteManualJournalEntry,
         openCashShift,
         closeCashShift,
@@ -2307,6 +2321,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   deleteUser: () => {},
   canAccessTab: () => true,
   addManualJournalEntry: () => {},
+  updateManualJournalEntry: () => {},
   deleteManualJournalEntry: () => {},
   openCashShift: () => {},
   closeCashShift: () => {},

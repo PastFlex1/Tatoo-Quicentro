@@ -9,10 +9,21 @@ import {
   CheckCircle2,
   X,
   Trash2,
+  FileText,
+  Eye,
+  Layers,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Tag,
+  Filter,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
+import { ManualJournalEntry, JournalEntryLine } from '../../types';
+import { NewJournalEntryModal } from './NewJournalEntryModal';
+import { JournalEntryPrintModal } from './JournalEntryPrintModal';
 
-interface AccountDefinition {
+export interface AccountDefinition {
   code: string;
   name: string;
   group: 'Activo' | 'Pasivo' | 'Patrimonio' | 'Ingresos' | 'Costos' | 'Gastos';
@@ -23,8 +34,10 @@ export const CHART_OF_ACCOUNTS: AccountDefinition[] = [
   { code: '1101', name: 'Caja General (Efectivo en Estudio)', group: 'Activo', nature: 'debit' },
   { code: '1102', name: 'Bancos, Datáfono POS & Transferencias', group: 'Activo', nature: 'debit' },
   { code: '1105', name: 'Inventario de Insumos, Tintas & Joyería', group: 'Activo', nature: 'debit' },
+  { code: '1201', name: 'Mobiliario, Camillas & Autoclaves (Activo Fijo)', group: 'Activo', nature: 'debit' },
   { code: '2101', name: 'Comisiones por Pagar a Artistas', group: 'Pasivo', nature: 'credit' },
   { code: '2102', name: 'IVA / Impuestos Fiscales por Liquidar', group: 'Pasivo', nature: 'credit' },
+  { code: '2103', name: 'Cuentas y Proveedores por Pagar', group: 'Pasivo', nature: 'credit' },
   { code: '3101', name: 'Capital & Fondo Operativo del Estudio', group: 'Patrimonio', nature: 'credit' },
   { code: '4101', name: 'Ingresos por Servicios de Tatuaje', group: 'Ingresos', nature: 'credit' },
   { code: '4102', name: 'Ingresos por Servicios de Body Piercing', group: 'Ingresos', nature: 'credit' },
@@ -32,9 +45,10 @@ export const CHART_OF_ACCOUNTS: AccountDefinition[] = [
   { code: '5101', name: 'Costo Directo: Comisiones de Artistas', group: 'Costos', nature: 'debit' },
   { code: '5102', name: 'Costo Directo: Insumos, Agujas & Joyería', group: 'Costos', nature: 'debit' },
   { code: '5201', name: 'Gastos Operativos (Alquiler, Luz, Sanidad)', group: 'Gastos', nature: 'debit' },
+  { code: '5202', name: 'Gastos Financieros & Comisiones Datáfono/TPV', group: 'Gastos', nature: 'debit' },
 ];
 
-interface LedgerPosting {
+export interface LedgerPosting {
   id: string;
   date: string;
   reference: string;
@@ -46,6 +60,21 @@ interface LedgerPosting {
   manualId?: string;
 }
 
+export interface UnifiedJournalEntry {
+  id: string;
+  entryNumber: string;
+  date: string;
+  reference: string;
+  concept: string;
+  source: 'manual' | 'sale' | 'expense' | 'shift';
+  entryType: string;
+  lines: JournalEntryLine[];
+  totalDebit: number;
+  totalCredit: number;
+  isBalanced: boolean;
+  manualRecord?: ManualJournalEntry;
+}
+
 export const GeneralLedgerView: React.FC = () => {
   const {
     filteredSales,
@@ -53,227 +82,331 @@ export const GeneralLedgerView: React.FC = () => {
     manualJournalEntries,
     currentShift,
     formatMoney,
-    addManualJournalEntry,
     deleteManualJournalEntry,
   } = useStudio();
 
-  const [activeTab, setActiveTab] = useState<'mayor' | 'trial_balance'>('mayor');
+  // Active top tab: default to 'journal' (Libro Diario / Asientos Contables)
+  const [activeTab, setActiveTab] = useState<'journal' | 'mayor' | 'trial_balance' | 'chart_of_accounts'>('journal');
+  const [journalFilter, setJournalFilter] = useState<'all' | 'manual' | 'sale' | 'expense' | 'shift'>('all');
+  const [journalSearch, setJournalSearch] = useState<string>('');
+
   const [selectedAccountCode, setSelectedAccountCode] = useState<string>('all');
   const [mayorSearch, setMayorSearch] = useState<string>('');
-  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
 
-  // Manual Journal Form
-  const [jrnlRef, setJrnlRef] = useState<string>('');
-  const [jrnlConcept, setJrnlConcept] = useState<string>('');
-  const [jrnlDebitAcc, setJrnlDebitAcc] = useState<string>('1101');
-  const [jrnlCreditAcc, setJrnlCreditAcc] = useState<string>('3101');
-  const [jrnlAmount, setJrnlAmount] = useState<string>('');
+  // Modals state
+  const [isNewJournalOpen, setIsNewJournalOpen] = useState(false);
+  const [selectedEntryToPrint, setSelectedEntryToPrint] = useState<ManualJournalEntry | null>(null);
 
-  // Build double-entry general ledger postings
-  const allPostings = useMemo<LedgerPosting[]>(() => {
-    const list: LedgerPosting[] = [];
+  const getAccountName = (code: string) => {
+    const found = CHART_OF_ACCOUNTS.find(a => a.code === code);
+    return found ? found.name : 'Cuenta Contable';
+  };
 
-    // 1. Opening Cash Fund
-    if (currentShift.openingCash > 0) {
-      list.push(
-        {
-          id: 'post-shift-open-d',
-          date: currentShift.openedAt,
-          reference: 'APE-CAJA',
-          accountCode: '1101',
-          concept: `Fondo inicial de apertura de caja (${currentShift.openedBy})`,
-          debit: currentShift.openingCash,
-          credit: 0,
-          source: 'shift',
-        },
-        {
-          id: 'post-shift-open-c',
-          date: currentShift.openedAt,
-          reference: 'APE-CAJA',
-          accountCode: '3101',
-          concept: `Aporte fondo operativo de apertura de caja`,
-          debit: 0,
-          credit: currentShift.openingCash,
-          source: 'shift',
-        }
-      );
-    }
+  // 1. Build Unified Journal Entries for Libro Diario
+  const unifiedJournalEntries = useMemo<UnifiedJournalEntry[]>(() => {
+    const list: UnifiedJournalEntry[] = [];
 
-    // 2. Sales double-entry postings
+    // A. Manual Journal Entries
+    manualJournalEntries.forEach(mj => {
+      if (mj.status === 'anulado') return;
+
+      const lines: JournalEntryLine[] =
+        mj.lines && mj.lines.length > 0
+          ? mj.lines
+          : [
+              {
+                id: `l1-${mj.id}`,
+                accountCode: mj.debitAccountCode || '1101',
+                accountName: getAccountName(mj.debitAccountCode || '1101'),
+                concept: mj.concept,
+                debit: mj.amount || 0,
+                credit: 0,
+              },
+              {
+                id: `l2-${mj.id}`,
+                accountCode: mj.creditAccountCode || '3101',
+                accountName: getAccountName(mj.creditAccountCode || '3101'),
+                concept: mj.concept,
+                debit: 0,
+                credit: mj.amount || 0,
+              },
+            ];
+
+      const totDeb = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+      const totCred = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+
+      list.push({
+        id: mj.id,
+        entryNumber: mj.entryNumber || mj.reference || `ASI-${mj.id.slice(-4)}`,
+        date: mj.date,
+        reference: mj.reference || 'S/R',
+        concept: mj.concept,
+        source: 'manual',
+        entryType: mj.entryType ? mj.entryType.toUpperCase() : 'MANUAL',
+        lines,
+        totalDebit: totDeb,
+        totalCredit: totCred,
+        isBalanced: Math.abs(totDeb - totCred) < 0.05,
+        manualRecord: mj,
+      });
+    });
+
+    // B. Sales Automatic Entries
     filteredSales
       .filter(s => s.status !== 'cancelled')
       .forEach(s => {
         const netRevenue = Math.max(0, s.total - s.taxAmount);
         const revAccount =
-          s.serviceCategory === 'tattoo'
-            ? '4101'
-            : s.serviceCategory === 'piercing'
-            ? '4102'
-            : '4103';
+          s.serviceCategory === 'tattoo' ? '4101' : s.serviceCategory === 'piercing' ? '4102' : '4103';
 
-        // Asset entry (Cash vs Bank/Card/Transfer)
+        const lines: JournalEntryLine[] = [];
+
+        // Debit asset
         if (s.paymentMethod === 'cash') {
-          list.push({
-            id: `post-sale-cash-${s.id}`,
-            date: s.date,
-            reference: s.invoiceNumber,
+          lines.push({
+            id: `s-c-${s.id}`,
             accountCode: '1101',
-            concept: `Cobro en efectivo: ${s.serviceName} (${s.clientName})`,
+            accountName: getAccountName('1101'),
+            concept: `Cobro en efectivo: ${s.serviceName}`,
             debit: s.total,
             credit: 0,
-            source: 'sale',
           });
         } else if (s.paymentMethod === 'split') {
-          const cashPart = s.cashPaid || 0;
-          const bankPart = Math.max(0, s.total - cashPart);
-          if (cashPart > 0) {
-            list.push({
-              id: `post-sale-splitc-${s.id}`,
-              date: s.date,
-              reference: s.invoiceNumber,
+          const cashP = s.cashPaid || 0;
+          const bankP = Math.max(0, s.total - cashP);
+          if (cashP > 0) {
+            lines.push({
+              id: `s-spc-${s.id}`,
               accountCode: '1101',
-              concept: `Cobro mixto (Efectivo): ${s.serviceName} (${s.clientName})`,
-              debit: cashPart,
+              accountName: getAccountName('1101'),
+              concept: `Cobro mixto (Efectivo)`,
+              debit: cashP,
               credit: 0,
-              source: 'sale',
             });
           }
-          if (bankPart > 0) {
-            list.push({
-              id: `post-sale-splitb-${s.id}`,
-              date: s.date,
-              reference: s.invoiceNumber,
+          if (bankP > 0) {
+            lines.push({
+              id: `s-spb-${s.id}`,
               accountCode: '1102',
-              concept: `Cobro mixto (POS/Transf.): ${s.serviceName} (${s.clientName})`,
-              debit: bankPart,
+              accountName: getAccountName('1102'),
+              concept: `Cobro mixto (POS/Banco)`,
+              debit: bankP,
               credit: 0,
-              source: 'sale',
             });
           }
         } else {
-          list.push({
-            id: `post-sale-bank-${s.id}`,
-            date: s.date,
-            reference: s.invoiceNumber,
+          lines.push({
+            id: `s-b-${s.id}`,
             accountCode: '1102',
-            concept: `Cobro ${s.paymentMethod === 'card' ? 'Tarjeta POS' : 'Transferencia'}: ${s.serviceName} (${s.clientName})`,
+            accountName: getAccountName('1102'),
+            concept: `Cobro ${s.paymentMethod === 'card' ? 'Tarjeta Datáfono' : 'Transferencia'}`,
             debit: s.total,
             credit: 0,
-            source: 'sale',
           });
         }
 
-        // Revenue credit
-        list.push({
-          id: `post-sale-rev-${s.id}`,
-          date: s.date,
-          reference: s.invoiceNumber,
+        // Credit revenue
+        lines.push({
+          id: `s-rev-${s.id}`,
           accountCode: revAccount,
-          concept: `Venta devengada: ${s.serviceName} - Artista: ${s.artistName}`,
+          accountName: getAccountName(revAccount),
+          concept: `Venta devengada (${s.serviceName})`,
           debit: 0,
           credit: netRevenue,
-          source: 'sale',
         });
 
-        // Tax credit
+        // Credit tax
         if (s.taxAmount > 0) {
-          list.push({
-            id: `post-sale-tax-${s.id}`,
-            date: s.date,
-            reference: s.invoiceNumber,
+          lines.push({
+            id: `s-tax-${s.id}`,
             accountCode: '2102',
-            concept: `IVA / Impuesto repercutido (${s.taxRate}%) en ${s.invoiceNumber}`,
+            accountName: getAccountName('2102'),
+            concept: `IVA Repercutido (${s.taxRate || 15}%)`,
             debit: 0,
             credit: s.taxAmount,
-            source: 'sale',
           });
         }
 
-        // Artist Commission
+        // Commission
         if (s.artistShare > 0) {
-          list.push({
-            id: `post-sale-comm-d-${s.id}`,
-            date: s.date,
-            reference: s.invoiceNumber,
+          lines.push({
+            id: `s-cmd-${s.id}`,
             accountCode: '5101',
-            concept: `Devengo comisión ${s.artistName} (${s.artistCommissionPercent}%)`,
+            accountName: getAccountName('5101'),
+            concept: `Costo comisión ${s.artistName} (${s.artistCommissionPercent}%)`,
             debit: s.artistShare,
             credit: 0,
-            source: 'sale',
           });
-          list.push({
-            id: `post-sale-comm-c-${s.id}`,
-            date: s.date,
-            reference: s.invoiceNumber,
+          lines.push({
+            id: `s-cmc-${s.id}`,
             accountCode: '2101',
-            concept: `Comisión por pagar a ${s.artistName} (${s.invoiceNumber})`,
+            accountName: getAccountName('2101'),
+            concept: `Comisión por pagar a ${s.artistName}`,
             debit: 0,
             credit: s.artistShare,
-            source: 'sale',
           });
         }
+
+        const totDeb = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+        const totCred = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+
+        list.push({
+          id: `sale-entry-${s.id}`,
+          entryNumber: s.invoiceNumber,
+          date: s.date,
+          reference: s.invoiceNumber,
+          concept: `Facturación y cobro servicio: ${s.serviceName} - Cliente: ${s.clientName}`,
+          source: 'sale',
+          entryType: s.documentType === 'nota_venta' ? 'NOTA VENTA RIMPE' : 'VENTA / FACTURA',
+          lines,
+          totalDebit: totDeb,
+          totalCredit: totCred,
+          isBalanced: Math.abs(totDeb - totCred) < 0.05,
+        });
       });
 
-    // 3. Operating Expenses postings
+    // C. Operating Expenses Automatic Entries
     filteredExpenses.forEach(exp => {
       const isArtistPayout = exp.category === 'artist_payout';
-      const isInventorySupplies = exp.category === 'jewelry_restock' || exp.category === 'supplies_tattoo' || exp.category === 'supplies_piercing';
+      const isInventorySupplies =
+        exp.category === 'jewelry_restock' || exp.category === 'supplies_tattoo' || exp.category === 'supplies_piercing';
       const debitAccount = isArtistPayout ? '2101' : isInventorySupplies ? '1105' : '5201';
       const creditAccount = exp.paymentMethod === 'cash' ? '1101' : '1102';
       const refCode = exp.invoiceReference || `GAS-${exp.id.slice(-4)}`;
 
-      list.push({
-        id: `post-exp-d-${exp.id}`,
-        date: exp.date,
-        reference: refCode,
-        accountCode: debitAccount,
-        concept: `${exp.description} (${exp.supplier})`,
-        debit: exp.amount,
-        credit: 0,
-        source: 'expense',
-      });
+      const lines: JournalEntryLine[] = [
+        {
+          id: `exp-d-${exp.id}`,
+          accountCode: debitAccount,
+          accountName: getAccountName(debitAccount),
+          concept: exp.description,
+          debit: exp.amount,
+          credit: 0,
+        },
+        {
+          id: `exp-c-${exp.id}`,
+          accountCode: creditAccount,
+          accountName: getAccountName(creditAccount),
+          concept: `Pago a proveedor: ${exp.supplier}`,
+          debit: 0,
+          credit: exp.amount,
+        },
+      ];
 
       list.push({
-        id: `post-exp-c-${exp.id}`,
+        id: `exp-entry-${exp.id}`,
+        entryNumber: refCode,
         date: exp.date,
         reference: refCode,
-        accountCode: creditAccount,
-        concept: `Pago ${exp.paymentMethod === 'cash' ? 'en efectivo' : 'bancario'}: ${exp.description}`,
-        debit: 0,
-        credit: exp.amount,
+        concept: `Compra / Gasto: ${exp.description} (${exp.supplier})`,
         source: 'expense',
+        entryType: isInventorySupplies ? 'COMPRA INVENTARIO' : 'GASTO OPERATIVO',
+        lines,
+        totalDebit: exp.amount,
+        totalCredit: exp.amount,
+        isBalanced: true,
       });
     });
 
-    // 4. Manual Journal Entries
-    manualJournalEntries.forEach(mj => {
+    // D. Shift Opening Entry
+    if (currentShift.openingCash > 0) {
       list.push({
-        id: `post-man-d-${mj.id}`,
-        date: mj.date,
-        reference: mj.reference,
-        accountCode: mj.debitAccountCode,
-        concept: mj.concept,
-        debit: mj.amount,
-        credit: 0,
-        source: 'manual',
-        manualId: mj.id,
+        id: `shift-open-entry`,
+        entryNumber: 'APE-CAJA',
+        date: currentShift.openedAt,
+        reference: 'APE-CAJA-01',
+        concept: `Apertura de turno y fondo inicial de caja (${currentShift.openedBy})`,
+        source: 'shift',
+        entryType: 'APERTURA CAJA',
+        lines: [
+          {
+            id: 'so-d',
+            accountCode: '1101',
+            accountName: getAccountName('1101'),
+            concept: 'Fondo inicial disponible en caja',
+            debit: currentShift.openingCash,
+            credit: 0,
+          },
+          {
+            id: 'so-c',
+            accountCode: '3101',
+            accountName: getAccountName('3101'),
+            concept: 'Aporte de fondo operativo de turno',
+            debit: 0,
+            credit: currentShift.openingCash,
+          },
+        ],
+        totalDebit: currentShift.openingCash,
+        totalCredit: currentShift.openingCash,
+        isBalanced: true,
       });
+    }
 
-      list.push({
-        id: `post-man-c-${mj.id}`,
-        date: mj.date,
-        reference: mj.reference,
-        accountCode: mj.creditAccountCode,
-        concept: mj.concept,
-        debit: 0,
-        credit: mj.amount,
-        source: 'manual',
-        manualId: mj.id,
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [manualJournalEntries, filteredSales, filteredExpenses, currentShift]);
+
+  // Filtered Journal Entries
+  const filteredJournalEntries = useMemo(() => {
+    return unifiedJournalEntries.filter(entry => {
+      const q = journalSearch.toLowerCase();
+      const matchSearch =
+        !q ||
+        entry.entryNumber.toLowerCase().includes(q) ||
+        entry.concept.toLowerCase().includes(q) ||
+        entry.reference.toLowerCase().includes(q) ||
+        entry.lines.some(
+          l =>
+            l.accountCode.toLowerCase().includes(q) ||
+            (l.accountName && l.accountName.toLowerCase().includes(q)) ||
+            (l.concept && l.concept.toLowerCase().includes(q))
+        );
+
+      const matchSource =
+        journalFilter === 'all' ||
+        (journalFilter === 'manual' && entry.source === 'manual') ||
+        (journalFilter === 'sale' && entry.source === 'sale') ||
+        (journalFilter === 'expense' && entry.source === 'expense') ||
+        (journalFilter === 'shift' && entry.source === 'shift');
+
+      return matchSearch && matchSource;
+    });
+  }, [unifiedJournalEntries, journalSearch, journalFilter]);
+
+  // 2. Build Postings for Cuentas T and Trial Balance
+  const allPostings = useMemo<LedgerPosting[]>(() => {
+    const list: LedgerPosting[] = [];
+    unifiedJournalEntries.forEach(entry => {
+      entry.lines.forEach((l, idx) => {
+        if (l.debit > 0) {
+          list.push({
+            id: `post-d-${entry.id}-${idx}`,
+            date: entry.date,
+            reference: entry.entryNumber,
+            accountCode: l.accountCode,
+            concept: l.concept || entry.concept,
+            debit: l.debit,
+            credit: 0,
+            source: entry.source,
+            manualId: entry.manualRecord?.id,
+          });
+        }
+        if (l.credit > 0) {
+          list.push({
+            id: `post-c-${entry.id}-${idx}`,
+            date: entry.date,
+            reference: entry.entryNumber,
+            accountCode: l.accountCode,
+            concept: l.concept || entry.concept,
+            debit: 0,
+            credit: l.credit,
+            source: entry.source,
+            manualId: entry.manualRecord?.id,
+          });
+        }
       });
     });
-
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [filteredSales, filteredExpenses, manualJournalEntries, currentShift]);
+  }, [unifiedJournalEntries]);
 
   // Group postings by account for Cuentas T
   const ledgerAccountsMap = useMemo(() => {
@@ -336,7 +469,7 @@ export const GeneralLedgerView: React.FC = () => {
     return map;
   }, [allPostings]);
 
-  // Accounts visible based on filter and search
+  // Accounts visible based on filter and search in Mayor
   const visibleLedgerAccounts = useMemo(() => {
     const q = mayorSearch.toLowerCase();
     return Array.from(ledgerAccountsMap.values())
@@ -404,56 +537,33 @@ export const GeneralLedgerView: React.FC = () => {
     };
   }, [trialBalanceRows]);
 
-  const handleCreateJournalEntry = (e: React.FormEvent) => {
-    e.preventDefault();
-    const amountNum = parseFloat(jrnlAmount);
-    if (!jrnlConcept.trim() || isNaN(amountNum) || amountNum <= 0) return;
-    if (jrnlDebitAcc === jrnlCreditAcc) {
-      alert('La cuenta al Debe y la cuenta al Haber deben ser distintas para cumplir la Partida Doble.');
-      return;
-    }
-
-    addManualJournalEntry({
-      date: new Date().toISOString(),
-      reference: jrnlRef.trim() || `ASI-${Date.now().toString().slice(-4)}`,
-      concept: jrnlConcept.trim(),
-      debitAccountCode: jrnlDebitAcc,
-      creditAccountCode: jrnlCreditAcc,
-      amount: amountNum,
-    });
-
-    setIsJournalModalOpen(false);
-    setJrnlRef('');
-    setJrnlConcept('');
-    setJrnlAmount('');
-  };
-
-  const handleExportCSV = () => {
+  const handleExportJournalCSV = () => {
     const headers = [
-      'Codigo Cuenta',
-      'Nombre Cuenta',
-      'Grupo',
+      'N° Asiento',
       'Fecha',
+      'Tipo Asiento',
       'Referencia',
-      'Concepto Contable',
-      'Debe (Debito)',
-      'Haber (Credito)',
-      'Saldo Acumulado',
+      'Concepto / Glosa',
+      'Código Cuenta',
+      'Nombre Cuenta',
+      'Debe ($)',
+      'Haber ($)',
     ];
+
     const rows: string[] = [];
-    visibleLedgerAccounts.forEach(g => {
-      g.rows.forEach(r => {
+    filteredJournalEntries.forEach(entry => {
+      entry.lines.forEach(line => {
         rows.push(
           [
-            `"${g.account.code}"`,
-            `"${g.account.name}"`,
-            `"${g.account.group}"`,
-            new Date(r.date).toLocaleDateString('es-ES'),
-            `"${r.reference}"`,
-            `"${r.concept.replace(/"/g, '""')}"`,
-            r.debit.toFixed(2),
-            r.credit.toFixed(2),
-            r.balance.toFixed(2),
+            `"${entry.entryNumber}"`,
+            `"${entry.date.split('T')[0]}"`,
+            `"${entry.entryType}"`,
+            `"${entry.reference}"`,
+            `"${(line.concept || entry.concept).replace(/"/g, '""')}"`,
+            `"${line.accountCode}"`,
+            `"${line.accountName || getAccountName(line.accountCode)}"`,
+            line.debit.toFixed(2),
+            line.credit.toFixed(2),
           ].join(',')
         );
       });
@@ -462,10 +572,37 @@ export const GeneralLedgerView: React.FC = () => {
     const csv = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csv));
-    link.setAttribute('download', `libro_mayor_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `libro_diario_asientos_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleOpenPrintManualEntry = (entry: UnifiedJournalEntry) => {
+    if (entry.manualRecord) {
+      setSelectedEntryToPrint(entry.manualRecord);
+    } else {
+      // Synthesize printable voucher for automatic entries as well!
+      setSelectedEntryToPrint({
+        id: entry.id,
+        entryNumber: entry.entryNumber,
+        date: entry.date,
+        reference: entry.reference,
+        concept: entry.concept,
+        entryType: entry.source === 'sale' ? 'diario' : entry.source === 'expense' ? 'diario' : 'apertura',
+        lines: entry.lines,
+        totalDebit: entry.totalDebit,
+        totalCredit: entry.totalCredit,
+        status: 'cuadrado',
+        createdByName: 'Sistema Contable Automático',
+      });
+    }
+  };
+
+  const handleDeleteManual = (id: string, entryNum: string) => {
+    if (confirm(`¿Estás seguro de anular el asiento contable ${entryNum}? Se revertirán sus movimientos en el Libro Mayor.`)) {
+      deleteManualJournalEntry(id);
+    }
   };
 
   return (
@@ -476,17 +613,32 @@ export const GeneralLedgerView: React.FC = () => {
           <div className="flex items-center gap-2.5 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366] shrink-0"></span>
             <h1 className="text-sm font-bold text-white uppercase tracking-wider">
-              Libro Mayor & Plan Contable
+              Contabilidad General & Asientos Contables
             </h1>
           </div>
           <p className="text-[11px] text-neutral-400">
-            Mayorización por Cuentas T (Debe / Haber), Asientos Contables de Partida Doble y Balance de Sumas y Saldos.
+            Libro Diario oficial, Mayorización por Cuentas T (Partida Doble) y Balance de Comprobación NIIF / SRI.
           </p>
         </div>
 
         <div className="flex items-center flex-wrap gap-2">
-          {/* Sub-tabs: Mayor vs Trial Balance */}
+          {/* Sub-tabs Selector */}
           <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730] overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('journal')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'journal'
+                  ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_10px_rgba(255,51,102,0.4)]'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Libro Diario (Asientos)</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/25 font-mono">
+                {unifiedJournalEntries.length}
+              </span>
+            </button>
+
             <button
               onClick={() => setActiveTab('mayor')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap cursor-pointer ${
@@ -510,30 +662,26 @@ export const GeneralLedgerView: React.FC = () => {
               <Scale className="w-3.5 h-3.5" />
               <span>Balance de Sumas y Saldos</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('chart_of_accounts')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === 'chart_of_accounts'
+                  ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_10px_rgba(255,51,102,0.4)]'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Plan de Cuentas</span>
+            </button>
           </div>
 
           <button
-            onClick={() => setIsJournalModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(255,51,102,0.35)] cursor-pointer"
+            onClick={() => setIsNewJournalOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_14px_rgba(255,51,102,0.35)] cursor-pointer"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            <span>Nuevo Asiento</span>
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#18181D] border border-[#272730] hover:border-[#FF3366] text-white text-xs font-semibold transition-all cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-[#FF3366]" />
-            <span>CSV</span>
-          </button>
-
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#18181D] border border-[#272730] hover:border-[#FF3366] text-white text-xs font-semibold transition-all cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5 text-[#FF3366]" />
-            <span className="hidden sm:inline">Imprimir</span>
+            <span>+ Registrar Asiento Contable</span>
           </button>
         </div>
       </div>
@@ -541,7 +689,7 @@ export const GeneralLedgerView: React.FC = () => {
       {/* KPI Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[11px] text-neutral-400 block mb-1">Total Movimientos al DEBE (Débitos)</span>
+          <span className="text-[11px] text-neutral-400 block mb-1">Total Débitos al DEBE</span>
           <div className="text-lg sm:text-xl font-bold font-mono text-emerald-400">
             {formatMoney(trialBalanceTotals.totalDebitSum)}
           </div>
@@ -549,35 +697,226 @@ export const GeneralLedgerView: React.FC = () => {
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[11px] text-neutral-400 block mb-1">Total Movimientos al HABER (Créditos)</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-sky-400">
+          <span className="text-[11px] text-neutral-400 block mb-1">Total Créditos al HABER</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-amber-300">
             {formatMoney(trialBalanceTotals.totalCreditSum)}
           </div>
           <span className="text-[10px] text-neutral-500 block mt-1">Abonos acumulados en cuentas</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[11px] text-neutral-400 block mb-1">Estado de Partida Doble</span>
+          <span className="text-[11px] text-neutral-400 block mb-1">Ecuación Contable / Partida Doble</span>
           <div className="flex items-center gap-2 text-base sm:text-lg font-bold text-emerald-400">
             <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span>Cuadrado Exacto</span>
+            <span>100% Cuadrado</span>
           </div>
           <span className="text-[10px] text-neutral-500 block mt-1">
-            {CHART_OF_ACCOUNTS.length} cuentas del plan oficial
+            Activo = Pasivo + Patrimonio
           </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
-          <span className="text-[11px] text-neutral-400 block mb-1">Asientos Manuales Registrados</span>
-          <div className="text-lg sm:text-xl font-bold font-mono text-white">
-            {manualJournalEntries.length}
+          <span className="text-[11px] text-neutral-400 block mb-1">Asientos en Libro Diario</span>
+          <div className="text-lg sm:text-xl font-bold font-mono text-white flex items-center justify-between">
+            <span>{unifiedJournalEntries.length} asientos</span>
+            <span className="text-xs text-[#FF3366] font-normal">
+              ({manualJournalEntries.length} manuales)
+            </span>
           </div>
-          <span className="text-[10px] text-neutral-500 block mt-1">Ajustes y traspasos contables</span>
+          <span className="text-[10px] text-neutral-500 block mt-1">Sincronizados en tiempo real</span>
         </div>
       </div>
 
       {/* =====================================================================
-          TAB 1: LIBRO MAYOR (CUENTAS T)
+          TAB 1: LIBRO DIARIO (REGISTRO CRONOLÓGICO DE ASIENTOS CONTABLES)
+      ===================================================================== */}
+      {activeTab === 'journal' && (
+        <div className="space-y-4">
+          {/* Filter Bar */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#18181D] border border-[#272730] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <input
+                type="text"
+                placeholder="Buscar por N° asiento, glosa, cuenta o referencia..."
+                value={journalSearch}
+                onChange={e => setJournalSearch(e.target.value)}
+                className="w-full pl-4 pr-10 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+              />
+              <Search className="w-4 h-4 text-[#FF3366] absolute right-3.5 top-2.5" />
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+              {[
+                { id: 'all', label: 'Todos los Asientos' },
+                { id: 'manual', label: 'Manuales / Ajuste' },
+                { id: 'sale', label: 'Ventas / POS' },
+                { id: 'expense', label: 'Compras / Gastos' },
+                { id: 'shift', label: 'Caja' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setJournalFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    journalFilter === tab.id
+                      ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.4)]'
+                      : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+
+              <button
+                onClick={handleExportJournalCSV}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-[#FF3366] text-[#FF3366] hover:bg-[#FF3366]/10 text-xs font-semibold transition-all whitespace-nowrap ml-auto cursor-pointer"
+                title="Exportar Libro Diario en CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Journal Entries List */}
+          <div className="space-y-4">
+            {filteredJournalEntries.length === 0 ? (
+              <div className="p-12 text-center bg-[#18181D] rounded-3xl border border-[#272730] text-neutral-400 space-y-3">
+                <FileText className="w-10 h-10 mx-auto text-neutral-600 opacity-50" />
+                <h3 className="font-bold text-white text-sm">No se encontraron asientos contables</h3>
+                <p className="text-xs text-neutral-500 max-w-md mx-auto">
+                  No hay asientos que coincidan con los filtros aplicados. Puedes registrar un nuevo asiento contable con el botón superior.
+                </p>
+                <button
+                  onClick={() => setIsNewJournalOpen(true)}
+                  className="px-4 py-2 rounded-full bg-[#FF3366] text-white font-bold text-xs shadow-md cursor-pointer hover:bg-[#E62557] transition-all"
+                >
+                  + Registrar Primer Asiento Manual
+                </button>
+              </div>
+            ) : (
+              filteredJournalEntries.map(entry => (
+                <div
+                  key={entry.id}
+                  className="bg-[#18181D] border border-[#272730] rounded-2xl overflow-hidden shadow-lg transition-all hover:border-[#383844]"
+                >
+                  {/* Entry Header */}
+                  <div className="p-3.5 sm:p-4 bg-[#141419] border-b border-[#24242B] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center flex-wrap gap-2.5">
+                      <span className="font-mono font-black text-[#FF3366] text-xs sm:text-sm">
+                        {entry.entryNumber}
+                      </span>
+                      <span className="text-[11px] font-mono text-neutral-400">
+                        {new Date(entry.date).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1A1A24] border border-[#2A2A38] text-neutral-300 uppercase">
+                        {entry.entryType}
+                      </span>
+                      {entry.reference && entry.reference !== entry.entryNumber && (
+                        <span className="text-[10px] text-neutral-500 font-mono">
+                          Ref: {entry.reference}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Partida Doble OK</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenPrintManualEntry(entry)}
+                          className="p-1.5 rounded-lg bg-[#202028] hover:bg-[#2B2B36] text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                          title="Ver / Imprimir Comprobante Oficial de Diario"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+
+                        {entry.source === 'manual' && entry.manualRecord && (
+                          <button
+                            onClick={() => handleDeleteManual(entry.manualRecord!.id, entry.entryNumber)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-[#FF3366] border border-rose-500/20 transition-colors cursor-pointer"
+                            title="Anular asiento manual"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Concept / Glosa */}
+                  <div className="px-4 py-2.5 bg-[#121216] border-b border-[#202026] text-xs text-neutral-300 italic">
+                    <span className="font-semibold not-italic text-neutral-500 mr-1.5 uppercase text-[10px]">
+                      Glosa:
+                    </span>
+                    "{entry.concept}"
+                  </div>
+
+                  {/* Multi-line Double Entry Breakdown */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead className="bg-[#101014] text-neutral-500 uppercase text-[9.5px] border-b border-[#202026]">
+                        <tr>
+                          <th className="py-2 px-4 w-20">Código</th>
+                          <th className="py-2 px-4">Cuenta Contable (Plan NIIF)</th>
+                          <th className="py-2 px-4">Detalle / Referencia</th>
+                          <th className="py-2 px-4 text-right w-32 text-emerald-400">DEBE ($)</th>
+                          <th className="py-2 px-4 text-right w-32 text-amber-300">HABER ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1D1D24]">
+                        {entry.lines.map((l, lIdx) => (
+                          <tr key={lIdx} className="hover:bg-[#16161D]">
+                            <td className="py-2 px-4 font-mono font-bold text-white text-[11px]">
+                              {l.accountCode}
+                            </td>
+                            <td className="py-2 px-4">
+                              <span className="font-medium text-white">
+                                {l.accountName || getAccountName(l.accountCode)}
+                              </span>
+                            </td>
+                            <td className="py-2 px-4 text-neutral-400 text-[11px] truncate max-w-xs">
+                              {l.concept || entry.concept}
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-bold text-emerald-400">
+                              {l.debit > 0 ? formatMoney(l.debit) : '—'}
+                            </td>
+                            <td className="py-2 px-4 text-right font-mono font-bold text-amber-300">
+                              {l.credit > 0 ? formatMoney(l.credit) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-[#121216] border-t border-[#202026] font-bold text-xs">
+                        <tr>
+                          <td colSpan={3} className="py-2 px-4 text-right text-neutral-400 uppercase text-[10px]">
+                            Sumas del Asiento:
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-emerald-400">
+                            {formatMoney(entry.totalDebit)}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-amber-300">
+                            {formatMoney(entry.totalCredit)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          TAB 2: LIBRO MAYOR (CUENTAS T)
       ===================================================================== */}
       {activeTab === 'mayor' && (
         <div className="space-y-4">
@@ -599,7 +938,7 @@ export const GeneralLedgerView: React.FC = () => {
               <select
                 value={selectedAccountCode}
                 onChange={e => setSelectedAccountCode(e.target.value)}
-                className="w-full md:w-80 px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white focus:border-[#FF3366]/60"
+                className="w-full md:w-80 px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white focus:border-[#FF3366]/60 cursor-pointer"
               >
                 <option value="all">Todas las Cuentas del Plan Contable ({CHART_OF_ACCOUNTS.length})</option>
                 {CHART_OF_ACCOUNTS.map(acc => (
@@ -652,7 +991,7 @@ export const GeneralLedgerView: React.FC = () => {
                         <th className="py-2.5 px-3">Doc / Asiento</th>
                         <th className="py-2.5 px-3">Concepto Contable</th>
                         <th className="py-2.5 px-3 text-right text-emerald-400">Debe (Débito)</th>
-                        <th className="py-2.5 px-3 text-right text-sky-400">Haber (Crédito)</th>
+                        <th className="py-2.5 px-3 text-right text-amber-300">Haber (Crédito)</th>
                         <th className="py-2.5 px-3 text-right">Saldo</th>
                         <th className="py-2.5 px-2 text-center"></th>
                       </tr>
@@ -668,7 +1007,7 @@ export const GeneralLedgerView: React.FC = () => {
                         rows.map(r => (
                           <tr key={r.id} className="hover:bg-[#1E1E25] transition-colors">
                             <td className="py-2.5 px-3 font-mono text-[11px] text-neutral-300 whitespace-nowrap">
-                              {new Date(r.date).toLocaleDateString('es-ES', {
+                              {new Date(r.date).toLocaleDateString('es-EC', {
                                 day: '2-digit',
                                 month: 'short',
                               })}
@@ -682,7 +1021,7 @@ export const GeneralLedgerView: React.FC = () => {
                             <td className="py-2.5 px-3 text-right font-mono font-medium text-emerald-400 whitespace-nowrap">
                               {r.debit > 0 ? formatMoney(r.debit) : '—'}
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono font-medium text-sky-400 whitespace-nowrap">
+                            <td className="py-2.5 px-3 text-right font-mono font-medium text-amber-300 whitespace-nowrap">
                               {r.credit > 0 ? formatMoney(r.credit) : '—'}
                             </td>
                             <td className="py-2.5 px-3 text-right font-mono font-bold text-white whitespace-nowrap">
@@ -715,7 +1054,7 @@ export const GeneralLedgerView: React.FC = () => {
                         <td className="py-2 px-3 text-right text-emerald-400">
                           {formatMoney(sumDebit)}
                         </td>
-                        <td className="py-2 px-3 text-right text-sky-400">
+                        <td className="py-2 px-3 text-right text-amber-300">
                           {formatMoney(sumCredit)}
                         </td>
                         <td className="py-2 px-3 text-right text-white">
@@ -733,7 +1072,7 @@ export const GeneralLedgerView: React.FC = () => {
       )}
 
       {/* =====================================================================
-          TAB 2: BALANCE DE SUMAS Y SALDOS (TRIAL BALANCE)
+          TAB 3: BALANCE DE SUMAS Y SALDOS (TRIAL BALANCE)
       ===================================================================== */}
       {activeTab === 'trial_balance' && (
         <div className="space-y-4">
@@ -759,11 +1098,11 @@ export const GeneralLedgerView: React.FC = () => {
 
                     {/* Sumas */}
                     <th className="py-3 px-3 text-right whitespace-nowrap text-emerald-400">Total DEBE</th>
-                    <th className="py-3 px-3 text-right whitespace-nowrap text-sky-400 border-r border-[#24242B]">Total HABER</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap text-amber-300 border-r border-[#24242B]">Total HABER</th>
 
                     {/* Saldos */}
                     <th className="py-3 px-3 text-right whitespace-nowrap text-emerald-400">Saldo Deudor</th>
-                    <th className="py-3 px-3 text-right whitespace-nowrap text-sky-400">Saldo Acreedor</th>
+                    <th className="py-3 px-3 text-right whitespace-nowrap text-amber-300">Saldo Acreedor</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#222228]">
@@ -791,7 +1130,7 @@ export const GeneralLedgerView: React.FC = () => {
                       <td className="py-2.5 px-3 text-right font-bold text-emerald-400 whitespace-nowrap">
                         {row.debtorBalance > 0 ? formatMoney(row.debtorBalance) : '—'}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-sky-400 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-right font-bold text-amber-300 whitespace-nowrap">
                         {row.creditorBalance > 0 ? formatMoney(row.creditorBalance) : '—'}
                       </td>
                     </tr>
@@ -805,13 +1144,13 @@ export const GeneralLedgerView: React.FC = () => {
                     <td className="py-3 px-3 text-right text-emerald-400">
                       {formatMoney(trialBalanceTotals.totalDebitSum)}
                     </td>
-                    <td className="py-3 px-3 text-right text-sky-400 border-r border-[#24242B]">
+                    <td className="py-3 px-3 text-right text-amber-300 border-r border-[#24242B]">
                       {formatMoney(trialBalanceTotals.totalCreditSum)}
                     </td>
                     <td className="py-3 px-3 text-right text-emerald-400 font-black">
                       {formatMoney(trialBalanceTotals.totalDebtorBalance)}
                     </td>
-                    <td className="py-3 px-3 text-right text-sky-400 font-black">
+                    <td className="py-3 px-3 text-right text-amber-300 font-black">
                       {formatMoney(trialBalanceTotals.totalCreditorBalance)}
                     </td>
                   </tr>
@@ -822,132 +1161,98 @@ export const GeneralLedgerView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Registrar Asiento Contable Manual */}
-      {isJournalModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-[#141417] border border-[#272730] rounded-3xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#24242A] bg-[#16161B]">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-[#FF3366]/20 border border-[#FF3366]/40 flex items-center justify-center text-[#FF3366]">
-                  <BookOpen className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Registrar Asiento Contable Manual
-                  </h3>
-                  <p className="text-[11px] text-neutral-400">
-                    Ajuste contable con validación estricta de Partida Doble
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsJournalModalOpen(false)}
-                className="w-7 h-7 rounded-full border border-[#2A2A34] text-neutral-400 hover:text-white flex items-center justify-center cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
+      {/* =====================================================================
+          TAB 4: PLAN GENERAL DE CUENTAS (NIIF / SRI ECUADOR)
+      ===================================================================== */}
+      {activeTab === 'chart_of_accounts' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-[#18181D] border border-[#272730] rounded-2xl flex items-center justify-between text-xs text-neutral-300">
+            <div>
+              <span className="font-bold text-white uppercase tracking-wider block">
+                Catálogo General de Cuentas Contables (Plan NIIF Pymes Ecuador)
+              </span>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Codificación estructurada para el registro automático de operaciones de tatuaje, piercing, inventarios e impuestos del SRI.
+              </p>
             </div>
+            <span className="px-3 py-1 rounded-full bg-[#121215] border border-[#272730] text-neutral-400 font-mono text-[11px]">
+              {CHART_OF_ACCOUNTS.length} Cuentas Oficiales
+            </span>
+          </div>
 
-            <form onSubmit={handleCreateJournalEntry} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-neutral-400 block mb-1">N° Asiento / Referencia</label>
-                  <input
-                    type="text"
-                    placeholder="Ej: ASI-0012, AJUSTE-01"
-                    value={jrnlRef}
-                    onChange={e => setJrnlRef(e.target.value)}
-                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-neutral-400 block mb-1">Importe ($) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    required
-                    placeholder="0.00"
-                    value={jrnlAmount}
-                    onChange={e => setJrnlAmount(e.target.value)}
-                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-neutral-400 block mb-1">Glosa / Concepto Contable *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Traspaso a cuenta de ahorro, Ajuste por merma, Aporte socios..."
-                  value={jrnlConcept}
-                  onChange={e => setJrnlConcept(e.target.value)}
-                  className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#111114] border border-[#24242C] space-y-3">
-                <div className="text-[11px] font-bold text-white uppercase tracking-wider">
-                  Partida Doble (Cuentas Involucradas)
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-emerald-400 font-semibold block mb-1">
-                    Cuenta al DEBE (Cargo / Débito)
-                  </label>
-                  <select
-                    value={jrnlDebitAcc}
-                    onChange={e => setJrnlDebitAcc(e.target.value)}
-                    className="w-full bg-[#18181D] border border-[#2E2E38] focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
-                  >
-                    {CHART_OF_ACCOUNTS.map(a => (
-                      <option key={a.code} value={a.code}>
-                        {a.code} - {a.name} ({a.group})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-sky-400 font-semibold block mb-1">
-                    Cuenta al HABER (Abono / Crédito)
-                  </label>
-                  <select
-                    value={jrnlCreditAcc}
-                    onChange={e => setJrnlCreditAcc(e.target.value)}
-                    className="w-full bg-[#18181D] border border-[#2E2E38] focus:border-sky-500 rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
-                  >
-                    {CHART_OF_ACCOUNTS.map(a => (
-                      <option key={a.code} value={a.code}>
-                        {a.code} - {a.name} ({a.group})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#24242A]">
-                <button
-                  type="button"
-                  onClick={() => setIsJournalModalOpen(false)}
-                  className="px-4 py-2 rounded-full border border-[#272730] text-neutral-400 hover:text-white cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold transition-all shadow-[0_0_12px_rgba(255,51,102,0.4)] cursor-pointer"
-                >
-                  Guardar Asiento
-                </button>
-              </div>
-            </form>
+          <div className="rounded-3xl bg-[#18181D] border border-[#272730] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium uppercase text-[10px]">
+                    <th className="py-3 px-4">Código</th>
+                    <th className="py-3 px-4">Nombre de la Cuenta</th>
+                    <th className="py-3 px-4">Grupo Contable</th>
+                    <th className="py-3 px-4 text-center">Naturaleza</th>
+                    <th className="py-3 px-4 text-right">Saldo Actual</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#222228]">
+                  {CHART_OF_ACCOUNTS.map(acc => {
+                    const data = ledgerAccountsMap.get(acc.code);
+                    const bal = data ? data.finalBalance : 0;
+                    return (
+                      <tr key={acc.code} className="hover:bg-[#1E1E25] transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-[#FF3366]">
+                          {acc.code}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-white">
+                          {acc.name}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              acc.group === 'Activo'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                                : acc.group === 'Pasivo'
+                                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                                : acc.group === 'Patrimonio'
+                                ? 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                                : acc.group === 'Ingresos'
+                                ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
+                                : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                            }`}
+                          >
+                            {acc.group}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="font-mono text-[11px] text-neutral-400">
+                            {acc.nature === 'debit' ? 'Deudora (Debe)' : 'Acreedora (Haber)'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-white">
+                          {formatMoney(bal)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Modal 1: Registrar Asiento Contable (Comprobante de Diario) */}
+      <NewJournalEntryModal
+        isOpen={isNewJournalOpen}
+        onClose={() => setIsNewJournalOpen(false)}
+        onEntrySaved={entry => {
+          setSelectedEntryToPrint(entry);
+        }}
+      />
+
+      {/* Modal 2: Imprimir / Visualizar Comprobante de Diario A4 */}
+      <JournalEntryPrintModal
+        entry={selectedEntryToPrint}
+        onClose={() => setSelectedEntryToPrint(null)}
+      />
     </div>
   );
 };
-

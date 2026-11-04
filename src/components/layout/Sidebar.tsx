@@ -70,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { id: 'cash', label: 'Arqueo de Caja', icon: BadgeDollarSign },
     { id: 'inventory', label: 'Inventario & Joyería', icon: Boxes },
     { id: 'kardex', label: 'Kardex de Insumos', icon: Layers },
-    { id: 'ledger', label: 'Libro Mayor Contable', icon: BookOpen },
+    { id: 'ledger', label: 'Asientos & Libro Diario', icon: BookOpen },
     { id: 'reports', label: 'Centro de Reportes', icon: FileSpreadsheet },
     { id: 'users', label: 'Usuarios & Roles', icon: ShieldCheck },
     { id: 'settings', label: 'Configuración', icon: SlidersHorizontal },

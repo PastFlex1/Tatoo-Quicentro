@@ -281,15 +281,38 @@ export interface KardexMovement {
   balanceTotal: number; // Saldo valorizado total
 }
 
+export interface JournalEntryLine {
+  id: string;
+  accountId?: string;
+  accountCode: string;
+  accountName?: string;
+  concept?: string;
+  detalle?: string;
+  debit: number;
+  credit: number;
+  debe?: number;
+  haber?: number;
+}
+
+export type JournalEntryType = 'diario' | 'ajuste' | 'apertura' | 'cierre';
+
 export interface ManualJournalEntry {
   id: string;
+  entryNumber: string; // ej. ASI-2026-0001
   date: string;
   reference: string;
   concept: string;
-  debitAccountCode: string;
-  creditAccountCode: string;
-  amount: number;
+  entryType?: JournalEntryType;
+  lines?: JournalEntryLine[];
+  // Campos de compatibilidad:
+  debitAccountCode?: string;
+  creditAccountCode?: string;
+  amount?: number;
+  totalDebit?: number;
+  totalCredit?: number;
+  status?: 'cuadrado' | 'anulado';
   notes?: string;
+  createdByName?: string;
 }
 
 export interface CashShift {
@@ -786,16 +809,6 @@ export interface PurchaseInvoice {
   asientoId?: string;
   pagado: boolean;
   estado?: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
-}
-
-export interface JournalEntryLine {
-  id: string;
-  accountId: string;
-  accountCode: string;
-  accountName: string;
-  debe: number;
-  haber: number;
-  detalle?: string;
 }
 
 export interface JournalEntry {
