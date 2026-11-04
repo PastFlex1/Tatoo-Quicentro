@@ -17,6 +17,8 @@ import {
   ClientProfile,
   Proforma,
   ProformaItem,
+  GalleryPhoto,
+  Supplier,
 } from '../types';
 import {
   INITIAL_ARTISTS,
@@ -29,6 +31,8 @@ import {
   INITIAL_KARDEX,
   INITIAL_CLIENTS,
   INITIAL_PROFORMAS,
+  INITIAL_GALLERY_PHOTOS,
+  INITIAL_SUPPLIERS,
 } from '../data/initialData';
 
 interface StudioContextType {
@@ -43,6 +47,8 @@ interface StudioContextType {
   appointments: Appointment[];
   clients: ClientProfile[];
   proformas: Proforma[];
+  galleryPhotos: GalleryPhoto[];
+  suppliers: Supplier[];
   currentShift: CashShift;
   pastShifts: CashShift[];
   settings: StudioSettings;
@@ -130,6 +136,16 @@ interface StudioContextType {
   deleteClient: (id: string) => void;
   upsertClient: (profile: Partial<ClientProfile> & { name: string }) => ClientProfile;
 
+  // Actions - Gallery & Portfolio
+  addGalleryPhoto: (photo: Omit<GalleryPhoto, 'id' | 'createdAt'>) => GalleryPhoto;
+  updateGalleryPhoto: (id: string, updated: Partial<GalleryPhoto>) => void;
+  deleteGalleryPhoto: (id: string) => void;
+
+  // Actions - Suppliers / Proveedores
+  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt'>) => Supplier;
+  updateSupplier: (id: string, updated: Partial<Supplier>) => void;
+  deleteSupplier: (id: string) => void;
+
   // Actions - General Ledger Manual Entries
   addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id'>) => void;
   deleteManualJournalEntry: (id: string) => void;
@@ -180,6 +196,8 @@ const STORAGE_KEYS = {
   APPOINTMENTS: 'inkledger_appointments_v1',
   CLIENTS: 'inkledger_clients_v1',
   PROFORMAS: 'inkledger_proformas_v1',
+  GALLERY: 'inkledger_gallery_v1',
+  SUPPLIERS: 'inkledger_suppliers_v1',
   CURRENT_SHIFT: 'inkledger_curr_shift_v1',
   PAST_SHIFTS: 'inkledger_past_shifts_v1',
   SETTINGS: 'inkledger_settings_v1',
@@ -228,6 +246,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     safeLoadFromStorage(STORAGE_KEYS.PROFORMAS, INITIAL_PROFORMAS)
   );
 
+  const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.GALLERY, INITIAL_GALLERY_PHOTOS)
+  );
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() =>
+    safeLoadFromStorage(STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS)
+  );
+
   const [currentShift, setCurrentShift] = useState<CashShift>(() =>
     safeLoadFromStorage(STORAGE_KEYS.CURRENT_SHIFT, INITIAL_CASH_SHIFT)
   );
@@ -267,6 +293,12 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           telefono: parsed.telefono || parsed.phone || INITIAL_SETTINGS.telefono,
           codigoEstablecimiento: parsed.codigoEstablecimiento || INITIAL_SETTINGS.codigoEstablecimiento,
           puntoEmision: parsed.puntoEmision || INITIAL_SETTINGS.puntoEmision,
+          pais: parsed.pais || INITIAL_SETTINGS.pais,
+          provincia: parsed.provincia || INITIAL_SETTINGS.provincia,
+          ciudad: parsed.ciudad || INITIAL_SETTINGS.ciudad,
+          parroquia: parsed.parroquia || INITIAL_SETTINGS.parroquia,
+          secuencialFactura: parsed.secuencialFactura || INITIAL_SETTINGS.secuencialFactura,
+          secuencialNotaVenta: parsed.secuencialNotaVenta || INITIAL_SETTINGS.secuencialNotaVenta,
           regimenTributario: parsed.regimenTributario || INITIAL_SETTINGS.regimenTributario,
           ambiente: parsed.ambiente || INITIAL_SETTINGS.ambiente,
         };
@@ -325,6 +357,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PROFORMAS, JSON.stringify(proformas));
   }, [proformas]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.GALLERY, JSON.stringify(galleryPhotos));
+  }, [galleryPhotos]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SUPPLIERS, JSON.stringify(suppliers));
+  }, [suppliers]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SHIFT, JSON.stringify(currentShift));
@@ -512,6 +552,44 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         tags: ['Nuevo'],
       });
     }
+  };
+
+  // Gallery Operations
+  const addGalleryPhoto = (photoData: Omit<GalleryPhoto, 'id' | 'createdAt'>): GalleryPhoto => {
+    const newPhoto: GalleryPhoto = {
+      ...photoData,
+      id: `gal-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setGalleryPhotos(prev => [newPhoto, ...prev]);
+    return newPhoto;
+  };
+
+  const updateGalleryPhoto = (id: string, updated: Partial<GalleryPhoto>) => {
+    setGalleryPhotos(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
+  };
+
+  const deleteGalleryPhoto = (id: string) => {
+    setGalleryPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  // Supplier Operations
+  const addSupplier = (supplierData: Omit<Supplier, 'id' | 'createdAt'>): Supplier => {
+    const newSupplier: Supplier = {
+      ...supplierData,
+      id: `sup-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setSuppliers(prev => [newSupplier, ...prev]);
+    return newSupplier;
+  };
+
+  const updateSupplier = (id: string, updated: Partial<Supplier>) => {
+    setSuppliers(prev => prev.map(s => (s.id === id ? { ...s, ...updated } : s)));
+  };
+
+  const deleteSupplier = (id: string) => {
+    setSuppliers(prev => prev.filter(s => s.id !== id));
   };
 
   // Appointment Operations
@@ -865,14 +943,33 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Sale Operations
   const addSale = (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): SaleRecord => {
-    const nextSeq = sales.length + 183;
-    const invoiceNumber = `FAC-${new Date().getFullYear()}-${String(nextSeq).padStart(4, '0')}`;
+    // Código de serie SRI (Establecimiento y Punto de Emisión)
+    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
+    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
+
+    // Secuencial oficial de 9 dígitos configurado en settings
+    const currentSeqNum =
+      parseInt(settings.secuencialFactura?.replace(/\D/g, '') || '', 10) ||
+      (sales.length + 183);
+    const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
+
+    // Formato oficial SRI de factura: 001-001-000000001
+    const invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
+
     const newSale: SaleRecord = {
       ...saleData,
       id: `sale-${Date.now()}`,
       invoiceNumber,
     };
     setSales(prev => [newSale, ...prev]);
+
+    // Incrementar automáticamente el siguiente secuencial en settings
+    const nextSeqNum = currentSeqNum + 1;
+    const nextSecuencialPadded = String(nextSeqNum).padStart(9, '0').slice(-9);
+    setSettings(prev => ({
+      ...prev,
+      secuencialFactura: nextSecuencialPadded,
+    }));
 
     // Ensure client profile is synced in client directory
     if (saleData.clientName) {
@@ -1207,6 +1304,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setAppointments(INITIAL_APPOINTMENTS);
     setClients(INITIAL_CLIENTS);
     setProformas(INITIAL_PROFORMAS);
+    setGalleryPhotos(INITIAL_GALLERY_PHOTOS);
+    setSuppliers(INITIAL_SUPPLIERS);
     setCurrentShift(INITIAL_CASH_SHIFT);
     setSettlements([]);
     setSettings(INITIAL_SETTINGS);
@@ -1222,6 +1321,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setAppointments([]);
     setClients([]);
     setProformas([]);
+    setGalleryPhotos([]);
+    setSuppliers([]);
     const freshShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -1253,6 +1354,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       appointments,
       clients,
       proformas,
+      galleryPhotos,
+      suppliers,
       settlements,
       pastShifts,
       currentShift,
@@ -1278,6 +1381,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.appointments && Array.isArray(parsed.appointments)) setAppointments(parsed.appointments);
       if (parsed.clients && Array.isArray(parsed.clients)) setClients(parsed.clients);
       if (parsed.proformas && Array.isArray(parsed.proformas)) setProformas(parsed.proformas);
+      if (parsed.galleryPhotos && Array.isArray(parsed.galleryPhotos)) setGalleryPhotos(parsed.galleryPhotos);
+      if (parsed.suppliers && Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
       if (parsed.settlements && Array.isArray(parsed.settlements)) setSettlements(parsed.settlements);
       if (parsed.settings) setSettings(parsed.settings);
       if (parsed.currentShift) setCurrentShift(parsed.currentShift);
@@ -1301,6 +1406,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         appointments,
         clients,
         proformas,
+        galleryPhotos,
+        suppliers,
         currentShift,
         pastShifts,
         settings,
@@ -1339,6 +1446,12 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updateClient,
         deleteClient,
         upsertClient,
+        addGalleryPhoto,
+        updateGalleryPhoto,
+        deleteGalleryPhoto,
+        addSupplier,
+        updateSupplier,
+        deleteSupplier,
         addManualJournalEntry,
         deleteManualJournalEntry,
         openCashShift,
@@ -1369,6 +1482,8 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   appointments: INITIAL_APPOINTMENTS,
   clients: INITIAL_CLIENTS,
   proformas: INITIAL_PROFORMAS,
+  galleryPhotos: INITIAL_GALLERY_PHOTOS,
+  suppliers: INITIAL_SUPPLIERS,
   currentShift: INITIAL_CASH_SHIFT,
   pastShifts: [],
   settings: INITIAL_SETTINGS,
@@ -1407,6 +1522,12 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   updateClient: () => {},
   deleteClient: () => {},
   upsertClient: (cli) => ({ ...cli, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() } as any),
+  addGalleryPhoto: (photo) => ({ ...photo, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updateGalleryPhoto: () => {},
+  deleteGalleryPhoto: () => {},
+  addSupplier: (sup) => ({ ...sup, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
+  updateSupplier: () => {},
+  deleteSupplier: () => {},
   addManualJournalEntry: () => {},
   deleteManualJournalEntry: () => {},
   openCashShift: () => {},

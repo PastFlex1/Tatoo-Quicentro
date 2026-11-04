@@ -486,6 +486,7 @@ export const KardexView: React.FC = () => {
                     min="1"
                     value={kdxQty}
                     onChange={e => setKdxQty(parseInt(e.target.value) || 1)}
+                    onFocus={e => e.target.select()}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-hidden"
                   />
                 </div>
@@ -502,6 +503,7 @@ export const KardexView: React.FC = () => {
                     placeholder="Auto según producto"
                     value={kdxUnitCost}
                     onChange={e => setKdxUnitCost(e.target.value)}
+                    onFocus={e => e.target.select()}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-hidden"
                   />
                 </div>

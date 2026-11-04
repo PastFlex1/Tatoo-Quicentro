@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   FileText,
   Layers,
+  Camera,
+  Truck,
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -38,10 +40,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     { id: 'dashboard', label: 'Tablero General', icon: LayoutDashboard },
     { id: 'pos', label: 'Terminal POS / Cobro', icon: CreditCard },
     { id: 'clients', label: 'Historial Clientes', icon: UserCheck },
+    { id: 'gallery', label: 'Galería de Fotos', icon: Camera },
     { id: 'appointments', label: 'Agenda de Citas', icon: Calendar },
     { id: 'proformas', label: 'Cotizaciones & Proformas', icon: FileText },
     { id: 'sales', label: 'Ventas & Servicios', icon: ReceiptText },
     { id: 'expenses', label: 'Gastos & Compras', icon: WalletCards },
+    { id: 'suppliers', label: 'Gestión Proveedores', icon: Truck },
     { id: 'artists', label: 'Liquidación Artistas', icon: Users },
     { id: 'cash', label: 'Arqueo de Caja', icon: BadgeDollarSign },
     { id: 'inventory', label: 'Inventario & Joyería', icon: Boxes },

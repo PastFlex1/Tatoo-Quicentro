@@ -10,6 +10,8 @@ import {
   ArrowRightLeft,
   Layers,
   Calendar,
+  CalendarCheck,
+  Search,
   Boxes,
   ReceiptText,
   CheckCircle2,
@@ -24,6 +26,7 @@ import { Appointment, InventoryItem, PaymentMethod, SaleRecord, ServiceCategory 
 import { consultarIdentificacion } from '../../services/sriService';
 import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
 import { validateSriBusinessConfig } from '../../utils/sriBusinessConfig';
+import { SelectAppointmentModal } from './SelectAppointmentModal';
 
 interface PosViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -147,6 +150,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const [linkedAppointmentId, setLinkedAppointmentId] = useState<string | null>(null);
   const [linkedInventoryItemId, setLinkedInventoryItemId] = useState<string | null>(null);
   const [lastCreatedSale, setLastCreatedSale] = useState<SaleRecord | null>(null);
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
 
   useEffect(() => {
     if (artists.length > 0 && !artistId) {
@@ -169,6 +173,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       a => a.status !== 'completed' && a.status !== 'cancelled' && a.status !== 'no_show'
     );
   }, [appointments]);
+
+  // Linked appointment object if any
+  const linkedAppointment = useMemo(() => {
+    return appointments.find(a => a.id === linkedAppointmentId);
+  }, [appointments, linkedAppointmentId]);
 
   // Retail items from inventory
   const retailItems = useMemo(() => {
@@ -198,6 +207,22 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setServiceName(apt.serviceName);
     setClientName(apt.clientName);
     setClientPhone(apt.clientPhone || '');
+
+    // Match client in clients database to get DNI if available
+    const matchedClient = clients.find(
+      c =>
+        (c.name && c.name.toLowerCase().trim() === apt.clientName.toLowerCase().trim()) ||
+        (c.phone && apt.clientPhone && c.phone.replace(/\D/g, '') === apt.clientPhone.replace(/\D/g, ''))
+    );
+    if (matchedClient?.dni) {
+      setClientDni(matchedClient.dni);
+      handleSearchSriInPos(matchedClient.dni);
+    } else {
+      setClientDni('');
+      setSriRegimen('');
+      setSriStatusMsg(null);
+    }
+
     setArtistId(apt.artistId);
     const foundArtist = artists.find(a => a.id === apt.artistId);
     if (foundArtist) setCustomCommission(foundArtist.defaultCommissionRate);
@@ -210,6 +235,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setNotes(
       `Cita agendada (${apt.date} ${apt.startTime})${apt.bodyPlacement ? ` · Zona: ${apt.bodyPlacement}` : ''}`
     );
+  };
+
+  const handleUnlinkAppointment = () => {
+    setLinkedAppointmentId(null);
   };
 
   // Load from preset
@@ -231,7 +260,21 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setServiceCategory(cat);
     setServiceName(`${item.name} (${item.brand})`);
     setPieces(1);
-    setSubtotal(item.retailPrice || item.unitCost * 2);
+    
+    // In Ecuador SRI, subtotal is base without VAT
+    const vatMultiplier = item.taxRate === 15 ? 0.15 : item.taxRate === 5 ? 0.05 : 0;
+    const baseSubtotal =
+      item.priceWithoutVat ??
+      (item.priceWithVat ? item.priceWithVat / (1 + vatMultiplier) : undefined) ??
+      (item.retailPrice ? item.retailPrice / (1 + vatMultiplier) : item.unitCost * 2);
+
+    setSubtotal(Math.round(baseSubtotal * 100) / 100);
+
+    if (item.taxRate !== undefined) {
+      const rateNum = typeof item.taxRate === 'number' ? item.taxRate : 0;
+      setTaxRate(rateNum);
+    }
+
     setDepositAmount(0);
     setConsentFormSigned(false);
     setCustomCommission(cat === 'jewelry' ? 30 : 20);
@@ -415,6 +458,22 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         </div>
 
         <div className="flex items-center flex-wrap gap-2">
+          {/* BOTÓN CITA DESTACADO */}
+          <button
+            type="button"
+            onClick={() => setIsAppointmentModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#FF4D7D] hover:to-[#FF3366] text-white text-xs font-bold shadow-lg shadow-[#FF3366]/25 hover:shadow-[#FF3366]/40 transition-all cursor-pointer transform active:scale-95"
+            title="Buscar y traer cita agendada para facturación automática en POS"
+          >
+            <Calendar className="w-4 h-4 text-white" />
+            <span className="tracking-wide">CITA</span>
+            {pendingAppointments.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-white text-[#FF3366] text-[10px] font-black leading-none shadow-xs">
+                {pendingAppointments.length}
+              </span>
+            )}
+          </button>
+
           {/* Estado de Configuración SRI del Negocio */}
           <button
             type="button"
@@ -466,6 +525,57 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         </div>
       </div>
 
+      {/* Banner de Cita Vinculada al POS */}
+      {linkedAppointment && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FF3366]/20 via-[#18181D] to-[#18181D] border border-[#FF3366]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-[#FF3366]/10 animate-in fade-in duration-200">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] flex items-center justify-center shrink-0">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  ✓ Cita Cargada en POS
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-[#FF3366] text-white text-[10px] font-bold">
+                  {linkedAppointment.date} · {linkedAppointment.startTime} hs
+                </span>
+                {linkedAppointment.depositAmount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold font-mono">
+                    Seña: {formatMoney(linkedAppointment.depositAmount)}
+                  </span>
+                )}
+                {clientDni && (
+                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px] font-mono">
+                    DNI: {clientDni}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-neutral-300 mt-1">
+                Cliente: <strong className="text-white">{linkedAppointment.clientName}</strong> · Servicio: <strong className="text-white">{linkedAppointment.serviceName}</strong> · Artista: <strong className="text-white">{linkedAppointment.artistName}</strong>
+                {linkedAppointment.bodyPlacement && <span className="text-neutral-400"> · Zona: {linkedAppointment.bodyPlacement}</span>}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsAppointmentModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-[#262630] hover:bg-[#323240] text-xs font-semibold text-neutral-200 transition-all cursor-pointer"
+            >
+              Cambiar Cita
+            </button>
+            <button
+              type="button"
+              onClick={handleUnlinkAppointment}
+              className="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all cursor-pointer"
+            >
+              Desvincular
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main 2-Column POS Layout */}
       <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-6 items-start">
         {/* LEFT COLUMN (7/12 or 8/12): Quick Selectors + Service & Client Details */}
@@ -473,14 +583,21 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           {/* 1. Cargar Cita Agendada (1-Click Import) */}
           {pendingAppointments.length > 0 && (
             <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 text-xs font-bold text-white uppercase tracking-wider">
                   <Calendar className="w-3.5 h-3.5 text-[#FF3366]" />
                   <span>Cargar Cliente desde Citas en Curso / Agendadas</span>
                 </div>
-                <span className="text-[10px] font-mono text-[#FF3366]">
-                  Clic para autocompletar cobro
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAppointmentModalOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#FF3366]/15 hover:bg-[#FF3366]/25 text-[#FF3366] border border-[#FF3366]/30 text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    <Search className="w-3 h-3" />
+                    <span>Ver Todas ({pendingAppointments.length})</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-2.5">
@@ -619,7 +736,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                           <div className="flex items-center justify-between gap-2 text-xs font-bold text-white mb-0.5">
                             <span className="truncate">{item.name}</span>
                             <span className="font-mono text-emerald-400 shrink-0">
-                              {formatMoney(item.retailPrice || item.unitCost)}
+                              {formatMoney(item.priceWithVat ?? item.retailPrice ?? item.unitCost)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between text-[10px] text-neutral-400">
@@ -1211,6 +1328,19 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           </div>
         </div>
       </form>
+
+      {/* Modal para Seleccionar y Traer Citas al POS */}
+      <SelectAppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => setIsAppointmentModalOpen(false)}
+        appointments={appointments}
+        artists={artists}
+        clients={clients}
+        onSelectAppointment={handleSelectAppointment}
+        formatMoney={formatMoney}
+        selectedAppointmentId={linkedAppointmentId}
+        onGoToAppointments={() => setActiveTab('appointments')}
+      />
     </div>
   );
 };

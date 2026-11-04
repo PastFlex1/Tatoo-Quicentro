@@ -338,6 +338,45 @@ export const ReportsView: React.FC = () => {
     .reduce((acc, i) => acc + i.currentStock * (i.retailPrice || 0), 0);
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockAlert).length;
 
+  const reportTabTitles: Record<ReportTab, string> = {
+    executive: 'INFORME EJECUTIVO DE CONTABILIDAD Y RESULTADOS',
+    visual_charts: 'INFORME DE ANÁLISIS GRÁFICO Y DISTRIBUCIÓN CONTABLE',
+    pl_statement: 'ESTADO DE PÉRDIDAS Y GANANCIAS AUDITADO (P&L)',
+    artists_productivity: 'INFORME DE PRODUCTIVIDAD Y RENDIMIENTO POR ARTISTA',
+    sales_departments: 'INFORME DE LÍNEAS DE NEGOCIO Y CANALES DE COBRO',
+    tax_audit: 'AUDITORÍA FISCAL Y BALANCE DE IMPUESTOS (SRI ECUADOR)',
+    inventory_costs: 'INFORME DE VALUACIÓN DE INVENTARIO Y CONTROL DE STOCK',
+  };
+
+  const reportTabShortNames: Record<ReportTab, string> = {
+    executive: 'Resumen Ejecutivo',
+    visual_charts: 'Gráficas & Métricas',
+    pl_statement: 'P&L Resultados',
+    artists_productivity: 'Productividad Artistas',
+    sales_departments: 'Líneas de Negocio',
+    tax_audit: 'Auditoría Fiscal SRI',
+    inventory_costs: 'Valuación Stock',
+  };
+
+  const dateFilterLabel = useMemo(() => {
+    switch (dateFilter) {
+      case 'today':
+        return 'Hoy (Día Actual)';
+      case 'week':
+        return 'Semana en Curso';
+      case 'month':
+        return 'Mes en Curso';
+      case 'quarter':
+        return 'Trimestre';
+      case 'year':
+        return 'Año en Curso';
+      case 'all':
+        return 'Histórico Consolidado (Todo)';
+      default:
+        return dateFilter;
+    }
+  }, [dateFilter]);
+
   const handlePrintReport = () => {
     window.print();
   };
@@ -409,53 +448,794 @@ export const ReportsView: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const renderPrintContent = () => {
+    switch (activeReportTab) {
+      case 'executive':
+        return (
+          <div className="space-y-4">
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-4 gap-2 border border-neutral-300 p-2.5 rounded bg-neutral-50 text-center">
+              <div className="border-r border-neutral-300 pr-2">
+                <div className="text-[10px] text-neutral-600 font-bold uppercase">Facturación Bruta</div>
+                <div className="text-sm font-bold font-mono text-black">{formatMoney(totalGrossRevenue)}</div>
+                <div className="text-[9px] text-neutral-500">{validSales.length} ventas registradas</div>
+              </div>
+              <div className="border-r border-neutral-300 px-2">
+                <div className="text-[10px] text-neutral-600 font-bold uppercase">Margen Bruto Casa</div>
+                <div className="text-sm font-bold font-mono text-black">{formatMoney(grossProfit)}</div>
+                <div className="text-[9px] text-neutral-500">{grossMarginPercent}% margen operativo</div>
+              </div>
+              <div className="border-r border-neutral-300 px-2">
+                <div className="text-[10px] text-neutral-600 font-bold uppercase">Utilidad Neta (EBITDA)</div>
+                <div className="text-sm font-bold font-mono text-black">{formatMoney(netOperatingProfit)}</div>
+                <div className="text-[9px] text-neutral-500">{netProfitMarginPercent}% rendimiento neto</div>
+              </div>
+              <div className="pl-2">
+                <div className="text-[10px] text-neutral-600 font-bold uppercase">Ticket Promedio</div>
+                <div className="text-sm font-bold font-mono text-black">{formatMoney(averageTicket)}</div>
+                <div className="text-[9px] text-neutral-500">{totalTattooHours} hrs en cabina</div>
+              </div>
+            </div>
+
+            {/* 1. Estado de Resultados (P&L) */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                1. ESTADO DE RESULTADOS (P&L)
+              </h3>
+              <table className="w-full text-xs">
+                <tbody>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Facturación Bruta de Servicios & Ventas</td>
+                    <td className="py-1 text-right font-mono font-bold">{formatMoney(totalGrossRevenue)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pl-4 text-neutral-600">(-) Comisiones Devengadas por Artistas</td>
+                    <td className="py-0.5 text-right font-mono text-neutral-700">-{formatMoney(totalArtistCommissions)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pl-4 text-neutral-600">(-) Costo de Insumos de Tatuaje y Joyería</td>
+                    <td className="py-0.5 text-right font-mono text-neutral-700">-{formatMoney(supplyExpenses)}</td>
+                  </tr>
+                  <tr className="font-bold border-t border-b border-neutral-300 bg-neutral-50">
+                    <td className="py-1">(=) MARGEN BRUTO OPERATIVO</td>
+                    <td className="py-1 text-right font-mono">{formatMoney(grossProfit)} ({grossMarginPercent}%)</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pl-4 text-neutral-600">(-) Alquiler Local y Suministros (Luz, Agua)</td>
+                    <td className="py-0.5 text-right font-mono text-neutral-700">-{formatMoney(rentExpense + utilitiesExpense)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pl-4 text-neutral-600">(-) Bioseguridad y Gestión Sanitaria</td>
+                    <td className="py-0.5 text-right font-mono text-neutral-700">-{formatMoney(bioSanitaryExpense)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-0.5 pl-4 text-neutral-600">(-) Otros Gastos Operativos y Administrativos</td>
+                    <td className="py-0.5 text-right font-mono text-neutral-700">-{formatMoney(otherFixedExpenses)}</td>
+                  </tr>
+                  <tr className="font-bold text-xs border-t-2 border-black bg-neutral-100">
+                    <td className="py-1.5">(=) RESULTADO NETO REAL DEL ESTUDIO (EBITDA)</td>
+                    <td className="py-1.5 text-right font-mono">{formatMoney(netOperatingProfit)} ({netProfitMarginPercent}%)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 2. Estructura de Costos y Cobros */}
+            <div className="grid grid-cols-2 gap-4 pt-1">
+              <div className="border border-neutral-300 rounded p-2.5">
+                <h4 className="font-bold uppercase text-[11px] border-b border-neutral-300 pb-1 mb-2">
+                  Estructura de Costos Totales ({formatMoney(totalDirectCosts + totalFixedExpenses)})
+                </h4>
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span>Comisiones Artistas:</span>
+                    <strong className="font-mono">{formatMoney(totalArtistCommissions)} ({totalGrossRevenue > 0 ? Math.round((totalArtistCommissions / totalGrossRevenue) * 100) : 0}%)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Insumos y Stock:</span>
+                    <strong className="font-mono">{formatMoney(supplyExpenses)} ({totalGrossRevenue > 0 ? Math.round((supplyExpenses / totalGrossRevenue) * 100) : 0}%)</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Gastos Fijos Operación:</span>
+                    <strong className="font-mono">{formatMoney(totalFixedExpenses)} ({totalGrossRevenue > 0 ? Math.round((totalFixedExpenses / totalGrossRevenue) * 100) : 0}%)</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border border-neutral-300 rounded p-2.5">
+                <h4 className="font-bold uppercase text-[11px] border-b border-neutral-300 pb-1 mb-2">
+                  Cobros por Canal ({formatMoney(paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)})
+                </h4>
+                <div className="space-y-1 text-[11px]">
+                  <div className="flex justify-between">
+                    <span>Efectivo en Caja:</span>
+                    <strong className="font-mono">{formatMoney(paymentBreakdown.cash)}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tarjetas / Datáfono:</span>
+                    <strong className="font-mono">{formatMoney(paymentBreakdown.card)}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Transferencias Bancarias:</span>
+                    <strong className="font-mono">{formatMoney(paymentBreakdown.transfer)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Rendimiento por Artista */}
+            <div className="pt-2">
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                2. RENDIMIENTO RESUMIDO POR ARTISTA
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Artista</th>
+                    <th className="py-1 px-2 text-center">Citas</th>
+                    <th className="py-1 px-2 text-center">Horas</th>
+                    <th className="py-1 px-2 text-right">Facturado ($)</th>
+                    <th className="py-1 px-2 text-right">Comisión ($)</th>
+                    <th className="py-1 px-2 text-right">Estudio ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {artistProductivity.map(a => (
+                    <tr key={a.artist.id}>
+                      <td className="py-1 px-2 font-medium">{a.artist.name}</td>
+                      <td className="py-1 px-2 text-center">{a.sessionsCount}</td>
+                      <td className="py-1 px-2 text-center">{a.hours > 0 ? `${a.hours}h` : '—'}</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(a.gross)}</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(a.commission)}</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(a.studioCut)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'visual_charts':
+        return (
+          <div className="space-y-4">
+            {/* 1. Líneas de Negocio */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                1. PARTICIPACIÓN Y DISTRIBUCIÓN POR LÍNEA DE NEGOCIO
+              </h3>
+              <table className="w-full text-xs border border-neutral-300 mb-3">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Departamento</th>
+                    <th className="py-1 px-2 text-right">Facturación ($ USD)</th>
+                    <th className="py-1 px-2 text-center">% del Total</th>
+                    <th className="py-1 px-2 text-right">Margen Estimado ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Tatuajes Artísticos</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(tattooRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((tattooRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(tattooRevenue * 0.65)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Body Piercing & Perforaciones</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(piercingRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((piercingRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(piercingRevenue * 0.50)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Venta Joyería Mostrador (Titanio / Oro)</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(jewelryRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((jewelryRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(jewelryRevenue * 0.55)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Venta Aftercare & Bálsamos Cicatrizantes</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(aftercareRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((aftercareRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(aftercareRevenue * 0.50)}</td>
+                  </tr>
+                  {otherRevenue > 0 && (
+                    <tr>
+                      <td className="py-1 px-2 font-medium">Otros Servicios & Reservas</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(otherRevenue)}</td>
+                      <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((otherRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(otherRevenue)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-neutral-100 font-bold border-t-2 border-black">
+                    <td className="py-1.5 px-2">TOTAL FACTURACIÓN BRUTA</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(totalGrossRevenue)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">100.0%</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(grossProfit)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 2. Rendimiento por Artista */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                2. COMPARATIVA DE RENDIMIENTO Y FACTURACIÓN POR ARTISTA
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Artista</th>
+                    <th className="py-1 px-2 text-left">Especialidad</th>
+                    <th className="py-1 px-2 text-center">Citas</th>
+                    <th className="py-1 px-2 text-right">Facturación ($)</th>
+                    <th className="py-1 px-2 text-center">% Ventas</th>
+                    <th className="py-1 px-2 text-right">Comisión ($)</th>
+                    <th className="py-1 px-2 text-right">Estudio ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {artistProductivity.map(a => (
+                    <tr key={a.artist.id}>
+                      <td className="py-1 px-2 font-medium">{a.artist.name}</td>
+                      <td className="py-1 px-2 text-neutral-600">{a.artist.role}</td>
+                      <td className="py-1 px-2 text-center">{a.sessionsCount}</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(a.gross)}</td>
+                      <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((a.gross / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(a.commission)}</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(a.studioCut)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 3. Flujo Financiero Global */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                3. RESUMEN DE FLUJO FINANCIERO OPERATIVO
+              </h3>
+              <div className="grid grid-cols-3 gap-3 border border-neutral-300 p-2.5 rounded bg-neutral-50 text-center text-xs">
+                <div>
+                  <span className="text-neutral-600 text-[10px] block font-bold uppercase">Ingresos Brutos</span>
+                  <span className="font-mono text-base font-bold text-black">{formatMoney(totalGrossRevenue)}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-600 text-[10px] block font-bold uppercase">Costos Totales Operación</span>
+                  <span className="font-mono text-base font-bold text-neutral-800">{formatMoney(totalDirectCosts + totalFixedExpenses)}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-600 text-[10px] block font-bold uppercase">Utilidad Neta (EBITDA)</span>
+                  <span className="font-mono text-base font-bold text-black">{formatMoney(netOperatingProfit)} ({netProfitMarginPercent}%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'pl_statement':
+        return (
+          <div className="space-y-4">
+            <div className="border border-neutral-300 p-2.5 rounded bg-neutral-50 flex justify-between items-center text-xs">
+              <span className="font-bold uppercase">Auditoría Financiera Período: {dateFilterLabel}</span>
+              <div className="space-x-3 font-mono font-bold">
+                <span>Margen Bruto: {grossMarginPercent}%</span>
+                <span>Margen Neto: {netProfitMarginPercent}%</span>
+              </div>
+            </div>
+
+            {/* 1. Ingresos Operativos */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                1. INGRESOS OPERATIVOS BRUTOS
+              </h3>
+              <table className="w-full text-xs">
+                <tbody>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Facturación Tatuajes Artísticos</td>
+                    <td className="py-1 text-right font-mono">{formatMoney(tattooRevenue)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Facturación Procedimientos Body Piercing</td>
+                    <td className="py-1 text-right font-mono">{formatMoney(piercingRevenue)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Ventas de Mostrador - Joyería Titanio / Oro</td>
+                    <td className="py-1 text-right font-mono">{formatMoney(jewelryRevenue)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Ventas de Mostrador - Aftercare & Bálsamos</td>
+                    <td className="py-1 text-right font-mono">{formatMoney(aftercareRevenue)}</td>
+                  </tr>
+                  {otherRevenue > 0 && (
+                    <tr className="border-b border-neutral-200">
+                      <td className="py-1">Otros Servicios & Señales</td>
+                      <td className="py-1 text-right font-mono">{formatMoney(otherRevenue)}</td>
+                    </tr>
+                  )}
+                  <tr className="font-bold bg-neutral-100 border-t border-b border-neutral-400">
+                    <td className="py-1.5 font-bold">TOTAL INGRESOS OPERATIVOS BRUTOS</td>
+                    <td className="py-1.5 text-right font-mono text-sm">{formatMoney(totalGrossRevenue)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 2. Costos Directos */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                2. COSTOS DIRECTOS DE SERVICIO (COGS)
+              </h3>
+              <table className="w-full text-xs">
+                <tbody>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Comisiones Devengadas por Artistas (Tatuadores / Piercers)</td>
+                    <td className="py-1 text-right font-mono text-neutral-800">-{formatMoney(totalArtistCommissions)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Compras de Insumos y Reposición de Joyería</td>
+                    <td className="py-1 text-right font-mono text-neutral-800">-{formatMoney(supplyExpenses)}</td>
+                  </tr>
+                  <tr className="font-bold bg-neutral-100 border-t border-b border-neutral-400">
+                    <td className="py-1.5 font-bold">TOTAL COSTOS DIRECTOS</td>
+                    <td className="py-1.5 text-right font-mono text-sm">-{formatMoney(totalDirectCosts)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Margen Bruto */}
+            <div className="p-2 border-2 border-black bg-neutral-50 flex justify-between items-center text-xs font-bold">
+              <span>(=) MARGEN BRUTO OPERATIVO DE LA CASA</span>
+              <span className="font-mono text-sm">{formatMoney(grossProfit)} ({grossMarginPercent}%)</span>
+            </div>
+
+            {/* 3. Gastos Fijos (OPEX) */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                3. GASTOS FIJOS Y ESTRUCTURA DE OPERACIÓN (OPEX)
+              </h3>
+              <table className="w-full text-xs">
+                <tbody>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Alquiler del Local Comercial</td>
+                    <td className="py-1 text-right font-mono">-{formatMoney(rentExpense)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Suministros (Electricidad, Agua, Climatización)</td>
+                    <td className="py-1 text-right font-mono">-{formatMoney(utilitiesExpense)}</td>
+                  </tr>
+                  <tr className="border-b border-neutral-200">
+                    <td className="py-1">Bioseguridad, Sanidad & Gestión Residuos Peligrosos</td>
+                    <td className="py-1 text-right font-mono">-{formatMoney(bioSanitaryExpense)}</td>
+                  </tr>
+                  {otherFixedExpenses > 0 && (
+                    <tr className="border-b border-neutral-200">
+                      <td className="py-1">Otros Gastos Operativos (TPV, Software, Marketing)</td>
+                      <td className="py-1 text-right font-mono">-{formatMoney(otherFixedExpenses)}</td>
+                    </tr>
+                  )}
+                  <tr className="font-bold bg-neutral-100 border-t border-b border-neutral-400">
+                    <td className="py-1.5 font-bold">TOTAL GASTOS FIJOS OPERATIVOS</td>
+                    <td className="py-1.5 text-right font-mono text-sm">-{formatMoney(totalFixedExpenses)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Resultado Neto */}
+            <div className="p-2.5 border-2 border-black bg-neutral-100 flex justify-between items-center text-sm font-bold">
+              <span>(=) RESULTADO NETO FINAL DEL ESTUDIO (EBITDA)</span>
+              <span className="font-mono text-base">{formatMoney(netOperatingProfit)} ({netProfitMarginPercent}%)</span>
+            </div>
+          </div>
+        );
+
+      case 'artists_productivity':
+        return (
+          <div className="space-y-4">
+            <div className="border border-neutral-300 p-2.5 rounded bg-neutral-50 grid grid-cols-4 gap-2 text-center text-xs">
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Artistas Evaluados</span>
+                <span className="font-bold text-sm">{artistProductivity.length}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Citas / Sesiones</span>
+                <span className="font-bold text-sm">{validSales.length}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Horas Tatuaje</span>
+                <span className="font-bold text-sm">{totalTattooHours} hrs</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Comisiones Totales</span>
+                <span className="font-bold text-sm font-mono">{formatMoney(totalArtistCommissions)}</span>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                TABLA DE RENDIMIENTO Y LIQUIDACIÓN POR ARTISTA
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Artista</th>
+                    <th className="py-1 px-2 text-left">Rol / Especialidad</th>
+                    <th className="py-1 px-2 text-center">Citas</th>
+                    <th className="py-1 px-2 text-center">Horas</th>
+                    <th className="py-1 px-2 text-right">Facturación ($)</th>
+                    <th className="py-1 px-2 text-right">Comisión ($)</th>
+                    <th className="py-1 px-2 text-right">Estudio ($)</th>
+                    <th className="py-1 px-2 text-right">Propinas ($)</th>
+                    <th className="py-1 px-2 text-right">Ticket Prom.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {artistProductivity.map(item => (
+                    <tr key={item.artist.id}>
+                      <td className="py-1.5 px-2 font-bold">{item.artist.name}</td>
+                      <td className="py-1.5 px-2 text-neutral-600">{item.artist.role}</td>
+                      <td className="py-1.5 px-2 text-center font-mono font-bold">{item.sessionsCount}</td>
+                      <td className="py-1.5 px-2 text-center font-mono">{item.hours > 0 ? `${item.hours}h` : '—'}</td>
+                      <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(item.gross)}</td>
+                      <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(item.commission)}</td>
+                      <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(item.studioCut)}</td>
+                      <td className="py-1.5 px-2 text-right font-mono text-neutral-700">{item.tips > 0 ? formatMoney(item.tips) : '—'}</td>
+                      <td className="py-1.5 px-2 text-right font-mono">{formatMoney(item.averagePerSession)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-neutral-100 font-bold border-t-2 border-black">
+                  <tr>
+                    <td colSpan={2} className="py-1.5 px-2 uppercase">TOTALES CONSOLIDADOS:</td>
+                    <td className="py-1.5 px-2 text-center font-mono">{artistProductivity.reduce((acc, a) => acc + a.sessionsCount, 0)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">{totalTattooHours}h</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(totalGrossRevenue)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(totalArtistCommissions)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(grossProfit)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(artistProductivity.reduce((acc, a) => acc + a.tips, 0))}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(averageTicket)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Firmas de Conformidad */}
+            <div className="pt-6 grid grid-cols-2 gap-8 text-center text-xs">
+              <div>
+                <div className="border-b border-black mb-1 w-48 mx-auto h-8"></div>
+                <span className="font-bold block">Firma Administrador / Gerente</span>
+                <span className="text-[10px] text-neutral-600">{settings.studioName}</span>
+              </div>
+              <div>
+                <div className="border-b border-black mb-1 w-48 mx-auto h-8"></div>
+                <span className="font-bold block">Conformidad de Artistas</span>
+                <span className="text-[10px] text-neutral-600">Revisión de Liquidación Periódica</span>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'sales_departments':
+        return (
+          <div className="space-y-4">
+            {/* 1. Líneas de Negocio */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                1. FACTURACIÓN POR LÍNEA DE NEGOCIO Y DEPARTAMENTO
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Departamento</th>
+                    <th className="py-1 px-2 text-right">Facturación ($ USD)</th>
+                    <th className="py-1 px-2 text-center">% del Total</th>
+                    <th className="py-1 px-2 text-right">Margen Estimado ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Tatuajes Artísticos</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(tattooRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((tattooRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(tattooRevenue * 0.65)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Procedimientos Body Piercing</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(piercingRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((piercingRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(piercingRevenue * 0.50)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Venta Joyería Mostrador (Titanio / Oro)</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(jewelryRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((jewelryRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(jewelryRevenue * 0.55)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1 px-2 font-medium">Venta Aftercare & Bálsamos</td>
+                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(aftercareRevenue)}</td>
+                    <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((aftercareRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(aftercareRevenue * 0.50)}</td>
+                  </tr>
+                  {otherRevenue > 0 && (
+                    <tr>
+                      <td className="py-1 px-2 font-medium">Otros Servicios & Señales</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(otherRevenue)}</td>
+                      <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((otherRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(otherRevenue)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-neutral-100 font-bold border-t-2 border-black">
+                    <td className="py-1.5 px-2">TOTAL FACTURACIÓN BRUTA</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(totalGrossRevenue)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">100.0%</td>
+                    <td className="py-1.5 px-2 text-right font-mono">{formatMoney(grossProfit)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* 2. Canales de Cobro */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                2. CANALES DE COBRO Y ARQUEO DE CAJA
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">Canal de Pago</th>
+                    <th className="py-1 px-2 text-left">Detalle / Modalidad</th>
+                    <th className="py-1 px-2 text-right">Importe Cobrado ($ USD)</th>
+                    <th className="py-1 px-2 text-center">% del Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  <tr>
+                    <td className="py-1.5 px-2 font-bold">Efectivo en Caja</td>
+                    <td className="py-1.5 px-2 text-neutral-600">Billetes y monedas físicas recibidas</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(paymentBreakdown.cash)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">
+                      {paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer > 0
+                        ? ((paymentBreakdown.cash / (paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)) * 100).toFixed(1)
+                        : 0}%
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 px-2 font-bold">Tarjetas / Datáfono TPV</td>
+                    <td className="py-1.5 px-2 text-neutral-600">Cobro digital directo a banco / Datafast</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(paymentBreakdown.card)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">
+                      {paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer > 0
+                        ? ((paymentBreakdown.card / (paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)) * 100).toFixed(1)
+                        : 0}%
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 px-2 font-bold">Transferencias Electrónicas</td>
+                    <td className="py-1.5 px-2 text-neutral-600">Bancos Ecuador (Pichincha, Produbanco, DeUna)</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold">{formatMoney(paymentBreakdown.transfer)}</td>
+                    <td className="py-1.5 px-2 text-center font-mono">
+                      {paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer > 0
+                        ? ((paymentBreakdown.transfer / (paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)) * 100).toFixed(1)
+                        : 0}%
+                    </td>
+                  </tr>
+                  <tr className="bg-neutral-100 font-bold border-t-2 border-black">
+                    <td colSpan={2} className="py-1.5 px-2 uppercase">TOTAL COBRADO EN PERÍODO:</td>
+                    <td className="py-1.5 px-2 text-right font-mono font-bold text-sm">
+                      {formatMoney(paymentBreakdown.cash + paymentBreakdown.card + paymentBreakdown.transfer)}
+                    </td>
+                    <td className="py-1.5 px-2 text-center font-mono">100.0%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+      case 'tax_audit':
+        return (
+          <div className="space-y-4">
+            <div className="border border-neutral-300 p-2.5 rounded bg-neutral-50 grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Contribuyente / RUC</span>
+                <span className="font-bold">{settings.razonSocial || settings.studioName}</span>
+                <span className="font-mono text-[10px] text-neutral-500 block">{settings.ruc || settings.taxId}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Régimen Tributario</span>
+                <span className="font-bold">{settings.regimenTributario || 'RÉGIMEN GENERAL'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Tarifa IVA Vigente</span>
+                <span className="font-bold font-mono">15% (Ecuador SRI)</span>
+              </div>
+            </div>
+
+            {/* Resumen de IVA */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                1. BALANCE DE IMPUESTOS (IVA REPERCUTIDO VS DEDUCIBLE)
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1.5 px-2 text-left">Concepto Fiscal</th>
+                    <th className="py-1.5 px-2 text-left">Documentos Sustento</th>
+                    <th className="py-1.5 px-2 text-right">Base Imponible ($)</th>
+                    <th className="py-1.5 px-2 text-center">Tarifa</th>
+                    <th className="py-1.5 px-2 text-right">Monto IVA ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  <tr>
+                    <td className="py-2 px-2 font-bold">Impuesto Repercutido (Cobrado)</td>
+                    <td className="py-2 px-2 text-neutral-600">{validSales.length} Facturas y Tickets de Venta</td>
+                    <td className="py-2 px-2 text-right font-mono">{formatMoney(totalGrossRevenue)}</td>
+                    <td className="py-2 px-2 text-center font-mono">15%</td>
+                    <td className="py-2 px-2 text-right font-mono font-bold text-black">{formatMoney(outputTax)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 px-2 font-bold">Impuesto Soportado (Deducible)</td>
+                    <td className="py-2 px-2 text-neutral-600">Facturas de Proveedores e Insumos</td>
+                    <td className="py-2 px-2 text-right font-mono">{formatMoney(supplyExpenses)}</td>
+                    <td className="py-2 px-2 text-center font-mono">15%</td>
+                    <td className="py-2 px-2 text-right font-mono font-bold text-neutral-800">-{formatMoney(inputTax)}</td>
+                  </tr>
+                  <tr className="bg-neutral-100 font-bold border-t-2 border-black text-sm">
+                    <td colSpan={4} className="py-2 px-2 uppercase">
+                      {netTaxPayable >= 0 ? '(=) SALDO NETO A LIQUIDAR AL SRI (A PAGAR):' : '(=) CRÉDITO TRIBUTARIO A FAVOR DEL ESTUDIO:'}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono font-bold">
+                      {formatMoney(Math.abs(netTaxPayable))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Detalle de Ventas Facturadas */}
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                2. COMPROBANTES Y MOVIMIENTOS FACTURADOS
+              </h3>
+              <div className="grid grid-cols-3 gap-3 border border-neutral-300 p-2.5 rounded text-center text-xs">
+                <div>
+                  <span className="text-[10px] text-neutral-600 block uppercase">Total Ventas Emitidas</span>
+                  <span className="font-mono text-base font-bold">{validSales.length}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-600 block uppercase">Subtotal Sin Impuesto</span>
+                  <span className="font-mono text-base font-bold">{formatMoney(totalGrossRevenue)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-600 block uppercase">Total con IVA (15%)</span>
+                  <span className="font-mono text-base font-bold">{formatMoney(totalInvoicedWithTax)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-2 border border-neutral-300 rounded bg-neutral-50 text-[10px] text-neutral-600">
+              <strong>Nota de Responsabilidad Tributaria:</strong> Este reporte refleja la liquidación de IVA calculada en el período con base en los comprobantes autorizados y ventas emitidas conforme a la normativa tributaria del Servicio de Rentas Internas (SRI) del Ecuador.
+            </div>
+          </div>
+        );
+
+      case 'inventory_costs':
+        return (
+          <div className="space-y-4">
+            <div className="border border-neutral-300 p-2.5 rounded bg-neutral-50 grid grid-cols-4 gap-2 text-center text-xs">
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Valuación Costo Compra</span>
+                <span className="font-mono text-sm font-bold">{formatMoney(inventoryTotalValuation)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Potencial Venta (PVP)</span>
+                <span className="font-mono text-sm font-bold">{formatMoney(inventoryRetailPotential)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Margen Potencial</span>
+                <span className="font-mono text-sm font-bold">
+                  {formatMoney(inventoryRetailPotential - inventoryTotalValuation)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-neutral-600 block uppercase">Bajo Stock Mínimo</span>
+                <span className="font-mono text-sm font-bold text-neutral-900">{lowStockCount} artículos</span>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-bold border-b border-black pb-1 mb-2 uppercase text-xs">
+                DETALLE DE INVENTARIO Y STOCK EN ALMACÉN ({inventory.length} referencias)
+              </h3>
+              <table className="w-full text-xs border border-neutral-300">
+                <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
+                  <tr>
+                    <th className="py-1 px-2 text-left">SKU / Código</th>
+                    <th className="py-1 px-2 text-left">Producto / Referencia</th>
+                    <th className="py-1 px-2 text-left">Categoría</th>
+                    <th className="py-1 px-2 text-center">Stock</th>
+                    <th className="py-1 px-2 text-center">Mínimo</th>
+                    <th className="py-1 px-2 text-right">Costo Unit.</th>
+                    <th className="py-1 px-2 text-right">PVP Unit.</th>
+                    <th className="py-1 px-2 text-right">Valuación Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-200">
+                  {inventory.map(item => (
+                    <tr key={item.id}>
+                      <td className="py-1 px-2 font-mono text-[10px]">{item.sku || '—'}</td>
+                      <td className="py-1 px-2 font-medium">
+                        {item.name} {item.brand ? `(${item.brand})` : ''}
+                      </td>
+                      <td className="py-1 px-2 text-neutral-600 capitalize">{item.category}</td>
+                      <td className="py-1 px-2 text-center font-mono font-bold">{item.currentStock}</td>
+                      <td className="py-1 px-2 text-center font-mono text-neutral-600">{item.minStockAlert}</td>
+                      <td className="py-1 px-2 text-right font-mono">{formatMoney(item.unitCost)}</td>
+                      <td className="py-1 px-2 text-right font-mono">{item.retailPrice ? formatMoney(item.retailPrice) : '—'}</td>
+                      <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(item.currentStock * item.unitCost)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-neutral-100 font-bold border-t-2 border-black">
+                  <tr>
+                    <td colSpan={7} className="py-1.5 px-2 uppercase">TOTAL VALUACIÓN DE STOCK EN COSTO:</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-sm">{formatMoney(inventoryTotalValuation)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Printable Report (Print media) */}
       <div id="printable-receipt" className="hidden print:block p-8 bg-white text-black font-sans text-xs">
-        <div className="border-b-2 border-black pb-4 mb-4 text-center">
-          <h1 className="text-xl font-bold uppercase">{settings.studioName}</h1>
-          <p className="text-xs">{settings.address} · Tel: {settings.phone}</p>
-          <p className="text-xs">RUC: {settings.ruc || settings.taxId} · Registro Sanitario: {settings.healthSanitaryRegistration}</p>
-          <h2 className="text-sm font-bold uppercase mt-3 tracking-wider">INFORME EJECUTIVO DE CONTABILIDAD Y RESULTADOS</h2>
-          <p className="text-[11px] text-neutral-600">Período: {dateFilter} · Fecha: {new Date().toLocaleDateString('es-EC')}</p>
+        {/* Header Oficial A4 */}
+        <div className="border-b-2 border-black pb-3 mb-4 flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-wide">{settings.studioName}</h1>
+            <p className="text-xs text-neutral-800">{settings.address} · Tel: {settings.phone}</p>
+            <p className="text-xs text-neutral-800">
+              RUC: <strong className="font-mono">{settings.ruc || settings.taxId}</strong> · Registro Sanitario: <strong>{settings.healthSanitaryRegistration}</strong>
+            </p>
+            <p className="text-[11px] text-neutral-600">
+              Régimen: {settings.regimenTributario || 'GENERAL'} · Quito - Ecuador · Moneda: USD ($)
+            </p>
+          </div>
+          <div className="text-right border border-neutral-300 rounded p-2.5 bg-neutral-50 text-[11px]">
+            <div className="font-bold uppercase text-neutral-800 tracking-wider">REPORTE OFICIAL</div>
+            <div className="font-mono text-xs font-bold text-neutral-900 mt-0.5">
+              {reportTabTitles[activeReportTab]}
+            </div>
+            <div className="text-neutral-700 mt-1">Período: <strong>{dateFilterLabel}</strong></div>
+            <div className="text-neutral-500 text-[10px]">
+              Emisión: {new Date().toLocaleDateString('es-EC')} {new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-bold border-b border-neutral-400 pb-1 mb-2">1. ESTADO DE RESULTADOS (P&L)</h3>
-            <table className="w-full text-xs">
-              <tbody>
-                <tr><td className="py-1">Ingresos Brutos Servicios & Ventas</td><td className="py-1 text-right font-mono font-bold">{formatMoney(totalGrossRevenue)}</td></tr>
-                <tr><td className="py-1 pl-4 text-neutral-600">(-) Comisiones a Artistas</td><td className="py-1 text-right font-mono text-neutral-700">-{formatMoney(totalArtistCommissions)}</td></tr>
-                <tr><td className="py-1 pl-4 text-neutral-600">(-) Insumos de Tatuaje y Joyería</td><td className="py-1 text-right font-mono text-neutral-700">-{formatMoney(supplyExpenses)}</td></tr>
-                <tr className="font-bold border-t border-b border-neutral-300"><td className="py-1">(=) MARGEN BRUTO OPERATIVO</td><td className="py-1 text-right font-mono">{formatMoney(grossProfit)} ({grossMarginPercent}%)</td></tr>
-                <tr><td className="py-1 pl-4 text-neutral-600">(-) Alquiler y Suministros</td><td className="py-1 text-right font-mono text-neutral-700">-{formatMoney(rentExpense + utilitiesExpense)}</td></tr>
-                <tr><td className="py-1 pl-4 text-neutral-600">(-) Bioseguridad y Sanidad</td><td className="py-1 text-right font-mono text-neutral-700">-{formatMoney(bioSanitaryExpense)}</td></tr>
-                <tr><td className="py-1 pl-4 text-neutral-600">(-) Otros Gastos Fijos</td><td className="py-1 text-right font-mono text-neutral-700">-{formatMoney(otherFixedExpenses)}</td></tr>
-                <tr className="font-bold text-sm border-t-2 border-black"><td className="py-1.5">(=) RESULTADO NETO (EBITDA)</td><td className="py-1.5 text-right font-mono">{formatMoney(netOperatingProfit)} ({netProfitMarginPercent}%)</td></tr>
-              </tbody>
-            </table>
-          </div>
+        {/* Dynamic Print Content Based on Active Tab */}
+        {renderPrintContent()}
 
-          <div className="pt-3">
-            <h3 className="font-bold border-b border-neutral-400 pb-1 mb-2">2. RENDIMIENTO POR ARTISTA</h3>
-            <table className="w-full text-xs border border-neutral-300">
-              <thead className="bg-neutral-100 border-b border-neutral-300 font-bold">
-                <tr><th className="py-1 px-2 text-left">Artista</th><th className="py-1 px-2 text-center">Citas</th><th className="py-1 px-2 text-right">Facturado</th><th className="py-1 px-2 text-right">Comisión</th><th className="py-1 px-2 text-right">Estudio</th></tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-200">
-                {artistProductivity.map(a => (
-                  <tr key={a.artist.id}>
-                    <td className="py-1 px-2 font-medium">{a.artist.name}</td>
-                    <td className="py-1 px-2 text-center">{a.sessionsCount}</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(a.gross)}</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(a.commission)}</td>
-                    <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(a.studioCut)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Footer Oficial */}
+        <div className="mt-8 pt-3 border-t border-neutral-400 flex justify-between items-center text-[10px] text-neutral-600">
+          <div>
+            <span className="font-semibold">{settings.studioName}</span> · C.C. Quicentro Shopping, Quito, Ecuador
+            <span className="block text-[9px] text-neutral-500">
+              Documento emitido para fines de control administrativo, contable y tributario interno bajo normativa ecuatoriana.
+            </span>
+          </div>
+          <div className="text-right font-mono">
+            <span>Página 1 de 1 · Sistema InkLedger POS</span>
           </div>
         </div>
       </div>
@@ -503,11 +1283,11 @@ export const ReportsView: React.FC = () => {
 
           <button
             onClick={handlePrintReport}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)]"
-            title="Imprimir informe formal o guardar como PDF"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
+            title={`Imprimir ${reportTabTitles[activeReportTab]} o guardar en PDF`}
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Imprimir / PDF</span>
+            <span>Imprimir: {reportTabShortNames[activeReportTab]} / PDF</span>
           </button>
 
           <button

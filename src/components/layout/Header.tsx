@@ -35,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Terminal Punto de Venta (POS)';
       case 'clients':
         return 'Historial & Expediente de Clientes';
+      case 'gallery':
+        return 'Galería de Fotos & Portafolio Artístico';
       case 'appointments':
         return 'Agenda & Agendamiento de Citas';
       case 'proformas':
@@ -43,6 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Libro Diario de Ventas';
       case 'expenses':
         return 'Gastos & Compras';
+      case 'suppliers':
+        return 'Gestión de Proveedores & Distribuidores';
       case 'artists':
         return 'Liquidación de Artistas';
       case 'cash':

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Save,
   CheckCircle,
@@ -22,6 +22,9 @@ import {
   Trash2,
   Layers,
   FileCheck2,
+  Image as ImageIcon,
+  Globe,
+  Hash,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { validateSriBusinessConfig } from '../../utils/sriBusinessConfig';
@@ -43,10 +46,16 @@ export const SettingsView: React.FC = () => {
   const [nombreComercial, setNombreComercial] = useState(settings.nombreComercial || settings.studioName || 'Devolution Ink Tattoo Studio');
   const [dirMatriz, setDirMatriz] = useState(settings.dirMatriz || settings.address || 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito, Ecuador');
   const [dirEstablecimiento, setDirEstablecimiento] = useState(settings.dirEstablecimiento || settings.address || 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Local 214, Quito, Ecuador');
+  const [pais, setPais] = useState(settings.pais || 'ECUADOR');
+  const [provincia, setProvincia] = useState(settings.provincia || 'PICHINCHA');
+  const [ciudad, setCiudad] = useState(settings.ciudad || 'QUITO');
+  const [parroquia, setParroquia] = useState(settings.parroquia || 'IÑAQUITO');
   const [telefono, setTelefono] = useState(settings.telefono || settings.phone || '+593 99 123 4567');
   const [email, setEmail] = useState(settings.email || 'contacto@devolutionink.com');
   const [codigoEstablecimiento, setCodigoEstablecimiento] = useState(settings.codigoEstablecimiento || '001');
   const [puntoEmision, setPuntoEmision] = useState(settings.puntoEmision || '001');
+  const [secuencialFactura, setSecuencialFactura] = useState(settings.secuencialFactura || '000000001');
+  const [secuencialNotaVenta, setSecuencialNotaVenta] = useState(settings.secuencialNotaVenta || '000000001');
   const [regimenTributario, setRegimenTributario] = useState<string>(settings.regimenTributario || 'RIMPE_EMPRENDEDOR');
   const [obligadoContabilidad, setObligadoContabilidad] = useState<'SI' | 'NO'>(settings.obligadoContabilidad || 'NO');
   const [agenteRetencion, setAgenteRetencion] = useState<'SI' | 'NO'>(settings.agenteRetencion === 'SI' ? 'SI' : 'NO');
@@ -73,6 +82,10 @@ export const SettingsView: React.FC = () => {
   const [receiptFooterMessage, setReceiptFooterMessage] = useState(settings.receiptFooterMessage || '');
   const [healthSanitaryRegistration, setHealthSanitaryRegistration] = useState(settings.healthSanitaryRegistration || 'REG-SAN-ARCSA-2026');
 
+  // Logo Oficial de la Empresa (Base64 data URL o URL de imagen)
+  const [logoUrl, setLogoUrl] = useState<string>(settings.logoUrl || '');
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
   // Estados de proceso
   const [isSaved, setIsSaved] = useState(false);
   const [isSearchingSri, setIsSearchingSri] = useState(false);
@@ -85,15 +98,22 @@ export const SettingsView: React.FC = () => {
     nombreComercial: nombreComercial.trim(),
     dirMatriz: dirMatriz.trim(),
     dirEstablecimiento: dirEstablecimiento.trim(),
+    pais: pais.trim().toUpperCase(),
+    provincia: provincia.trim().toUpperCase(),
+    ciudad: ciudad.trim().toUpperCase(),
+    parroquia: parroquia.trim().toUpperCase(),
     telefono: telefono.trim(),
     email: email.trim(),
     codigoEstablecimiento: codigoEstablecimiento.trim(),
     puntoEmision: puntoEmision.trim(),
+    secuencialFactura: (secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
+    secuencialNotaVenta: (secuencialNotaVenta.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
     regimenTributario,
     obligadoContabilidad,
     agenteRetencion,
     contribuyenteEspecial: contribuyenteEspecial.trim() || undefined,
     ambiente,
+    logoUrl: logoUrl.trim() || undefined,
     firmaElectronicaBase64,
     firmaElectronicaNombre: firmaElectronicaNombreArchivo || firmaElectronicaNombre,
     firmaElectronicaNombreArchivo,
@@ -108,15 +128,22 @@ export const SettingsView: React.FC = () => {
     nombreComercial,
     dirMatriz,
     dirEstablecimiento,
+    pais,
+    provincia,
+    ciudad,
+    parroquia,
     telefono,
     email,
     codigoEstablecimiento,
     puntoEmision,
+    secuencialFactura,
+    secuencialNotaVenta,
     regimenTributario,
     obligadoContabilidad,
     agenteRetencion,
     contribuyenteEspecial,
     ambiente,
+    logoUrl,
     firmaElectronicaBase64,
     firmaElectronicaNombre,
     firmaElectronicaNombreArchivo,
@@ -220,13 +247,46 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  // Carga y procesamiento del logotipo de la empresa
+  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona un archivo de imagen válido (PNG, JPG, JPEG, WEBP o SVG).');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('La imagen no debe superar los 2 MB para garantizar una impresión rápida y nítida.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      setLogoUrl(base64Data);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRestoreDefaultLogo = () => {
+    const defaultSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" width="240" height="80"><rect width="240" height="80" rx="12" fill="%23111115"/><text x="120" y="38" font-family="Arial,sans-serif" font-weight="900" font-size="20" fill="%23FF3366" text-anchor="middle" letter-spacing="2">DEVOLUTION INK</text><text x="120" y="58" font-family="Arial,sans-serif" font-weight="700" font-size="9" fill="%23A3A3A3" text-anchor="middle" letter-spacing="4">TATTOO STUDIO · QUITO</text></svg>`;
+    setLogoUrl(defaultSvg);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoUrl('');
+  };
+
   // Guardar configuración completa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     updateSettings({
       // Compatibilidad con campos previos de StudioSettings
-      studioName: nombreComercial.trim(),
+      studioName: nombreComercial.trim() || settings.studioName,
       taxId: ruc.trim(),
       address: dirEstablecimiento.trim(),
       phone: telefono.trim(),
@@ -238,6 +298,7 @@ export const SettingsView: React.FC = () => {
       defaultArtistCommission,
       receiptFooterMessage: receiptFooterMessage.trim(),
       healthSanitaryRegistration: healthSanitaryRegistration.trim(),
+      logoUrl: logoUrl.trim() || undefined,
 
       // Campos oficiales de CompanyConfig (SRI Ecuador)
       ruc: ruc.trim(),
@@ -245,9 +306,15 @@ export const SettingsView: React.FC = () => {
       nombreComercial: nombreComercial.trim(),
       dirMatriz: dirMatriz.trim(),
       dirEstablecimiento: dirEstablecimiento.trim(),
+      pais: pais.trim().toUpperCase() || 'ECUADOR',
+      provincia: provincia.trim().toUpperCase() || 'PICHINCHA',
+      ciudad: ciudad.trim().toUpperCase() || 'QUITO',
+      parroquia: parroquia.trim().toUpperCase() || 'IÑAQUITO',
       telefono: telefono.trim(),
-      codigoEstablecimiento: codigoEstablecimiento.trim() || '001',
-      puntoEmision: puntoEmision.trim() || '001',
+      codigoEstablecimiento: (codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3),
+      puntoEmision: (puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3),
+      secuencialFactura: (secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
+      secuencialNotaVenta: (secuencialNotaVenta.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
       regimenTributario,
       obligadoContabilidad,
       agenteRetencion,
@@ -418,7 +485,10 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>1. Datos Fiscales SRI</span>
+          <span>1. Datos Fiscales & Logo</span>
+          {logoUrl && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          )}
         </button>
 
         <button
@@ -430,7 +500,7 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           <MapPin className="w-4 h-4" />
-          <span>2. Establecimiento & Emisión</span>
+          <span>2. Establecimiento, Ubicación & Secuencial</span>
         </button>
 
         <button
@@ -505,6 +575,103 @@ export const SettingsView: React.FC = () => {
                 <span>{sriSearchNotice.text}</span>
               </div>
             )}
+
+            {/* SECCIÓN OFICIAL DE LOGO DE LA EMPRESA */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-[#121215] border border-[#272730] flex flex-col md:flex-row items-center gap-5 shadow-inner">
+              {/* Preview Box */}
+              <div className="relative group shrink-0">
+                <div className="w-44 h-28 rounded-xl border border-[#2B2B36] bg-[#18181D] flex items-center justify-center p-3 overflow-hidden shadow-inner relative">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt="Logo de la Empresa"
+                      className="max-h-full max-w-full object-contain transition-all group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="text-center p-2 flex flex-col items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-neutral-500 mb-1" />
+                      <span className="text-[10px] text-neutral-400 font-semibold block">Sin Logo</span>
+                      <span className="text-[9px] text-neutral-600 block mt-0.5">Sube PNG, JPG o SVG</span>
+                    </div>
+                  )}
+                </div>
+                {logoUrl && (
+                  <span className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-md shadow-emerald-500/30 flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    <span>Activo</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Controls & Description */}
+              <div className="flex-1 space-y-2.5 text-xs text-neutral-300 w-full">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#FF3366]" />
+                      <span>Logotipo de la Empresa / Estudio</span>
+                    </h4>
+                    <span className="text-[10px] text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-md">
+                      Impresión Facturas & Tickets POS
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                    Este logotipo aparecerá automáticamente en la cabecera de las <strong>Facturas Oficiales A4 (RIDE SRI Ecuador)</strong>, en los <strong>Tickets Térmicos POS (80mm)</strong>, en las Cotizaciones / Proformas y reportes contables.
+                  </p>
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <input
+                    type="file"
+                    ref={logoFileInputRef}
+                    onChange={handleLogoFileUpload}
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoFileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#FF4D7D] hover:to-[#FF3366] text-white font-bold transition-all shadow-md shadow-[#FF3366]/20 cursor-pointer text-xs"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    <span>{logoUrl ? 'Cambiar Logotipo' : 'Subir Logotipo'}</span>
+                  </button>
+
+                  {logoUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveLogo}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold transition-all cursor-pointer text-xs"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Eliminar</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleRestoreDefaultLogo}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#18181D] hover:bg-[#222228] text-neutral-300 hover:text-white border border-[#282832] font-medium transition-all cursor-pointer text-xs"
+                    title="Cargar insignia oficial vectorial de Devolution Ink"
+                  >
+                    <span>Emblema Oficial Devolution</span>
+                  </button>
+                </div>
+
+                {/* Input de URL externa opcional */}
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[10px] text-neutral-400 shrink-0 font-medium">O pegar URL de imagen:</span>
+                  <input
+                    type="url"
+                    value={logoUrl}
+                    onChange={e => setLogoUrl(e.target.value)}
+                    placeholder="https://ejemplo.com/logo-estudio.png"
+                    className="flex-1 bg-[#101014] border border-[#26262F] focus:border-[#FF3366] rounded-lg px-2.5 py-1 text-[11px] text-white font-mono placeholder-neutral-600 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               {/* RUC */}
@@ -641,113 +808,342 @@ export const SettingsView: React.FC = () => {
         {/* TAB 2: ESTABLECIMIENTO & PUNTOS DE EMISIÓN */}
         {/* ========================================================= */}
         {activeTab === 'establishment' && (
-          <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
-            <div className="border-b border-[#24242A] pb-3">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                Sucursales, Domicilio Fiscal y Canales de Contacto
-              </h3>
-              <p className="text-[11px] text-neutral-400">
-                Direcciones físicas impresas en los comprobantes y códigos de serie de 3 dígitos (001-001).
-              </p>
+          <div className="space-y-6">
+            {/* SECCIÓN 1: UBICACIÓN GEOGRÁFICA Y JURISDICCIÓN TERRITORIAL */}
+            <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#24242A] pb-3">
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-[#FF3366]" />
+                    <span>Ubicación Geográfica del Establecimiento</span>
+                  </h3>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Jurisdicción cantonal y provincial requerida para la emisión de comprobantes, RIDE A4 y tickets térmicos SRI.
+                  </p>
+                </div>
+                <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FF3366]/15 border border-[#FF3366]/30 text-[#FF3366]">
+                  Ecuador · SRI Requerido
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                {/* País */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    País *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={pais}
+                    onChange={e => setPais(e.target.value.toUpperCase())}
+                    placeholder="ECUADOR"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-semibold focus:border-[#FF3366]/60 uppercase tracking-wide"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    País de jurisdicción fiscal
+                  </span>
+                </div>
+
+                {/* Provincia */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Provincia *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={provincia}
+                    onChange={e => setProvincia(e.target.value.toUpperCase())}
+                    placeholder="PICHINCHA"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-semibold focus:border-[#FF3366]/60 uppercase tracking-wide"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Provincia según catastro RUC
+                  </span>
+                </div>
+
+                {/* Ciudad / Cantón */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Ciudad / Cantón *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={ciudad}
+                    onChange={e => setCiudad(e.target.value.toUpperCase())}
+                    placeholder="QUITO"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-semibold focus:border-[#FF3366]/60 uppercase tracking-wide"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Ciudad donde opera el estudio
+                  </span>
+                </div>
+
+                {/* Parroquia */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Parroquia
+                  </label>
+                  <input
+                    type="text"
+                    value={parroquia}
+                    onChange={e => setParroquia(e.target.value.toUpperCase())}
+                    placeholder="IÑAQUITO"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-semibold focus:border-[#FF3366]/60 uppercase tracking-wide"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Parroquia urbana o rural
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              {/* Dirección Matriz */}
-              <div className="md:col-span-2">
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Dirección Matriz (Según RUC) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={dirMatriz}
-                  onChange={e => setDirMatriz(e.target.value)}
-                  placeholder="Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito, Ecuador"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
-                />
+            {/* SECCIÓN 2: DOMICILIO FISCAL Y CANALES DE CONTACTO */}
+            <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
+              <div className="border-b border-[#24242A] pb-3">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#FF3366]" />
+                  <span>Domicilio Fiscal y Canales de Notificación</span>
+                </h3>
+                <p className="text-[11px] text-neutral-400 mt-0.5">
+                  Direcciones físicas exactas impresas en la cabecera de las facturas electrónicas y tickets POS.
+                </p>
               </div>
 
-              {/* Dirección Establecimiento */}
-              <div className="md:col-span-2">
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Dirección del Establecimiento / Local Comercial *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={dirEstablecimiento}
-                  onChange={e => setDirEstablecimiento(e.target.value)}
-                  placeholder="C.C. Quicentro Shopping, Local 214, Quito, Ecuador"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
-                />
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {/* Dirección Matriz */}
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Dirección Matriz (Según RUC SRI) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={dirMatriz}
+                    onChange={e => setDirMatriz(e.target.value)}
+                    placeholder="Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito, Ecuador"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Dirección fiscal principal registrada ante el Servicio de Rentas Internas
+                  </span>
+                </div>
 
-              {/* Código Establecimiento */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Código de Establecimiento (3 dígitos) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={3}
-                  value={codigoEstablecimiento}
-                  onChange={e => setCodigoEstablecimiento(e.target.value)}
-                  placeholder="001"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
-                />
-                <span className="text-[10px] text-neutral-500 mt-1 block">
-                  Primer bloque de la serie de factura: ej. <strong>001</strong>-001-000000001
+                {/* Dirección Establecimiento */}
+                <div className="md:col-span-2">
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Dirección del Establecimiento / Local Comercial *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={dirEstablecimiento}
+                    onChange={e => setDirEstablecimiento(e.target.value)}
+                    placeholder="C.C. Quicentro Shopping, Local 214, Av. Naciones Unidas, Quito, Ecuador"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Ubicación física del estudio donde se presta el servicio y se entrega el ticket
+                  </span>
+                </div>
+
+                {/* Teléfono */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Teléfono de Contacto Fiscal *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                    placeholder="+593 99 123 4567"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Correo Electrónico (Notificaciones Comprobantes) *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="contacto@devolutionink.com"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 3: SERIE Y NUMERACIÓN SECUENCIAL DE COMPROBANTES SRI */}
+            <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#24242A] pb-3">
+                <div>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Hash className="w-4 h-4 text-[#FF3366]" />
+                    <span>Serie y Numeración Secuencial de Facturación SRI</span>
+                  </h3>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Estructura oficial del comprobante: [Establecimiento: 3 dígitos] - [Punto Emisión: 3 dígitos] - [Secuencial: 9 dígitos].
+                  </p>
+                </div>
+                <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono">
+                  Formato: 001-001-000000001
                 </span>
               </div>
 
-              {/* Punto de Emisión */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Punto de Emisión (3 dígitos) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={3}
-                  value={puntoEmision}
-                  onChange={e => setPuntoEmision(e.target.value)}
-                  placeholder="001"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
-                />
-                <span className="text-[10px] text-neutral-500 mt-1 block">
-                  Segundo bloque de la serie: ej. 001-<strong>001</strong>-000000001
-                </span>
+              {/* Live Preview de la Próxima Factura */}
+              <div className="p-4 rounded-xl bg-[#121215] border border-[#2B2B36] flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="space-y-1 text-center md:text-left">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center justify-center md:justify-start gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#FF3366]" />
+                    <span>Vista Previa de la Serie & Próxima Factura Oficial</span>
+                  </span>
+                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1 font-mono">
+                    <div className="px-3 py-1.5 rounded-lg bg-[#18181D] border border-neutral-700 text-center">
+                      <span className="text-[9px] text-neutral-400 block uppercase font-sans">Establecimiento</span>
+                      <span className="text-sm font-bold text-white">
+                        {(codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}
+                      </span>
+                    </div>
+                    <span className="text-neutral-500 font-bold text-lg">-</span>
+                    <div className="px-3 py-1.5 rounded-lg bg-[#18181D] border border-neutral-700 text-center">
+                      <span className="text-[9px] text-neutral-400 block uppercase font-sans">Pto. Emisión</span>
+                      <span className="text-sm font-bold text-white">
+                        {(puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}
+                      </span>
+                    </div>
+                    <span className="text-neutral-500 font-bold text-lg">-</span>
+                    <div className="px-4 py-1.5 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/40 text-center">
+                      <span className="text-[9px] text-[#FF3366] block uppercase font-sans font-bold">Secuencial Activo</span>
+                      <span className="text-base font-extrabold text-[#FF3366]">
+                        {(secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center md:text-right text-[11px] text-neutral-400 max-w-xs leading-relaxed bg-[#18181D] p-3 rounded-xl border border-[#24242C]">
+                  <p>
+                    <strong className="text-emerald-400">Próxima Factura:</strong>{' '}
+                    <span className="font-mono font-bold text-white">
+                      {(codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}-
+                      {(puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}-
+                      {(secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9)}
+                    </span>
+                  </p>
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Cada vez que se emita una factura en el POS, el correlativo avanzará automáticamente +1.
+                  </p>
+                </div>
               </div>
 
-              {/* Teléfono */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Teléfono de Contacto Fiscal *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={telefono}
-                  onChange={e => setTelefono(e.target.value)}
-                  placeholder="+593 99 123 4567"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60"
-                />
-              </div>
+              {/* Form Inputs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                {/* Código Establecimiento */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Establecimiento (3 dígitos) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={3}
+                    value={codigoEstablecimiento}
+                    onChange={e => setCodigoEstablecimiento(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                    onBlur={() => setCodigoEstablecimiento(prev => (prev.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3))}
+                    placeholder="001"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Primer bloque de la serie (ej. <strong>001</strong>)
+                  </span>
+                </div>
 
-              {/* Email */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Correo Electrónico (Email Notificaciones) *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="contacto@devolutionink.com"
-                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
-                />
+                {/* Punto de Emisión */}
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">
+                    Punto de Emisión (3 dígitos) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={3}
+                    value={puntoEmision}
+                    onChange={e => setPuntoEmision(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                    onBlur={() => setPuntoEmision(prev => (prev.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3))}
+                    placeholder="001"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Segundo bloque de la serie (ej. <strong>001</strong>)
+                  </span>
+                </div>
+
+                {/* Secuencial Factura */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-semibold text-neutral-300">
+                      Secuencial Factura (9 dígitos) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setSecuencialFactura('000000001')}
+                      className="text-[10px] text-[#FF3366] hover:underline font-mono"
+                      title="Reiniciar a 000000001"
+                    >
+                      Reset 001
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={9}
+                    value={secuencialFactura}
+                    onChange={e => setSecuencialFactura(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    onBlur={() => setSecuencialFactura(prev => (prev.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9))}
+                    placeholder="000000001"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-[#FF3366] font-mono focus:border-[#FF3366] text-center text-sm font-extrabold tracking-wider shadow-inner"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    9 dígitos numéricos: ej. <strong>000000001</strong>
+                  </span>
+                </div>
+
+                {/* Secuencial Nota de Venta */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="font-semibold text-neutral-300">
+                      Secuencial Nota Venta (9 dígitos)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setSecuencialNotaVenta('000000001')}
+                      className="text-[10px] text-neutral-400 hover:text-white font-mono"
+                      title="Reiniciar a 000000001"
+                    >
+                      Reset 001
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={9}
+                    value={secuencialNotaVenta}
+                    onChange={e => setSecuencialNotaVenta(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                    onBlur={() => setSecuencialNotaVenta(prev => (prev.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9))}
+                    placeholder="000000001"
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
+                  />
+                  <span className="text-[10px] text-neutral-500 mt-1 block">
+                    Correlativo para notas de venta RIMPE
+                  </span>
+                </div>
               </div>
             </div>
           </div>

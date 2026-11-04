@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Users,
   Search,
@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Calendar,
-  ReceiptText,
+  Receipt,
   Clock,
   Sparkles,
   Edit2,
@@ -25,7 +25,14 @@ import {
   Building2,
   RefreshCw,
   CheckCircle2,
-  Globe,
+  Share2,
+  FileText,
+  DollarSign,
+  UserCheck,
+  Camera,
+  Image as ImageIcon,
+  Plus,
+  UploadCloud,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ClientProfile, SaleRecord } from '../../types';
@@ -42,6 +49,9 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     clients,
     sales,
     appointments,
+    galleryPhotos,
+    artists,
+    addGalleryPhoto,
     formatMoney,
     addClient,
     updateClient,
@@ -49,12 +59,26 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setActiveTab,
   } = useStudio();
 
+  // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
-  const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
-  const [activeTabSub, setActiveTabSub] = useState<'sales' | 'appointments' | 'medical' | 'body_map'>('sales');
+  const [consentFilter, setConsentFilter] = useState<'all' | 'signed' | 'pending'>('all');
 
-  // Modal State for New/Edit Client
+  // Modal 1: Visualizar Historial Completo del Cliente
+  const [viewHistoryClient, setViewHistoryClient] = useState<ClientProfile | null>(null);
+  const [historyTab, setHistoryTab] = useState<'sales' | 'appointments' | 'medical' | 'gallery'>('sales');
+  const [isClientPhotoUploadOpen, setIsClientPhotoUploadOpen] = useState(false);
+  const [clientPhotoTitle, setClientPhotoTitle] = useState('');
+  const [clientPhotoCategory, setClientPhotoCategory] = useState<'tattoo' | 'piercing' | 'healed' | 'flash' | 'coverup'>('tattoo');
+  const [clientPhotoArtistId, setClientPhotoArtistId] = useState('');
+  const [clientPhotoPlacement, setClientPhotoPlacement] = useState('');
+  const [clientPhotoStyle, setClientPhotoStyle] = useState('');
+  const [clientPhotoIsHealed, setClientPhotoIsHealed] = useState(false);
+  const [clientPhotoImagePreview, setClientPhotoImagePreview] = useState('');
+  const [clientPhotoUrl, setClientPhotoUrl] = useState('');
+  const clientPhotoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Modal 2: Crear / Editar Cliente
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
 
@@ -74,7 +98,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const [formConsent, setFormConsent] = useState(true);
   const [formTags, setFormTags] = useState('Frecuente');
 
-  // Metadatos SRI
+  // SRI Metadata in Form
   const [formTradeName, setFormTradeName] = useState('');
   const [formRegimen, setFormRegimen] = useState('');
   const [formTaxpayerType, setFormTaxpayerType] = useState('');
@@ -83,11 +107,22 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const [isSearchingSri, setIsSearchingSri] = useState(false);
   const [sriMessage, setSriMessage] = useState<{ text: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
-  // Unified dynamic clients list (includes registered clients + discovers any client names in sales/appointments)
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setViewHistoryClient(null);
+        setIsModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Unified dynamic clients list (includes registered clients + discovers client names in sales & appointments)
   const unifiedClients = useMemo(() => {
     const list: ClientProfile[] = [...clients];
 
-    // Look for any client in sales not yet in clients list
     sales.forEach(s => {
       if (!s.clientName) return;
       const clean = s.clientName.trim();
@@ -105,7 +140,6 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
       }
     });
 
-    // Look for any client in appointments not yet in list
     appointments.forEach(a => {
       if (!a.clientName) return;
       const clean = a.clientName.trim();
@@ -127,114 +161,100 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     return list;
   }, [clients, sales, appointments]);
 
-  // Filter clients
+  // Compute metrics for each client
+  const clientsWithMetrics = useMemo(() => {
+    return unifiedClients.map(client => {
+      const clientNameNorm = client.name.trim().toLowerCase();
+
+      // Matched sales
+      const clientSales = sales
+        .filter(s => {
+          const nameMatch = s.clientName && s.clientName.trim().toLowerCase() === clientNameNorm;
+          const phoneMatch = client.phone && s.clientPhone && s.clientPhone === client.phone;
+          const dniMatch = client.dni && s.clientDni && s.clientDni.toLowerCase() === client.dni.toLowerCase();
+          return nameMatch || phoneMatch || dniMatch;
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Matched appointments
+      const clientAppointments = appointments
+        .filter(a => {
+          const nameMatch = a.clientName && a.clientName.trim().toLowerCase() === clientNameNorm;
+          const phoneMatch = client.phone && a.clientPhone && a.clientPhone === client.phone;
+          return nameMatch || phoneMatch;
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      const totalSpent = clientSales.reduce(
+        (acc, s) => acc + (s.status !== 'cancelled' ? s.total : 0),
+        0
+      );
+      const totalVisits = clientSales.length;
+      const totalHours = clientSales.reduce((acc, s) => acc + (s.hours || 0), 0);
+      const lastVisitDate = clientSales[0]?.date || clientAppointments[0]?.date || client.createdAt || null;
+
+      // Fav artist
+      const artistCounts: { [name: string]: number } = {};
+      clientSales.forEach(s => {
+        if (s.artistName) artistCounts[s.artistName] = (artistCounts[s.artistName] || 0) + 1;
+      });
+      clientAppointments.forEach(a => {
+        if (a.artistName) artistCounts[a.artistName] = (artistCounts[a.artistName] || 0) + 1;
+      });
+
+      let favArtist = 'Sin registro';
+      let maxC = 0;
+      Object.entries(artistCounts).forEach(([aName, c]) => {
+        if (c > maxC) {
+          maxC = c;
+          favArtist = aName;
+        }
+      });
+
+      return {
+        client,
+        clientSales,
+        clientAppointments,
+        totalSpent,
+        totalVisits,
+        totalHours,
+        lastVisitDate,
+        favArtist,
+      };
+    });
+  }, [unifiedClients, sales, appointments]);
+
+  // Filtered clients list
   const filteredClients = useMemo(() => {
-    return unifiedClients.filter(c => {
+    return clientsWithMetrics.filter(({ client }) => {
       const q = searchTerm.toLowerCase();
       const matchesSearch =
         !q ||
-        c.name.toLowerCase().includes(q) ||
-        (c.phone && c.phone.toLowerCase().includes(q)) ||
-        (c.dni && c.dni.toLowerCase().includes(q)) ||
-        (c.email && c.email.toLowerCase().includes(q)) ||
-        (c.instagram && c.instagram.toLowerCase().includes(q));
+        client.name.toLowerCase().includes(q) ||
+        (client.phone && client.phone.toLowerCase().includes(q)) ||
+        (client.dni && client.dni.toLowerCase().includes(q)) ||
+        (client.email && client.email.toLowerCase().includes(q)) ||
+        (client.instagram && client.instagram.toLowerCase().includes(q));
 
       const matchesTag =
         selectedTagFilter === 'all' ||
-        (c.tags && c.tags.some(t => t.toLowerCase() === selectedTagFilter.toLowerCase()));
+        (client.tags && client.tags.some(t => t.toLowerCase() === selectedTagFilter.toLowerCase()));
 
-      return matchesSearch && matchesTag;
+      const matchesConsent =
+        consentFilter === 'all' ||
+        (consentFilter === 'signed' ? client.consentSigned : !client.consentSigned);
+
+      return matchesSearch && matchesTag && matchesConsent;
     });
-  }, [unifiedClients, searchTerm, selectedTagFilter]);
+  }, [clientsWithMetrics, searchTerm, selectedTagFilter, consentFilter]);
 
-  // Selected Client Object
-  const currentClient = useMemo(() => {
-    if (!selectedClientId) return filteredClients[0] || unifiedClients[0] || null;
-    return unifiedClients.find(c => c.id === selectedClientId) || filteredClients[0] || unifiedClients[0] || null;
-  }, [selectedClientId, unifiedClients, filteredClients]);
+  // Overall KPIs
+  const totalClientsCount = unifiedClients.length;
+  const totalStudioRevenue = clientsWithMetrics.reduce((acc, c) => acc + c.totalSpent, 0);
+  const signedConsentCount = unifiedClients.filter(c => c.consentSigned).length;
+  const sriVerifiedCount = unifiedClients.filter(c => c.sriVerified).length;
 
-  // Client's complete sales history
-  const clientSales = useMemo(() => {
-    if (!currentClient) return [];
-    const clientNameNorm = currentClient.name.trim().toLowerCase();
-    return sales
-      .filter(s => {
-        const nameMatch = s.clientName && s.clientName.trim().toLowerCase() === clientNameNorm;
-        const phoneMatch = currentClient.phone && s.clientPhone && s.clientPhone === currentClient.phone;
-        const dniMatch = currentClient.dni && s.clientDni && s.clientDni.toLowerCase() === currentClient.dni.toLowerCase();
-        return nameMatch || phoneMatch || dniMatch;
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [currentClient, sales]);
-
-  // Client's complete appointments history
-  const clientAppointments = useMemo(() => {
-    if (!currentClient) return [];
-    const clientNameNorm = currentClient.name.trim().toLowerCase();
-    return appointments
-      .filter(a => {
-        const nameMatch = a.clientName && a.clientName.trim().toLowerCase() === clientNameNorm;
-        const phoneMatch = currentClient.phone && a.clientPhone && a.clientPhone === currentClient.phone;
-        return nameMatch || phoneMatch;
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [currentClient, appointments]);
-
-  // Aggregate stats for current client
-  const clientStats = useMemo(() => {
-    const totalSpent = clientSales.reduce((acc, s) => acc + (s.status !== 'cancelled' ? s.total : 0), 0);
-    const totalHours = clientSales.reduce((acc, s) => acc + (s.hours || 0), 0);
-    const totalVisits = clientSales.length;
-    const avgTicket = totalVisits > 0 ? totalSpent / totalVisits : 0;
-
-    // Favorite artist
-    const artistCounts: { [name: string]: number } = {};
-    clientSales.forEach(s => {
-      artistCounts[s.artistName] = (artistCounts[s.artistName] || 0) + 1;
-    });
-    clientAppointments.forEach(a => {
-      artistCounts[a.artistName] = (artistCounts[a.artistName] || 0) + 1;
-    });
-
-    let favArtist = 'Sin registro';
-    let maxCount = 0;
-    Object.entries(artistCounts).forEach(([name, count]) => {
-      if (count > maxCount) {
-        maxCount = count;
-        favArtist = name;
-      }
-    });
-
-    // Body placements worked on
-    const bodyZones = new Set<string>();
-    clientAppointments.forEach(a => {
-      if (a.bodyPlacement) bodyZones.add(a.bodyPlacement);
-    });
-    clientSales.forEach(s => {
-      if (s.serviceName) {
-        const lower = s.serviceName.toLowerCase();
-        if (lower.includes('antebrazo')) bodyZones.add('Antebrazo');
-        if (lower.includes('espalda')) bodyZones.add('Espalda');
-        if (lower.includes('nostril') || lower.includes('nariz')) bodyZones.add('Nostril / Nariz');
-        if (lower.includes('helix') || lower.includes('oreja') || lower.includes('cartílago')) bodyZones.add('Helix / Oreja');
-        if (lower.includes('costillas')) bodyZones.add('Costillas');
-        if (lower.includes('muslo') || lower.includes('pierna')) bodyZones.add('Muslo / Pierna');
-        if (lower.includes('brazo')) bodyZones.add('Brazo');
-      }
-    });
-
-    return {
-      totalSpent,
-      totalHours,
-      totalVisits,
-      avgTicket,
-      favArtist,
-      bodyZones: Array.from(bodyZones),
-      lastVisitDate: clientSales[0]?.date || clientAppointments[0]?.date || null,
-    };
-  }, [clientSales, clientAppointments]);
-
-  // Handlers for modal
+  // Handlers
   const handleOpenAddModal = () => {
     setEditingClient(null);
     setFormName('');
@@ -285,7 +305,16 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setIsModalOpen(true);
   };
 
-  // Consulta en tiempo real al SRI / Registro Civil
+  const handleDeleteClient = (client: ClientProfile) => {
+    if (confirm(`¿Eliminar la ficha del cliente "${client.name}"? Los comprobantes y ventas previas se conservarán.`)) {
+      deleteClient(client.id);
+      if (viewHistoryClient?.id === client.id) {
+        setViewHistoryClient(null);
+      }
+    }
+  };
+
+  // Real-time lookup with SRI / Registro Civil
   const handleLookupSri = async (dniValue?: string) => {
     const targetDni = (dniValue || formDni || '').trim();
     if (!targetDni) {
@@ -312,51 +341,32 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
         setFormSriStatus(res.estado || 'ACTIVO');
         setFormSriVerified(true);
 
-        const sourceLabel = res.source === 'SRI_CATASTRO' ? 'Catastro SRI' :
-                            res.source === 'SRI_PERSONA' ? 'Persona SRI' :
-                            res.source === 'REGISTRO_CIVIL' ? 'Registro Civil' : 'SRI Móvil';
+        const sourceLabel =
+          res.source === 'SRI_CATASTRO'
+            ? 'Catastro SRI'
+            : res.source === 'SRI_PERSONA'
+            ? 'Persona SRI'
+            : res.source === 'REGISTRO_CIVIL'
+            ? 'Registro Civil'
+            : 'SRI Móvil';
 
         setSriMessage({
-          text: `✓ Identificación verificada (${sourceLabel}): ${res.nombre}${res.regimen ? ` · Régimen ${res.regimen}` : ''}`,
+          text: `✓ Identificación verificada (${sourceLabel}): ${res.nombre}${
+            res.regimen ? ` • Régimen ${res.regimen}` : ''
+          }`,
           type: 'success',
         });
       } else {
         setSriMessage({
-          text: res.error || 'No se encontraron registros para esta identificación en el SRI ni Registro Civil.',
+          text: res.error || 'No se encontraron registros en el SRI ni Registro Civil para esta identificación.',
           type: 'error',
         });
       }
     } catch {
       setSriMessage({
-        text: 'Error de conexión al consultar los servicios del SRI.',
+        text: 'Error de conexión al consultar los servicios tributarios del SRI.',
         type: 'error',
       });
-    } finally {
-      setIsSearchingSri(false);
-    }
-  };
-
-  // Actualizar un cliente seleccionado directamente desde el panel de detalle
-  const handleSyncCurrentClientWithSri = async () => {
-    if (!currentClient || !currentClient.dni) return;
-    setIsSearchingSri(true);
-    try {
-      const res = await consultarIdentificacion(currentClient.dni);
-      if (res.found && res.nombre) {
-        updateClient(currentClient.id, {
-          name: res.nombre,
-          tradeName: res.nombreComercial || currentClient.tradeName,
-          taxpayerRegime: res.regimen || currentClient.taxpayerRegime,
-          taxpayerType: res.tipoPersona || res.tipoContribuyente || currentClient.taxpayerType,
-          sriStatus: res.estado || 'ACTIVO',
-          sriVerified: true,
-        });
-        alert(`✓ Ficha actualizada con el SRI: ${res.nombre} (Régimen: ${res.regimen || 'GENERAL'})`);
-      } else {
-        alert(res.error || 'No se encontró información tributaria actualizada en el SRI.');
-      }
-    } catch {
-      alert('Error de conexión con el SRI.');
     } finally {
       setIsSearchingSri(false);
     }
@@ -396,59 +406,37 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     if (editingClient) {
       updateClient(editingClient.id, clientData);
     } else {
-      const created = addClient(clientData);
-      setSelectedClientId(created.id);
+      addClient(clientData);
     }
 
     setIsModalOpen(false);
   };
 
-  const handleDeleteClient = (client: ClientProfile) => {
-    if (confirm(`¿Eliminar la ficha del cliente "${client.name}"? Los tickets y citas históricas se conservarán.`)) {
-      deleteClient(client.id);
-      if (selectedClientId === client.id) {
-        setSelectedClientId('');
-      }
-    }
-  };
-
-  const handleCobrarEnPos = () => {
-    if (currentClient && onSelectClientForPos) {
-      onSelectClientForPos(currentClient);
+  const handleCobrarEnPos = (client: ClientProfile) => {
+    if (onSelectClientForPos) {
+      onSelectClientForPos(client);
     }
     setActiveTab('pos');
   };
 
-  const handleExportClientDossier = () => {
-    if (!currentClient) return;
+  const handleExportClientDossier = (client: ClientProfile, clientSales: SaleRecord[]) => {
     const lines = [
-      `"EXPEDIENTE CLÍNICO & HISTORIAL DE CLIENTE - ${currentClient.name.toUpperCase()}"`,
+      `"EXPEDIENTE CLÍNICO & HISTORIAL DE CLIENTE - ${client.name.toUpperCase()}"`,
       `"Generado: ${new Date().toLocaleString('es-EC')}"`,
-      `"Teléfono: ${currentClient.phone || 'N/A'}"`,
-      `"Cédula / RUC / Pasaporte: ${currentClient.dni || 'N/A'}"`,
-      `"Email: ${currentClient.email || 'N/A'}"`,
-      `"Instagram: ${currentClient.instagram || 'N/A'}"`,
-      `"Ficha Consentimiento Firmada: ${currentClient.consentSigned ? 'SÍ' : 'NO'}"`,
-      `"Alergias: ${currentClient.allergies || 'Ninguna registrada'}"`,
-      `"Condiciones Médicas: ${currentClient.medicalConditions || 'Ninguna'}"`,
-      `"Notas de Cicatrización: ${currentClient.skinNotes || 'N/A'}"`,
-      '""',
-      '"RESUMEN EN EL NEGOCIO"',
-      `"Total Facturado (LTV)","${formatMoney(clientStats.totalSpent)}"`,
-      `"Total Sesiones Realizadas","${clientStats.totalVisits}"`,
-      `"Horas Tatuadas Acumuladas","${clientStats.totalHours} hrs"`,
-      `"Artista Habitual","${clientStats.favArtist}"`,
+      `"Teléfono: ${client.phone || 'N/A'}"`,
+      `"Cédula / RUC / Pasaporte: ${client.dni || 'N/A'}"`,
+      `"Email: ${client.email || 'N/A'}"`,
+      `"Instagram: ${client.instagram || 'N/A'}"`,
+      `"Ficha Consentimiento Firmada: ${client.consentSigned ? 'SÍ' : 'NO'}"`,
+      `"Alergias: ${client.allergies || 'Ninguna registrada'}"`,
+      `"Condiciones Médicas: ${client.medicalConditions || 'Ninguna'}"`,
+      `"Notas de Piel: ${client.skinNotes || 'N/A'}"`,
       '""',
       '"HISTORIAL DE FACTURAS Y SERVICIOS"',
-      '"Factura","Fecha","Servicio","Artista","Horas","Total Pagado","Método Pago","Ficha Sanitaria"',
-      ...clientSales.map(s =>
-        `"${s.invoiceNumber}","${s.date}","${s.serviceName.replace(/"/g, '""')}","${s.artistName}","${s.hours || 0}","${s.total.toFixed(2)}","${s.paymentMethod}","${s.consentFormSigned ? 'SÍ' : 'NO'}"`
-      ),
-      '""',
-      '"HISTORIAL DE CITAS Y AGENDAMIENTO"',
-      '"ID Cita","Fecha","Horario","Servicio","Artista","Zona Cuerpo","Seña","Estado"',
-      ...clientAppointments.map(a =>
-        `"${a.id}","${a.date}","${a.startTime}-${a.endTime}","${a.serviceName.replace(/"/g, '""')}","${a.artistName}","${a.bodyPlacement || 'N/A'}","${a.depositAmount}","${a.status}"`
+      '"Factura","Fecha","Servicio","Artista","Total Pagado","Método Pago"',
+      ...clientSales.map(
+        s =>
+          `"${s.invoiceNumber}","${s.date}","${s.serviceName.replace(/"/g, '""')}","${s.artistName}","${s.total.toFixed(2)}","${s.paymentMethod}"`
       ),
     ];
 
@@ -456,880 +444,1217 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `expediente_${currentClient.name.toLowerCase().replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `expediente_${client.name.toLowerCase().replace(/\s+/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const handleWhatsAppChat = (client: ClientProfile) => {
+    const cleanPhone = (client.phone || '').replace(/\D/g, '');
+    const message = encodeURIComponent(`Hola ${client.name}! Te saludamos de Devolution Ink Tattoo Studio.`);
+    const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${message}` : `https://wa.me/?text=${message}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242A] pb-4">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366] shrink-0"></span>
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">
-              Historial del Cliente & Expediente en el Negocio
-            </h2>
+      {/* Top Banner Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#24242A] pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#FF3366]/15 border border-[#FF3366]/40 flex items-center justify-center text-[#FF3366] shadow-[0_0_12px_rgba(255,51,102,0.25)] shrink-0">
+            <Users className="w-5 h-5" />
           </div>
-          <p className="text-[11px] text-neutral-400">
-            Registro 360° de visitas, facturas previas, citas agendadas, ficha médica/alergias y mapa corporal.
-          </p>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-white uppercase">
+              Directorio & Historial de Clientes
+            </h1>
+            <p className="text-[11px] text-neutral-400">
+              Gestión horizontal de cartera de clientes, visualización de expediente clínico, compras históricas y acciones rápidas.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center flex-wrap gap-2.5">
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_14px_rgba(255,51,102,0.35)]"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Nuevo Cliente / Ficha</span>
-          </button>
+        <button
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_16px_rgba(255,51,102,0.35)] active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>Nuevo Cliente / Ficha</span>
+        </button>
+      </div>
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-[#18181D] border border-[#272730] rounded-2xl p-4">
+          <div className="flex items-center justify-between text-neutral-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+            <span>Cartera Total</span>
+            <Users className="w-3.5 h-3.5 text-[#FF3366]" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-white font-mono">
+            {totalClientsCount}
+          </div>
+          <div className="text-[10px] text-neutral-500 mt-1">
+            Clientes registrados en estudio
+          </div>
+        </div>
+
+        <div className="bg-[#18181D] border border-[#272730] rounded-2xl p-4">
+          <div className="flex items-center justify-between text-neutral-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+            <span>Facturación Cartera</span>
+            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-emerald-400 font-mono">
+            {formatMoney(totalStudioRevenue)}
+          </div>
+          <div className="text-[10px] text-neutral-500 mt-1">
+            Valor acumulado en sesiones
+          </div>
+        </div>
+
+        <div className="bg-[#18181D] border border-[#272730] rounded-2xl p-4">
+          <div className="flex items-center justify-between text-neutral-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+            <span>Fichas Sanitarias</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-white font-mono">
+            {signedConsentCount} <span className="text-xs font-normal text-neutral-400">/ {totalClientsCount}</span>
+          </div>
+          <div className="text-[10px] text-neutral-500 mt-1">
+            Consentimientos al día
+          </div>
+        </div>
+
+        <div className="bg-[#18181D] border border-[#272730] rounded-2xl p-4">
+          <div className="flex items-center justify-between text-neutral-400 text-[10px] font-bold uppercase tracking-wider mb-1">
+            <span>Verificados SRI</span>
+            <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-neutral-200 font-mono">
+            {sriVerifiedCount}
+          </div>
+          <div className="text-[10px] text-neutral-500 mt-1">
+            RUC / Catastro tributario
+          </div>
         </div>
       </div>
 
-      {/* Main 2-Column Responsive Dossier */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
-        {/* LEFT COLUMN: Client Directory (4 / 12) */}
-        <div className="lg:col-span-4 xl:col-span-4 space-y-3.5">
-          {/* Search & Tag Filter */}
-          <div className="p-3.5 rounded-2xl bg-[#18181D] border border-[#272730] space-y-2.5">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Buscar por nombre, teléfono, cédula, RUC o email..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-3.5 pr-9 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"
-              />
-              <Search className="w-4 h-4 text-[#FF3366] absolute right-3 top-2.5" />
-            </div>
+      {/* Filter and Search Bar */}
+      <div className="bg-[#18181D] border border-[#272730] rounded-2xl p-3.5 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+        {/* Search Input */}
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, teléfono, cédula, RUC, email o Instagram..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full bg-[#121215] border border-[#272730] rounded-full pl-9 pr-4 py-2 text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+          />
+        </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'vip', label: 'VIP' },
-                { id: 'coleccionista', label: 'Coleccionista' },
-                { id: 'piercing', label: 'Piercing' },
-                { id: 'frecuente', label: 'Frecuente' },
-              ].map(t => (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Quick Filter: Tags */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            {[
+              { id: 'all', label: 'Todos' },
+              { id: 'vip', label: 'VIP' },
+              { id: 'frecuente', label: 'Frecuente' },
+              { id: 'piercing', label: 'Piercing' },
+              { id: 'nuevo', label: 'Nuevo' },
+            ].map(t => {
+              const isActive = selectedTagFilter === t.id;
+              return (
                 <button
                   key={t.id}
                   onClick={() => setSelectedTagFilter(t.id)}
-                  className={`px-2.5 py-1 text-[10px] rounded-full font-semibold transition-all whitespace-nowrap shrink-0 ${
-                    selectedTagFilter === t.id
-                      ? 'bg-[#FF3366] text-white shadow-[0_0_6px_rgba(255,51,102,0.4)]'
+                  className={`px-3 py-1 text-xs rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                    isActive
+                      ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_rgba(255,51,102,0.4)]'
                       : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
                   }`}
                 >
                   {t.label}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Client List Cards */}
-          <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden max-h-[calc(100vh-280px)] overflow-y-auto divide-y divide-[#23232B]">
-            {filteredClients.length === 0 ? (
-              <div className="p-8 text-center text-xs text-neutral-500">
-                No se encontraron clientes con el criterio de búsqueda.
-              </div>
-            ) : (
-              filteredClients.map(client => {
-                const isSelected = currentClient?.id === client.id || currentClient?.name === client.name;
-                const clientPurchasesCount = sales.filter(s => s.clientName && s.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()).length;
-                const clientAptsCount = appointments.filter(a => a.clientName && a.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()).length;
-
-                return (
-                  <button
-                    key={client.id}
-                    onClick={() => setSelectedClientId(client.id)}
-                    className={`w-full p-3.5 text-left transition-all flex items-start justify-between gap-2.5 ${
-                      isSelected
-                        ? 'bg-[#FF3366]/10 border-l-4 border-l-[#FF3366]'
-                        : 'hover:bg-[#1C1C24]'
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-neutral-200'}`}>
-                          {client.name}
-                        </span>
-                        {client.consentSigned ? (
-                          <span title="Consentimiento firmado" className="inline-flex">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          </span>
-                        ) : (
-                          <span title="Sin consentimiento firmado" className="inline-flex">
-                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-[11px] text-neutral-400 font-mono truncate">
-                        {client.phone || client.dni || client.email || 'Sin contacto directo'}
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {client.tags?.map((t, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#121215] border border-[#2B2B36] text-neutral-300 font-medium"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] font-mono font-bold text-[#FF3366] block">
-                        {clientPurchasesCount} ventas
-                      </span>
-                      {clientAptsCount > 0 && (
-                        <span className="text-[9px] font-mono text-neutral-400 block mt-0.5">
-                          {clientAptsCount} citas
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+          {/* Quick Filter: Consent */}
+          <select
+            value={consentFilter}
+            onChange={e => setConsentFilter(e.target.value as any)}
+            className="bg-[#121215] border border-[#272730] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
+          >
+            <option value="all">Ficha Sanitaria: Todos</option>
+            <option value="signed">✓ Firmados</option>
+            <option value="pending">⚠ Pendientes</option>
+          </select>
         </div>
-
-        {/* RIGHT COLUMN: Full Client Dossier / Expediente (8 / 12) */}
-        {currentClient ? (
-          <div className="lg:col-span-8 xl:col-span-8 space-y-4 sm:space-y-5">
-            {/* Profile Overview Card */}
-            <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242B] pb-4">
-                <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] font-bold text-lg flex items-center justify-center shrink-0 shadow-[0_0_14px_rgba(255,51,102,0.25)]">
-                    {currentClient.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-base sm:text-lg font-bold text-white truncate">
-                        {currentClient.name}
-                      </h2>
-                      {currentClient.tags?.map((tag, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FF3366]/15 border border-[#FF3366]/30 text-[#FF3366]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-neutral-400 mt-1 flex-wrap font-mono">
-                      {currentClient.phone && (
-                        <span className="flex items-center gap-1 text-neutral-300">
-                          <Phone className="w-3 h-3 text-[#FF3366]" />
-                          {currentClient.phone}
-                        </span>
-                      )}
-                      {currentClient.dni && (
-                        <span className="flex items-center gap-1 text-neutral-300">
-                          <span className="text-neutral-500">ID:</span> {currentClient.dni}
-                        </span>
-                      )}
-                      {currentClient.taxpayerRegime && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                          ✓ SRI: {currentClient.taxpayerRegime}
-                        </span>
-                      )}
-                      {currentClient.email && (
-                        <span className="flex items-center gap-1 text-neutral-300">
-                          <Mail className="w-3 h-3 text-[#FF3366]" />
-                          {currentClient.email}
-                        </span>
-                      )}
-                      {currentClient.instagram && (
-                        <span className="text-[#FF3366] font-medium">{currentClient.instagram}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Profile Actions */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {currentClient.dni && (
-                    <button
-                      onClick={handleSyncCurrentClientWithSri}
-                      disabled={isSearchingSri}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1C1C24] border border-[#2B2B36] hover:border-emerald-500/50 text-neutral-200 hover:text-emerald-400 text-xs font-semibold transition-colors disabled:opacity-50"
-                      title="Sincronizar y verificar datos con el SRI y Registro Civil de Ecuador"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
-                      <span className="hidden sm:inline">Verificar SRI</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleCobrarEnPos}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_10px_rgba(255,51,102,0.3)]"
-                    title="Cobrar en terminal POS"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>Cobrar en POS</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenEditModal(currentClient)}
-                    className="p-2 rounded-full bg-[#121215] border border-[#272730] text-neutral-300 hover:text-white hover:border-[#FF3366] transition-colors"
-                    title="Editar ficha del cliente"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    onClick={handleExportClientDossier}
-                    className="p-2 rounded-full bg-[#121215] border border-[#272730] text-neutral-300 hover:text-white hover:border-[#FF3366] transition-colors"
-                    title="Exportar expediente en CSV"
-                  >
-                    <Download className="w-3.5 h-3.5 text-[#FF3366]" />
-                  </button>
-
-                  <button
-                    onClick={() => window.print()}
-                    className="p-2 rounded-full bg-[#121215] border border-[#272730] text-neutral-300 hover:text-white hover:border-[#FF3366] transition-colors"
-                    title="Imprimir ficha del cliente"
-                  >
-                    <Printer className="w-3.5 h-3.5 text-[#FF3366]" />
-                  </button>
-
-                  <button
-                    onClick={() => handleDeleteClient(currentClient)}
-                    className="p-2 rounded-full bg-[#121215] border border-[#272730] text-neutral-400 hover:text-[#FF3366] transition-colors"
-                    title="Eliminar de catálogo"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* KPI Strip of Client in the Studio */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#26262F]">
-                  <span className="text-[10px] text-neutral-400 block mb-0.5">Total Invertido en Estudio</span>
-                  <div className="text-base sm:text-lg font-bold font-mono text-emerald-400">
-                    {formatMoney(clientStats.totalSpent)}
-                  </div>
-                  <span className="text-[10px] text-neutral-500 block mt-0.5">
-                    Ticket Prom: {formatMoney(clientStats.avgTicket)}
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#26262F]">
-                  <span className="text-[10px] text-neutral-400 block mb-0.5">Sesiones Realizadas</span>
-                  <div className="text-base sm:text-lg font-bold font-mono text-white">
-                    {clientStats.totalVisits} visitas
-                  </div>
-                  <span className="text-[10px] text-neutral-500 block mt-0.5">
-                    {clientAppointments.length} citas en agenda
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#26262F]">
-                  <span className="text-[10px] text-neutral-400 block mb-0.5">Horas Tatuadas</span>
-                  <div className="text-base sm:text-lg font-bold font-mono text-[#FF3366]">
-                    {clientStats.totalHours} hrs
-                  </div>
-                  <span className="text-[10px] text-neutral-500 block mt-0.5">En cabinas</span>
-                </div>
-
-                <div className="p-3 rounded-xl bg-[#121215] border border-[#26262F]">
-                  <span className="text-[10px] text-neutral-400 block mb-0.5">Artista Habitual</span>
-                  <div className="text-xs sm:text-sm font-bold text-white truncate">
-                    {clientStats.favArtist}
-                  </div>
-                  <span className="text-[10px] text-neutral-500 block mt-0.5">
-                    Ficha Sanitaria:{' '}
-                    <strong className={currentClient.consentSigned ? 'text-emerald-400' : 'text-amber-400'}>
-                      {currentClient.consentSigned ? 'Al día' : 'Pendiente'}
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Dossier Tabs Navigation */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-[#24242A]">
-              {[
-                { id: 'sales', label: `Historial de Facturas & Ventas (${clientSales.length})`, icon: ReceiptText },
-                { id: 'appointments', label: `Citas & Agendamiento (${clientAppointments.length})`, icon: Calendar },
-                { id: 'medical', label: 'Ficha Sanitaria, Alergias & Piel', icon: HeartPulse },
-                { id: 'body_map', label: `Zonas Corporales (${clientStats.bodyZones.length})`, icon: Sparkles },
-              ].map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeTabSub === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTabSub(tab.id as any)}
-                    className={`flex items-center gap-2 py-2 px-3.5 rounded-full text-xs transition-all whitespace-nowrap shrink-0 ${
-                      isActive
-                        ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_10px_rgba(255,51,102,0.35)]'
-                        : 'bg-[#18181D] text-neutral-400 hover:text-white border border-[#272730]'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* TAB CONTENT 1: HISTORIAL DE VENTAS Y PAGOS */}
-            {activeTabSub === 'sales' && (
-              <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
-                <div className="p-4 border-b border-[#24242B] flex items-center justify-between">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    Registro de Pagos y Facturación del Cliente
-                  </span>
-                  <span className="text-xs font-mono font-bold text-[#FF3366]">
-                    Total: {formatMoney(clientStats.totalSpent)}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
-                        <th className="py-3 px-4 whitespace-nowrap">Factura</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Fecha</th>
-                        <th className="py-3 px-4">Servicio Realizado</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Artista</th>
-                        <th className="py-3 px-4 text-center whitespace-nowrap">Horas</th>
-                        <th className="py-3 px-4 text-right whitespace-nowrap">Importe</th>
-                        <th className="py-3 px-4 whitespace-nowrap">Método</th>
-                        <th className="py-3 px-4 text-center whitespace-nowrap">Ficha</th>
-                        <th className="py-3 px-4 text-center whitespace-nowrap">Ticket</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#222228]">
-                      {clientSales.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="py-10 text-center text-neutral-500">
-                            Aún no hay compras o servicios facturados a nombre de este cliente.
-                            <button
-                              onClick={handleCobrarEnPos}
-                              className="text-[#FF3366] ml-2 font-semibold hover:underline"
-                            >
-                              + Cobrar primera sesión en POS
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        clientSales.map(sale => (
-                          <tr key={sale.id} className="hover:bg-[#1E1E25] transition-colors">
-                            <td className="py-3 px-4 font-mono font-bold text-[#FF3366] whitespace-nowrap">
-                              {sale.invoiceNumber}
-                            </td>
-                            <td className="py-3 px-4 font-mono text-neutral-400 whitespace-nowrap">
-                              {new Date(sale.date).toLocaleDateString('es-ES', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </td>
-                            <td className="py-3 px-4 min-w-[200px]">
-                              <div className="font-semibold text-white">{sale.serviceName}</div>
-                              {sale.notes && (
-                                <div className="text-[10px] text-neutral-400 truncate max-w-[280px]">
-                                  {sale.notes}
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-neutral-300 whitespace-nowrap">{sale.artistName}</td>
-                            <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
-                              {sale.hours ? `${sale.hours}h` : '—'}
-                            </td>
-                            <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
-                              {formatMoney(sale.total)}
-                            </td>
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] bg-[#121215] border border-[#272730] uppercase font-mono text-neutral-300">
-                                {sale.paymentMethod}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-center">
-                              {sale.consentFormSigned ? (
-                                <span className="inline-flex text-emerald-400" title="Consentimiento firmado">
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                </span>
-                              ) : (
-                                <span className="inline-flex text-neutral-600" title="Sin ficha médica">
-                                  <ShieldAlert className="w-3.5 h-3.5" />
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-center whitespace-nowrap">
-                              <button
-                                onClick={() => onOpenReceipt(sale)}
-                                className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors"
-                                title="Ver recibo e imprimir ticket"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT 2: HISTORIAL DE CITAS Y AGENDAMIENTO */}
-            {activeTabSub === 'appointments' && (
-              <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden space-y-3">
-                <div className="p-4 border-b border-[#24242B] flex items-center justify-between">
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    Historial de Citas, Horarios y Anticipos
-                  </span>
-                  <button
-                    onClick={() => setActiveTab('appointments')}
-                    className="text-xs text-[#FF3366] font-semibold hover:underline"
-                  >
-                    Abrir Agenda Completa →
-                  </button>
-                </div>
-
-                <div className="divide-y divide-[#23232B]">
-                  {clientAppointments.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-neutral-500">
-                      No hay citas registradas para este cliente.
-                    </div>
-                  ) : (
-                    clientAppointments.map(apt => (
-                      <div key={apt.id} className="p-4 hover:bg-[#1C1C24] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-white">
-                              {apt.date} · {apt.startTime} - {apt.endTime}
-                            </span>
-                            <span
-                              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                                apt.status === 'completed'
-                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                  : apt.status === 'in_progress'
-                                  ? 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/40'
-                                  : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                              }`}
-                            >
-                              {apt.status === 'completed'
-                                ? 'Finalizada'
-                                : apt.status === 'in_progress'
-                                ? 'En Cabina'
-                                : 'Programada'}
-                            </span>
-                          </div>
-
-                          <div className="font-semibold text-white text-sm">{apt.serviceName}</div>
-                          <div className="text-[11px] text-neutral-400 flex items-center gap-2 flex-wrap">
-                            <span>Artista: <strong className="text-neutral-200">{apt.artistName}</strong></span>
-                            {apt.bodyPlacement && <span>· Zona: <strong className="text-neutral-200">{apt.bodyPlacement}</strong></span>}
-                            {apt.sizeApprox && <span>· Tamaño: {apt.sizeApprox}</span>}
-                          </div>
-                          {apt.notes && <div className="text-[11px] text-neutral-400 italic">“{apt.notes}”</div>}
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <div className="font-mono font-bold text-white text-sm">
-                            {formatMoney(apt.estimatedPrice)}
-                          </div>
-                          {apt.depositAmount > 0 && (
-                            <span className="text-[10px] font-mono text-emerald-400 block">
-                              Seña: {formatMoney(apt.depositAmount)} ({apt.depositPaid ? 'Pagada' : 'Pendiente'})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT 3: FICHA SANITARIA, ALERGIAS Y CONDICIONES */}
-            {activeTabSub === 'medical' && (
-              <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
-                <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <HeartPulse className="w-4 h-4 text-[#FF3366]" />
-                    <span>Ficha Sanitaria & Antecedentes Médicos para Cabina</span>
-                  </h3>
-                  <button
-                    onClick={() => handleOpenEditModal(currentClient)}
-                    className="text-xs text-[#FF3366] font-semibold hover:underline"
-                  >
-                    Modificar Ficha →
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div className="p-4 rounded-xl bg-[#121215] border border-[#272730] space-y-1.5">
-                    <span className="text-[11px] font-bold text-[#FF3366] flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Alergias Conocidas
-                    </span>
-                    <p className="text-neutral-200 font-medium">
-                      {currentClient.allergies || 'Sin alergias registradas por el cliente.'}
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#121215] border border-[#272730] space-y-1.5">
-                    <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
-                      <FileCheck className="w-3.5 h-3.5" />
-                      Condiciones Médicas / Medicación
-                    </span>
-                    <p className="text-neutral-200 font-medium">
-                      {currentClient.medicalConditions || 'Sin enfermedades ni medicación que afecte el procedimiento.'}
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#121215] border border-[#272730] space-y-1.5">
-                    <span className="text-[11px] font-bold text-neutral-300">Tipo de Piel & Cicatrización</span>
-                    <p className="text-neutral-200">
-                      {currentClient.skinNotes || 'Piel normal. Tolera films protectores tipo Dermalize o Saniderm.'}
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#121215] border border-[#272730] space-y-1.5">
-                    <span className="text-[11px] font-bold text-neutral-300">Contacto de Emergencia & Datos Clínicos</span>
-                    <p className="text-neutral-200">
-                      {currentClient.emergencyContact || 'No especificado.'}
-                    </p>
-                    <div className="text-[10px] text-neutral-400 pt-1">
-                      Grupo Sanguíneo: <strong className="text-white">{currentClient.bloodType || 'N/D'}</strong> · Nacimiento: <strong className="text-white">{currentClient.birthDate || 'N/D'}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-[#121215] border border-[#272730] flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-white block">Documento de Consentimiento Informado</span>
-                    <span className="text-[11px] text-neutral-400">
-                      Ficha firmada requerida por la normativa sanitaria de body art.
-                    </span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                    currentClient.consentSigned
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                      : 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                  }`}>
-                    {currentClient.consentSigned ? 'Firmado y Válido' : 'Pendiente de Firma'}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* TAB CONTENT 4: MAPA CORPORAL Y ZONAS */}
-            {activeTabSub === 'body_map' && (
-              <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
-                <div className="border-b border-[#24242B] pb-3">
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                    Mapa Corporal & Zonas Trabajadas en el Estudio
-                  </h3>
-                  <p className="text-[11px] text-neutral-400">
-                    Historial de áreas donde el cliente se ha tatuado o anillado
-                  </p>
-                </div>
-
-                {clientStats.bodyZones.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-neutral-500">
-                    Aún no se han especificado ubicaciones corporales en las citas de este cliente.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    {clientStats.bodyZones.map((zone, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3.5 rounded-xl bg-[#121215] border border-[#272730] flex items-center gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/30 text-[#FF3366] flex items-center justify-center font-bold text-xs shrink-0">
-                          #{idx + 1}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-bold text-white text-xs block truncate">{zone}</span>
-                          <span className="text-[10px] text-neutral-400">Zona intervenida</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="lg:col-span-8 p-12 text-center rounded-2xl bg-[#18181D] border border-[#272730] text-neutral-500 text-xs">
-            Selecciona un cliente de la lista para ver su expediente e historial completo.
-          </div>
-        )}
       </div>
 
-      {/* MODAL: ALTA O EDICIÓN DE CLIENTE Y FICHA MÉDICA */}
+      {/* =========================================================================
+          HORIZONTAL CLIENTS TABLE (DISEÑO HORIZONTAL TIPO TABLA)
+          ========================================================================= */}
+      <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-left">
+            <thead>
+              <tr className="bg-[#121215] border-b border-[#24242B] text-neutral-400 font-medium">
+                <th className="py-3.5 px-4 whitespace-nowrap">Cliente / Identificación</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Contacto & Redes</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Ficha Sanitaria</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Total Invertido</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Sesiones</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Última Visita</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Artista Habitual</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#222228]">
+              {filteredClients.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-neutral-500">
+                    No se encontraron clientes con los criterios de búsqueda seleccionados.
+                  </td>
+                </tr>
+              ) : (
+                filteredClients.map(({ client, clientSales, totalSpent, totalVisits, lastVisitDate, favArtist }) => {
+                  return (
+                    <tr
+                      key={client.id}
+                      className="hover:bg-[#1E1E25] transition-colors"
+                    >
+                      {/* Cliente / Identificación */}
+                      <td className="py-3 px-4 min-w-[220px]">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] font-bold text-xs flex items-center justify-center shrink-0">
+                            {client.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white text-xs truncate">
+                                {client.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {client.dni ? (
+                                <span className="font-mono text-[10px] text-neutral-400 bg-[#121215] px-1.5 py-0.2 rounded border border-[#272730]">
+                                  {client.dni}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-neutral-600 italic">Sin Cédula/RUC</span>
+                              )}
+                              {client.sriVerified && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                                  ✓ SRI
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Contacto & Redes */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="space-y-0.5">
+                          {client.phone ? (
+                            <div className="flex items-center gap-1.5 text-neutral-200 font-mono text-[11px]">
+                              <Phone className="w-3 h-3 text-[#FF3366]" />
+                              <span>{client.phone}</span>
+                            </div>
+                          ) : (
+                            <span className="text-neutral-600 text-[10px] italic">Sin teléfono</span>
+                          )}
+                          {client.email && (
+                            <div className="flex items-center gap-1.5 text-neutral-400 text-[10px] truncate max-w-[170px]">
+                              <Mail className="w-3 h-3 text-neutral-500" />
+                              <span className="truncate">{client.email}</span>
+                            </div>
+                          )}
+                          {client.instagram && (
+                            <div className="text-[10px] text-[#FF3366] font-medium">
+                              {client.instagram}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Ficha Sanitaria & Alergias */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="space-y-1">
+                          {client.consentSigned ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              <span>Consentimiento Firmado</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                              <ShieldAlert className="w-3 h-3 text-amber-400" />
+                              <span>Sin Ficha Firmada</span>
+                            </span>
+                          )}
+                          {client.allergies ? (
+                            <div className="text-[10px] text-amber-300 font-medium truncate max-w-[160px] flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span className="truncate">{client.allergies}</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-neutral-500">Sin alergias reportadas</div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Total Invertido */}
+                      <td className="py-3 px-4 text-right font-mono whitespace-nowrap">
+                        <span className="font-bold text-emerald-400 text-xs block">
+                          {formatMoney(totalSpent)}
+                        </span>
+                        <span className="text-[9px] text-neutral-500 block">LTV Acumulado</span>
+                      </td>
+
+                      {/* Sesiones Realizadas */}
+                      <td className="py-3 px-4 text-center font-mono whitespace-nowrap">
+                        <span className="font-bold text-white px-2 py-0.5 bg-[#121215] rounded-md border border-[#272730]">
+                          {totalVisits} visitas
+                        </span>
+                      </td>
+
+                      {/* Última Visita */}
+                      <td className="py-3 px-4 whitespace-nowrap font-mono text-[11px] text-neutral-300">
+                        {lastVisitDate ? (
+                          <div>
+                            <span>
+                              {new Date(lastVisitDate).toLocaleDateString('es-EC', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-neutral-600 italic">Sin registros</span>
+                        )}
+                      </td>
+
+                      {/* Artista Habitual */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1 text-neutral-300">
+                          <Sparkles className="w-3 h-3 text-[#FF3366]" />
+                          <span className="font-medium">{favArtist}</span>
+                        </div>
+                      </td>
+
+                      {/* ACCIONES HORIZONTALES: Visualizar Historial, Editar Cliente, Eliminar */}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* ACCIÓN 1: Visualizar Historial */}
+                          <button
+                            onClick={() => {
+                              setViewHistoryClient(client);
+                              setHistoryTab('sales');
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="Ver expediente clínico, historial de compras, citas y comprobantes"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[#FF3366]" />
+                            <span>Visualizar Historial</span>
+                          </button>
+
+                          {/* ACCIÓN 2: Editar Cliente */}
+                          <button
+                            onClick={() => handleOpenEditModal(client)}
+                            className="px-2.5 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            title="Editar datos, contacto y ficha del cliente"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Editar</span>
+                          </button>
+
+                          {/* Acción complementaria: WhatsApp */}
+                          <button
+                            onClick={() => handleWhatsAppChat(client)}
+                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-emerald-600/20 text-neutral-400 hover:text-emerald-400 border border-[#272730] transition-colors cursor-pointer"
+                            title="Escribir por WhatsApp"
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Acción complementaria: Cobrar en POS */}
+                          <button
+                            onClick={() => handleCobrarEnPos(client)}
+                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#FF3366]/20 text-neutral-400 hover:text-[#FF3366] border border-[#272730] transition-colors cursor-pointer"
+                            title="Cargar cliente en Terminal POS para cobrar"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* ACCIÓN 3: Eliminar */}
+                          <button
+                            onClick={() => handleDeleteClient(client)}
+                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-[#272730] transition-colors cursor-pointer"
+                            title="Eliminar cliente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          MODAL 1: VISUALIZAR HISTORIAL COMPLETO DEL CLIENTE (DOSSIER 360°)
+          ========================================================================= */}
+      {viewHistoryClient && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-fadeIn">
+          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-4xl w-full shadow-2xl p-5 sm:p-6 space-y-4 my-auto max-h-[92vh] flex flex-col">
+            {/* Modal Top Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#25252E] pb-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#FF3366]/20 border border-[#FF3366]/40 text-[#FF3366] font-bold text-base flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(255,51,102,0.25)]">
+                  {viewHistoryClient.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <span>{viewHistoryClient.name}</span>
+                    {viewHistoryClient.tags?.map((t, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FF3366]/15 border border-[#FF3366]/30 text-[#FF3366]"
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </h3>
+                  <div className="flex items-center gap-3 text-xs text-neutral-400 mt-0.5 font-mono flex-wrap">
+                    {viewHistoryClient.phone && (
+                      <span className="flex items-center gap-1 text-neutral-300">
+                        <Phone className="w-3 h-3 text-[#FF3366]" />
+                        {viewHistoryClient.phone}
+                      </span>
+                    )}
+                    {viewHistoryClient.dni && (
+                      <span className="text-neutral-300">ID: {viewHistoryClient.dni}</span>
+                    )}
+                    {viewHistoryClient.email && (
+                      <span className="text-neutral-400">{viewHistoryClient.email}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
+                    handleExportClientDossier(viewHistoryClient, matched ? matched.clientSales : []);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-300 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  title="Exportar historial a archivo CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#FF3366]" />
+                  <span>Exportar CSV</span>
+                </button>
+                <button
+                  onClick={() => handleCobrarEnPos(viewHistoryClient)}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1.5 shadow-[0_0_10px_rgba(255,51,102,0.3)] cursor-pointer"
+                  title="Cobrar en terminal POS"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Cobrar en POS</span>
+                </button>
+                <button
+                  onClick={() => setViewHistoryClient(null)}
+                  className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick KPI Strip of selected client */}
+            {(() => {
+              const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
+              const totalSpent = matched ? matched.totalSpent : 0;
+              const totalVisits = matched ? matched.totalVisits : 0;
+              const totalHours = matched ? matched.totalHours : 0;
+              const favArtist = matched ? matched.favArtist : 'Sin registro';
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs shrink-0">
+                  <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block">Total Invertido (LTV)</span>
+                    <span className="font-mono font-bold text-sm text-emerald-400 block mt-0.5">
+                      {formatMoney(totalSpent)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block">Sesiones / Visitas</span>
+                    <span className="font-mono font-bold text-sm text-white block mt-0.5">
+                      {totalVisits} visitas
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block">Horas en Cabina</span>
+                    <span className="font-mono font-bold text-sm text-[#FF3366] block mt-0.5">
+                      {totalHours} hrs
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
+                    <span className="text-[10px] text-neutral-400 block">Artista Frecuente</span>
+                    <span className="font-bold text-xs text-white block mt-0.5 truncate">
+                      {favArtist}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Sub-Tabs: Ventas, Citas, Ficha Médica */}
+            <div className="flex items-center gap-2 border-b border-[#25252E] pb-2 shrink-0">
+              <button
+                onClick={() => setHistoryTab('sales')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  historyTab === 'sales'
+                    ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
+                    : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>Facturas & Comprobantes</span>
+              </button>
+              <button
+                onClick={() => setHistoryTab('appointments')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  historyTab === 'appointments'
+                    ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
+                    : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Citas & Agendamiento</span>
+              </button>
+              <button
+                onClick={() => setHistoryTab('medical')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  historyTab === 'medical'
+                    ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
+                    : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                }`}
+              >
+                <HeartPulse className="w-3.5 h-3.5" />
+                <span>Ficha Médica & Bioseguridad</span>
+              </button>
+
+              {/* Tab 4: Galería de Fotos del Cliente */}
+              {(() => {
+                const cPhotos = galleryPhotos.filter(
+                  p => (p.clientId && p.clientId === viewHistoryClient.id) ||
+                       (p.clientName && p.clientName.toLowerCase().trim() === viewHistoryClient.name.toLowerCase().trim())
+                );
+                return (
+                  <button
+                    onClick={() => setHistoryTab('gallery')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      historyTab === 'gallery'
+                        ? 'bg-[#FF3366] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)]'
+                        : 'bg-[#121215] text-neutral-400 hover:text-white border border-[#272730]'
+                    }`}
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Galería de Fotos ({cPhotos.length})</span>
+                  </button>
+                );
+              })()}
+            </div>
+
+            {/* Tab Contents */}
+            <div className="overflow-y-auto flex-1 custom-scrollbar">
+              {historyTab === 'sales' && (
+                <div>
+                  {(() => {
+                    const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
+                    const sList = matched ? matched.clientSales : [];
+
+                    if (sList.length === 0) {
+                      return (
+                        <div className="py-12 text-center text-xs text-neutral-500">
+                          Este cliente aún no registra facturas o compras registradas en el sistema.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-[#24242B] text-neutral-400 font-medium bg-[#121215]">
+                            <th className="py-2.5 px-3 whitespace-nowrap">N° Factura</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Servicio / Trabajo</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
+                            <th className="py-2.5 px-3 text-right whitespace-nowrap">Total Pagado</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Forma de Pago</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Comprobante</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#222228]">
+                          {sList.map(sale => (
+                            <tr key={sale.id} className="hover:bg-[#1A1A22] transition-colors">
+                              <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">
+                                {sale.invoiceNumber}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap text-[11px]">
+                                {new Date(sale.date).toLocaleDateString('es-EC')}
+                              </td>
+                              <td className="py-2.5 px-3 text-neutral-200">
+                                {sale.serviceName}
+                              </td>
+                              <td className="py-2.5 px-3 font-medium text-neutral-300 whitespace-nowrap">
+                                {sale.artistName}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                                {formatMoney(sale.total)}
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap uppercase text-[10px] font-mono text-neutral-400">
+                                {sale.paymentMethod}
+                              </td>
+                              <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                <button
+                                  onClick={() => onOpenReceipt(sale)}
+                                  className="px-2.5 py-1 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  title="Ver ticket térmico o factura A4"
+                                >
+                                  <FileCheck className="w-3 h-3" />
+                                  <span>Ticket</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {historyTab === 'appointments' && (
+                <div>
+                  {(() => {
+                    const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
+                    const aList = matched ? matched.clientAppointments : [];
+
+                    if (aList.length === 0) {
+                      return (
+                        <div className="py-12 text-center text-xs text-neutral-500">
+                          No hay citas programadas para este cliente.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-[#24242B] text-neutral-400 font-medium bg-[#121215]">
+                            <th className="py-2.5 px-3 whitespace-nowrap">Fecha / Horario</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Servicio</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Zona Corporal</th>
+                            <th className="py-2.5 px-3 text-right whitespace-nowrap">Seña / Anticipo</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#222228]">
+                          {aList.map(apt => (
+                            <tr key={apt.id} className="hover:bg-[#1A1A22] transition-colors">
+                              <td className="py-2.5 px-3 font-mono text-neutral-300 whitespace-nowrap">
+                                {apt.date} ({apt.startTime} - {apt.endTime})
+                              </td>
+                              <td className="py-2.5 px-3 font-medium text-white">{apt.serviceName}</td>
+                              <td className="py-2.5 px-3 text-neutral-300">{apt.artistName}</td>
+                              <td className="py-2.5 px-3 text-neutral-400">{apt.bodyPlacement || '—'}</td>
+                              <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-semibold">
+                                {formatMoney(apt.depositAmount)}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#252530] text-neutral-300">
+                                  {apt.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {historyTab === 'medical' && (
+                <div className="p-4 bg-[#121215] rounded-2xl border border-[#272730] space-y-3.5 text-xs">
+                  <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
+                    <div className="flex items-center gap-2">
+                      <HeartPulse className="w-4 h-4 text-[#FF3366]" />
+                      <span className="font-bold text-white text-sm">Ficha Médica & Bioseguridad Sanitaria</span>
+                    </div>
+                    {viewHistoryClient.consentSigned ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Consentimiento Sanitario Firmado</span>
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center gap-1">
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>Consentimiento Pendiente de Firma</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <div className="p-3 rounded-xl bg-[#17171C] border border-[#25252E] space-y-1">
+                      <span className="text-[10px] text-neutral-400 font-semibold block">Alergias Conocidas:</span>
+                      <p className="text-amber-300 font-medium">
+                        {viewHistoryClient.allergies || 'Ninguna alergia registrada por el cliente.'}
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#17171C] border border-[#25252E] space-y-1">
+                      <span className="text-[10px] text-neutral-400 font-semibold block">Condiciones Médicas:</span>
+                      <p className="text-neutral-200">
+                        {viewHistoryClient.medicalConditions || 'Sin condiciones médicas preexistentes.'}
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#17171C] border border-[#25252E] space-y-1">
+                      <span className="text-[10px] text-neutral-400 font-semibold block">Tipo de Sangre & Nacimiento:</span>
+                      <p className="text-neutral-200 font-mono">
+                        Tipo: <strong className="text-white">{viewHistoryClient.bloodType || 'No especificado'}</strong> • Nacimiento:{' '}
+                        {viewHistoryClient.birthDate || 'No registrado'}
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#17171C] border border-[#25252E] space-y-1">
+                      <span className="text-[10px] text-neutral-400 font-semibold block">Contacto de Emergencia:</span>
+                      <p className="text-neutral-200">
+                        {viewHistoryClient.emergencyContact || 'Sin contacto de emergencia registrado.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {viewHistoryClient.notes && (
+                    <div className="p-3 rounded-xl bg-[#17171C] border border-[#25252E]">
+                      <span className="text-[10px] text-neutral-400 font-semibold block mb-0.5">Notas del Estudio:</span>
+                      <p className="text-neutral-300 italic">{viewHistoryClient.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: GALERÍA DE FOTOS DEL CLIENTE */}
+              {historyTab === 'gallery' && (
+                <div className="space-y-4">
+                  {(() => {
+                    const cPhotos = galleryPhotos.filter(
+                      p => (p.clientId && p.clientId === viewHistoryClient.id) ||
+                           (p.clientName && p.clientName.toLowerCase().trim() === viewHistoryClient.name.toLowerCase().trim())
+                    );
+
+                    return (
+                      <>
+                        {/* Header & Subir Foto */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[#24242B]">
+                          <div>
+                            <h4 className="font-bold text-white text-xs uppercase flex items-center gap-1.5">
+                              <Camera className="w-3.5 h-3.5 text-[#FF3366]" />
+                              <span>Obras & Seguimiento Fotográfico ({cPhotos.length})</span>
+                            </h4>
+                            <p className="text-[10px] text-neutral-400 mt-0.5">
+                              Tatuajes, perforaciones corporales y control de curación registrados para {viewHistoryClient.name}.
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsClientPhotoUploadOpen(true);
+                              setClientPhotoTitle('');
+                              setClientPhotoPlacement('');
+                              setClientPhotoStyle('');
+                              setClientPhotoArtistId(artists[0]?.id || '');
+                              setClientPhotoCategory('tattoo');
+                              setClientPhotoIsHealed(false);
+                              setClientPhotoImagePreview('');
+                              setClientPhotoUrl('');
+                            }}
+                            className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-[#FF3366] hover:bg-[#E62557] text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Subir Foto del Cliente</span>
+                          </button>
+                        </div>
+
+                        {/* Formulario para subir foto directa al expediente del cliente */}
+                        {isClientPhotoUploadOpen && (
+                          <div className="p-4 bg-[#121215] border border-[#FF3366]/40 rounded-2xl space-y-3 animate-fadeIn">
+                            <div className="flex items-center justify-between border-b border-[#24242A] pb-2">
+                              <span className="font-bold text-xs text-white flex items-center gap-1.5">
+                                <UploadCloud className="w-4 h-4 text-[#FF3366]" />
+                                <span>Adjuntar Fotografía al Expediente de {viewHistoryClient.name}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setIsClientPhotoUploadOpen(false)}
+                                className="text-neutral-400 hover:text-white"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div className="sm:col-span-2">
+                                <label className="block font-semibold text-neutral-300 mb-1">Título de la Obra *</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={clientPhotoTitle}
+                                  onChange={e => setClientPhotoTitle(e.target.value)}
+                                  placeholder={`Ej: Tatuaje Antebrazo - ${viewHistoryClient.name}, Piercing Hélice...`}
+                                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-neutral-300 mb-1">Categoría</label>
+                                <select
+                                  value={clientPhotoCategory}
+                                  onChange={e => setClientPhotoCategory(e.target.value as any)}
+                                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
+                                >
+                                  <option value="tattoo">Tatuaje</option>
+                                  <option value="piercing">Piercing</option>
+                                  <option value="healed">Cicatrizado (Healed)</option>
+                                  <option value="coverup">Cover Up</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-neutral-300 mb-1">Artista Autor</label>
+                                <select
+                                  value={clientPhotoArtistId}
+                                  onChange={e => setClientPhotoArtistId(e.target.value)}
+                                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
+                                >
+                                  {artists.map(art => (
+                                    <option key={art.id} value={art.id}>{art.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-neutral-300 mb-1">Zona Anatómica</label>
+                                <input
+                                  type="text"
+                                  value={clientPhotoPlacement}
+                                  onChange={e => setClientPhotoPlacement(e.target.value)}
+                                  placeholder="Ej: Antebrazo, Costillas, Oreja..."
+                                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block font-semibold text-neutral-300 mb-1">Estilo / Técnica</label>
+                                <input
+                                  type="text"
+                                  value={clientPhotoStyle}
+                                  onChange={e => setClientPhotoStyle(e.target.value)}
+                                  placeholder="Ej: Blackwork, Neotradicional, Fineline..."
+                                  className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                                />
+                              </div>
+
+                              <div className="sm:col-span-2">
+                                <label className="block font-semibold text-neutral-300 mb-1">Imagen (Archivo o URL) *</label>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                  <input
+                                    type="file"
+                                    ref={clientPhotoFileInputRef}
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => {
+                                      const f = e.target.files?.[0];
+                                      if (!f) return;
+                                      const r = new FileReader();
+                                      r.onload = () => {
+                                        setClientPhotoImagePreview(r.result as string);
+                                        setClientPhotoUrl('');
+                                      };
+                                      r.readAsDataURL(f);
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => clientPhotoFileInputRef.current?.click()}
+                                    className="px-3.5 py-1.5 bg-[#202028] hover:bg-[#2B2B36] border border-[#2A2A36] text-white font-semibold rounded-xl text-xs shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <UploadCloud className="w-3.5 h-3.5 text-[#FF3366]" />
+                                    <span>Cargar Archivo</span>
+                                  </button>
+                                  <input
+                                    type="url"
+                                    value={clientPhotoUrl}
+                                    onChange={e => {
+                                      setClientPhotoUrl(e.target.value);
+                                      setClientPhotoImagePreview('');
+                                    }}
+                                    placeholder="O pegar enlace URL..."
+                                    className="flex-1 px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none text-[11px]"
+                                  />
+                                </div>
+                                {(clientPhotoImagePreview || clientPhotoUrl) && (
+                                  <div className="mt-2 w-20 h-20 rounded-xl overflow-hidden border border-[#2B2B36]">
+                                    <img src={clientPhotoImagePreview || clientPhotoUrl} alt="Preview" className="w-full h-full object-cover" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2 border-t border-[#24242A]">
+                              <button
+                                type="button"
+                                onClick={() => setIsClientPhotoUploadOpen(false)}
+                                className="px-3 py-1.5 text-neutral-400 hover:text-white text-xs cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const finalImg = clientPhotoImagePreview || clientPhotoUrl.trim();
+                                  if (!finalImg) {
+                                    alert('Por favor selecciona una foto o ingresa una URL.');
+                                    return;
+                                  }
+                                  const artObj = artists.find(a => a.id === clientPhotoArtistId) || artists[0];
+                                  addGalleryPhoto({
+                                    title: clientPhotoTitle.trim() || `Obra para ${viewHistoryClient.name}`,
+                                    imageUrl: finalImg,
+                                    category: clientPhotoCategory,
+                                    artistId: artObj?.id,
+                                    artistName: artObj?.name || 'Artista',
+                                    clientId: viewHistoryClient.id,
+                                    clientName: viewHistoryClient.name,
+                                    date: new Date().toISOString().split('T')[0],
+                                    bodyPlacement: clientPhotoPlacement.trim() || undefined,
+                                    style: clientPhotoStyle.trim() || undefined,
+                                    isHealed: clientPhotoIsHealed || clientPhotoCategory === 'healed',
+                                    tags: [viewHistoryClient.name, clientPhotoCategory],
+                                    featured: true,
+                                  });
+                                  setIsClientPhotoUploadOpen(false);
+                                }}
+                                className="px-4 py-1.5 bg-[#FF3366] hover:bg-[#E62557] text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer"
+                              >
+                                Guardar Foto
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Grilla de fotos del cliente */}
+                        {cPhotos.length === 0 ? (
+                          <div className="p-8 text-center bg-[#121215] rounded-2xl border border-[#272730] space-y-2">
+                            <ImageIcon className="w-8 h-8 text-neutral-600 mx-auto" />
+                            <p className="text-xs text-neutral-300 font-semibold">
+                              No hay fotografías registradas aún para este cliente
+                            </p>
+                            <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
+                              Captura o sube fotos del tatuaje terminado, de la sesión o del proceso de cicatrización para su expediente clínico.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsClientPhotoUploadOpen(true);
+                                setClientPhotoTitle('');
+                                setClientPhotoPlacement('');
+                                setClientPhotoStyle('');
+                                setClientPhotoArtistId(artists[0]?.id || '');
+                                setClientPhotoCategory('tattoo');
+                                setClientPhotoIsHealed(false);
+                                setClientPhotoImagePreview('');
+                                setClientPhotoUrl('');
+                              }}
+                              className="mt-2 px-3.5 py-1.5 rounded-xl bg-[#1A1A22] hover:bg-[#242430] border border-[#2B2B38] text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5 text-[#FF3366]" />
+                              <span>Subir Primera Foto</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {cPhotos.map(photo => (
+                              <div
+                                key={photo.id}
+                                className="group relative bg-[#121215] border border-[#272730] hover:border-[#FF3366]/50 rounded-xl overflow-hidden shadow-sm transition-all"
+                              >
+                                <div className="aspect-square bg-black overflow-hidden relative">
+                                  <img
+                                    src={photo.imageUrl}
+                                    alt={photo.title}
+                                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent opacity-60 group-hover:opacity-90 transition-opacity" />
+                                  <div className="absolute top-2 left-2">
+                                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-black/70 text-white backdrop-blur-xs uppercase border border-white/20">
+                                      {photo.category}
+                                    </span>
+                                  </div>
+                                  <div className="absolute bottom-2 left-2 right-2 text-[10px] text-white">
+                                    <p className="font-bold line-clamp-1">{photo.title}</p>
+                                    <p className="text-[9px] text-neutral-400 font-mono">{photo.date}</p>
+                                  </div>
+                                </div>
+                                <div className="p-2 flex items-center justify-between text-[10px] text-neutral-400">
+                                  <span className="truncate">{photo.artistName}</span>
+                                  {photo.bodyPlacement && (
+                                    <span className="text-[#FF3366] font-mono shrink-0 ml-1 truncate max-w-[80px]">
+                                      {photo.bodyPlacement}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Bottom Footer */}
+            <div className="pt-3 border-t border-[#25252E] flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewHistoryClient(null)}
+                className="px-5 py-2 rounded-xl bg-[#252530] hover:bg-[#30303E] text-white font-semibold text-xs cursor-pointer"
+              >
+                Cerrar Expediente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 2: CREAR / EDITAR CLIENTE (CON CONSULTA SRI EN TIEMPO REAL)
+          ========================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#17171C] border border-[#2B2B36] rounded-2xl max-w-xl w-full shadow-2xl p-6 space-y-4 my-6">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-xl w-full shadow-2xl p-5 sm:p-6 space-y-4 my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#25252E] pb-3">
-              <h3 className="text-sm font-bold text-white tracking-wide">
-                {editingClient ? 'Editar Ficha y Expediente del Cliente' : 'Registrar Nuevo Cliente'}
-              </h3>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-[#FF3366]/15 text-[#FF3366]">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-white tracking-wide">
+                  {editingClient ? 'Editar Ficha del Cliente' : 'Registrar Nuevo Cliente'}
+                </h3>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-white"
+                className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveClient} className="space-y-3.5 text-xs">
-              {/* SRI Notification banner */}
-              {sriMessage && (
-                <div
-                  className={`p-2.5 rounded-xl border flex items-start gap-2 text-xs ${
-                    sriMessage.type === 'success'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                      : sriMessage.type === 'warning'
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                      : 'bg-red-500/10 border-red-500/30 text-red-300'
-                  }`}
-                >
-                  {sriMessage.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 text-[11px] leading-relaxed">
-                    {sriMessage.text}
-                  </div>
+            <form onSubmit={handleSaveClient} className="space-y-4 text-xs">
+              {/* Cédula / RUC con Verificación SRI */}
+              <div>
+                <label className="block font-semibold text-neutral-300 mb-1.5">
+                  Cédula / RUC (Ecuador)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Ej. 1712345678 o 1790012345001"
+                    value={formDni}
+                    onChange={e => setFormDni(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+                  />
                   <button
                     type="button"
-                    onClick={() => setSriMessage(null)}
-                    className="text-neutral-400 hover:text-white"
+                    onClick={() => handleLookupSri()}
+                    disabled={isSearchingSri}
+                    className="px-4 py-2.5 rounded-xl bg-[#1C1C24] hover:bg-[#252530] text-emerald-400 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin' : ''}`} />
+                    <span>{isSearchingSri ? 'Consultando...' : 'Consultar SRI'}</span>
                   </button>
                 </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="font-semibold text-neutral-300">Cédula / RUC / Pasaporte</label>
-                    {formDni.trim() && (
-                      <span className={`text-[10px] font-mono ${
-                        validarIdentificacionEcuador(formDni).isValid ? 'text-emerald-400' : 'text-neutral-400'
-                      }`}>
-                        {validarIdentificacionEcuador(formDni).label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      placeholder="Cédula 10 díg. / RUC 13 díg."
-                      value={formDni}
-                      onChange={e => {
-                        setFormDni(e.target.value);
-                        setSriMessage(null);
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleLookupSri();
-                        }
-                      }}
-                      className="flex-1 px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleLookupSri()}
-                      disabled={isSearchingSri || !formDni.trim()}
-                      className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 rounded-xl font-bold flex items-center gap-1.5 transition-all text-xs shrink-0 disabled:opacity-40"
-                      title="Consultar en servicios web del SRI y Registro Civil de Ecuador"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin text-emerald-400' : 'text-emerald-400'}`} />
-                      <span>{isSearchingSri ? 'Buscando...' : 'SRI'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">
-                    Nombre o Razón Social *
-                    {formSriVerified && (
-                      <span className="ml-2 text-[10px] text-emerald-400 font-normal">
-                        ✓ Verificado SRI
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej. Mateo Morales / CORPORACION..."
-                    value={formName}
-                    onChange={e => setFormName(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
-                  />
-                </div>
+                {sriMessage && (
+                  <p
+                    className={`text-[11px] mt-1.5 p-2 rounded-lg ${
+                      sriMessage.type === 'success'
+                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        : sriMessage.type === 'warning'
+                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        : 'bg-red-500/15 text-red-300 border border-red-500/30'
+                    }`}
+                  >
+                    {sriMessage.text}
+                  </p>
+                )}
               </div>
 
-              {/* Datos tributarios adicionales si fueron detectados */}
-              {(formTradeName || formRegimen || formTaxpayerType) && (
-                <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
-                  {formTradeName && (
-                    <div>
-                      <span className="text-neutral-500 block text-[10px]">Nombre Comercial</span>
-                      <span className="font-semibold text-neutral-200">{formTradeName}</span>
-                    </div>
-                  )}
-                  {formRegimen && (
-                    <div>
-                      <span className="text-neutral-500 block text-[10px]">Régimen Tributario</span>
-                      <span className="font-semibold text-emerald-400">{formRegimen}</span>
-                    </div>
-                  )}
-                  {formTaxpayerType && (
-                    <div>
-                      <span className="text-neutral-500 block text-[10px]">Tipo Contribuyente</span>
-                      <span className="font-semibold text-neutral-300">{formTaxpayerType}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Teléfono / WhatsApp</label>
-                  <input
-                    type="text"
-                    placeholder="+593 99 000 0000"
-                    value={formPhone}
-                    onChange={e => setFormPhone(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Email</label>
-                  <input
-                    type="email"
-                    placeholder="cliente@email.com"
-                    value={formEmail}
-                    onChange={e => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Instagram (@handle)</label>
-                  <input
-                    type="text"
-                    placeholder="@usuario"
-                    value={formInstagram}
-                    onChange={e => setFormInstagram(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-[#FF3366] mb-1">Alergias Conocidas</label>
-                  <input
-                    type="text"
-                    placeholder="Látex, níquel, apósitos, antibióticos..."
-                    value={formAllergies}
-                    onChange={e => setFormAllergies(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-amber-400 mb-1">Condiciones Médicas</label>
-                  <input
-                    type="text"
-                    placeholder="Anticoagulantes, diabetes, queloides..."
-                    value={formMedicalConditions}
-                    onChange={e => setFormMedicalConditions(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Grupo Sanguíneo</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. O+, A-"
-                    value={formBloodType}
-                    onChange={e => setFormBloodType(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Fecha Nacimiento</label>
-                  <input
-                    type="date"
-                    value={formBirthDate}
-                    onChange={e => setFormBirthDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1">Etiquetas (VIP, etc.)</label>
-                  <input
-                    type="text"
-                    placeholder="VIP, Coleccionista..."
-                    value={formTags}
-                    onChange={e => setFormTags(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
-                  />
-                </div>
-              </div>
-
+              {/* Nombre Completo */}
               <div>
-                <label className="block font-semibold text-neutral-300 mb-1">Tipo de Piel & Notas de Cicatrización</label>
+                <label className="block font-semibold text-neutral-300 mb-1.5">
+                  Nombres Completos / Razón Social *
+                </label>
                 <input
                   type="text"
-                  placeholder="Ej. Piel sensible, tolera film adhesivo Dermalize, buena retención..."
-                  value={formSkinNotes}
-                  onChange={e => setFormSkinNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white"
+                  required
+                  placeholder="Ej. Carlos Patricio Mendoza Silva"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
                 />
               </div>
 
-              <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#121215] border border-[#272730]">
-                <input
-                  type="checkbox"
-                  id="modal-consent"
-                  checked={formConsent}
-                  onChange={e => setFormConsent(e.target.checked)}
-                  className="w-4 h-4 rounded text-[#FF3366] bg-[#18181D] border-[#272730]"
-                />
-                <label htmlFor="modal-consent" className="text-xs text-neutral-300 cursor-pointer">
-                  <span className="font-bold text-white">Consentimiento Informado Firmado</span> (Archivado en estudio)
-                </label>
+              {/* Teléfono & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">Teléfono / WhatsApp</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 0987654321"
+                    value={formPhone}
+                    onChange={e => setFormPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    placeholder="cliente@gmail.com"
+                    value={formEmail}
+                    onChange={e => setFormEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+                  />
+                </div>
               </div>
 
-              <div className="pt-4 border-t border-[#25252E] flex justify-end gap-3">
+              {/* Instagram & Tags */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">Usuario Instagram</label>
+                  <input
+                    type="text"
+                    placeholder="@usuario_tattoo"
+                    value={formInstagram}
+                    onChange={e => setFormInstagram(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1.5">Etiquetas (separadas por coma)</label>
+                  <input
+                    type="text"
+                    placeholder="VIP, Coleccionista, Piercing"
+                    value={formTags}
+                    onChange={e => setFormTags(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Sección Médica */}
+              <div className="p-3.5 rounded-2xl bg-[#121215] border border-[#272730] space-y-3">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <HeartPulse className="w-4 h-4 text-[#FF3366]" />
+                  <span>Ficha Sanitaria & Bioseguridad</span>
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-medium text-neutral-300 mb-1">Alergias Conocidas</label>
+                    <input
+                      type="text"
+                      placeholder="Látex, pigmentos rojos, níquel..."
+                      value={formAllergies}
+                      onChange={e => setFormAllergies(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-neutral-300 mb-1">Tipo de Sangre</label>
+                    <select
+                      value={formBloodType}
+                      onChange={e => setFormBloodType(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
+                    >
+                      <option value="">No especificado</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-medium text-neutral-300 mb-1">Contacto de Emergencia</label>
+                  <input
+                    type="text"
+                    placeholder="Nombre y teléfono de familiar"
+                    value={formEmergencyContact}
+                    onChange={e => setFormEmergencyContact(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formConsent}
+                      onChange={e => setFormConsent(e.target.checked)}
+                      className="rounded accent-[#FF3366] w-4 h-4 cursor-pointer"
+                    />
+                    <span className="text-neutral-200 font-medium text-xs">
+                      Consentimiento informado y ficha sanitaria firmada digitalmente
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="pt-3 border-t border-[#25252E] flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-neutral-400 hover:text-white"
+                  className="px-4 py-2 text-neutral-400 hover:text-white cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.3)]"
+                  className="px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.3)] transition-all cursor-pointer"
                 >
-                  Guardar Ficha
+                  {editingClient ? 'Guardar Cambios' : 'Registrar Cliente'}
                 </button>
               </div>
             </form>
@@ -1339,4 +1664,3 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     </div>
   );
 };
-

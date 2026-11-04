@@ -7,8 +7,10 @@ import { Header } from './components/layout/Header';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { PosView } from './components/pos/PosView';
 import { ClientsView } from './components/clients/ClientsView';
+import { GalleryView } from './components/gallery/GalleryView';
 import { SalesView } from './components/sales/SalesView';
 import { ExpensesView } from './components/expenses/ExpensesView';
+import { SuppliersView } from './components/suppliers/SuppliersView';
 import { ArtistsView } from './components/artists/ArtistsView';
 import { CashRegisterView } from './components/cash/CashRegisterView';
 import { InventoryView } from './components/inventory/InventoryView';
@@ -59,6 +61,8 @@ const MainLayout: React.FC = () => {
         return <PosView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'clients':
         return <ClientsView onOpenReceipt={sale => setReceiptSale(sale)} />;
+      case 'gallery':
+        return <GalleryView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'appointments':
         return <AppointmentsView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'proformas':
@@ -73,7 +77,7 @@ const MainLayout: React.FC = () => {
       case 'expenses':
         return <ExpensesView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
       case 'artists':
-        return <ArtistsView />;
+        return <ArtistsView onOpenReceipt={sale => setReceiptSale(sale)} />;
       case 'cash':
         return <CashRegisterView />;
       case 'inventory':

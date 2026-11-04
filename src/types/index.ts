@@ -77,6 +77,37 @@ export interface ExpenseRecord {
   taxRate?: number;
 }
 
+export type SupplierCategory =
+  | 'insumos_tatuaje'
+  | 'joyeria_piercing'
+  | 'bioseguridad'
+  | 'aftercare'
+  | 'servicios'
+  | 'alquiler'
+  | 'otros';
+
+export interface Supplier {
+  id: string;
+  ruc: string; // 13 dígitos según catastro SRI
+  razonSocial: string;
+  nombreComercial?: string;
+  categoria: SupplierCategory;
+  contactoNombre?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  ciudad?: string;
+  diasCredito?: number; // 0 = Contado, 15, 30 días
+  bancoNombre?: string;
+  bancoTipoCuenta?: 'CORRIENTE' | 'AHORROS';
+  bancoNumeroCuenta?: string;
+  retencionIvaPorcentaje?: number; // 0, 30, 70, 100%
+  retencionRentaPorcentaje?: number; // 1.75, 2.75, 8%
+  estado: 'ACTIVO' | 'INACTIVO';
+  notas?: string;
+  createdAt: string;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -130,6 +161,10 @@ export interface InventoryItem {
   location?: string;
   sku?: string;
   notes?: string;
+  supplier?: string; // Proveedor / Distribuidor
+  taxRate?: VatRateType; // Tarifa SRI: 15, 5, 0, NO_OBJETO, EXENTO
+  priceWithoutVat?: number; // PVP sin IVA (Subtotal base)
+  priceWithVat?: number; // PVP final con IVA
 }
 
 export type KardexMovementType =
@@ -251,8 +286,14 @@ export interface CompanyConfig {
   nombreComercial?: string;
   dirMatriz?: string;
   dirEstablecimiento?: string;
+  pais?: string; // ej: "ECUADOR"
+  provincia?: string; // ej: "PICHINCHA"
+  ciudad?: string; // ej: "QUITO"
+  parroquia?: string; // ej: "IÑAQUITO"
   codigoEstablecimiento?: string; // ej: "001"
   puntoEmision?: string; // ej: "001"
+  secuencialFactura?: string; // ej: "000000001" (9 dígitos SRI)
+  secuencialNotaVenta?: string; // ej: "000000001" (9 dígitos SRI)
   obligadoContabilidad?: 'SI' | 'NO';
   regimenTributario?: SriTaxRegime | SriRegimenTributario | string;
   contribuyenteEspecial?: string; // Número de resolución si aplica
@@ -353,6 +394,28 @@ export interface ClientProfile {
   sriStatus?: string; // ACTIVO, SUSPENDIDO
   sriVerified?: boolean;
   address?: string;
+}
+
+export type GalleryCategory = 'all' | 'tattoo' | 'piercing' | 'healed' | 'flash' | 'coverup';
+
+export interface GalleryPhoto {
+  id: string;
+  title: string;
+  imageUrl: string;
+  category: 'tattoo' | 'piercing' | 'healed' | 'flash' | 'coverup';
+  artistId?: string;
+  artistName?: string;
+  clientId?: string;
+  clientName?: string;
+  date: string; // YYYY-MM-DD o ISO
+  bodyPlacement?: string; // e.g. Antebrazo, Costillas, Pierna, Hélice, Nostril
+  style?: string; // e.g. Realismo Sombras, Blackwork, Neotradicional, Fineline
+  description?: string;
+  tags?: string[];
+  isHealed?: boolean;
+  sessionHours?: number;
+  featured?: boolean;
+  createdAt: string;
 }
 
 export type ProformaStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'invoiced' | 'expired';
