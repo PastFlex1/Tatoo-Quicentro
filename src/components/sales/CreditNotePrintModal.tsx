@@ -3,7 +3,6 @@ import { X, Printer, Download, CheckCircle2, ShieldCheck, Share2 } from 'lucide-
 import { useStudio } from '../../context/StudioContext';
 import { CreditNoteRecord } from '../../types';
 import { SriBarcodeSvg } from '../common/SriBarcodeSvg';
-import { SRI_SIMULATION_MODE } from '../../utils/sriCalculations';
 
 interface CreditNotePrintModalProps {
   creditNote: CreditNoteRecord | null;
@@ -195,7 +194,7 @@ export const CreditNotePrintModal: React.FC<CreditNotePrintModalProps> = ({
                 {settings.razonSocial || 'DEVOLUTION INK TATTOO STUDIO S.A.S.'}
               </p>
               <p className="font-mono text-[10px] text-neutral-800 font-bold mt-0.5">
-                R.U.C.: {settings.ruc || settings.taxId || '1792847102001'}
+                R.U.C.: {settings.ruc || settings.taxId || '—'}
               </p>
               <p className="text-[10px] text-neutral-600">
                 {settings.dirMatriz || settings.address || 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito'}
@@ -222,15 +221,17 @@ export const CreditNotePrintModal: React.FC<CreditNotePrintModalProps> = ({
               </span>
               <div className="flex justify-center my-1">
                 <SriBarcodeSvg
-                  value={creditNote.sriAccessKey || '0101202604179284710200110010010000000011234567814'}
+                  value={creditNote.sriAccessKey || ''}
                   height={34}
                 />
               </div>
               <span className="font-mono text-[9px] tracking-tight block select-all break-all text-neutral-800">
-                {creditNote.sriAccessKey || '0101202604179284710200110010010000000011234567814'}
+                {creditNote.sriAccessKey || '—'}
               </span>
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
-                {SRI_SIMULATION_MODE ? '⚠ ESTADO: SIMULADO · SIN VALIDEZ TRIBUTARIA' : '✓ ESTADO: AUTORIZADO POR EL SRI'}
+                {creditNote.sriStatus === 'AUTORIZADO'
+                  ? `✓ AUTORIZADO POR EL SRI${creditNote.sriAuthorizationDate ? ` · ${new Date(creditNote.sriAuthorizationDate).toLocaleString('es-EC')}` : ''}`
+                  : `⚠ ESTADO SRI: ${(creditNote.sriStatus || 'PENDIENTE').replace('_', ' ')}`}
               </span>
             </div>
 

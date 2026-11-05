@@ -20,7 +20,8 @@ import { NewCreditNoteModal } from './NewCreditNoteModal';
 import { CreditNotePrintModal } from './CreditNotePrintModal';
 import { SalesNotePrintModal } from './SalesNotePrintModal';
 import { ReceiptModal } from './ReceiptModal';
-import { generateSriClaveAcceso, simulateXadesBesXmlSigning, SRI_SIMULATION_MODE, SRI_EMITTED_STATUS_LABEL } from '../../utils/sriCalculations';
+import { buildAccessKey, buildFacturaXml, buildNotaCreditoXml } from '../../services/sriElectronicService';
+import { SriStatusBadge } from '../common/SriStatusBadge';
 
 interface SalesViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -33,8 +34,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   const {
     filteredSales,
     filteredCreditNotes,
+    sales: allSales,
     settings,
     formatMoney,
+    emitSaleToSri,
+    emitCreditNoteToSri,
   } = useStudio();
 
   // Active Billing Tab
@@ -60,6 +64,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
     claveAcceso: string;
     authDate: string;
     xmlContent: string;
+    status: string;
   } | null>(null);
   const [copiedXml, setCopiedXml] = useState(false);
 
@@ -199,229 +204,31 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
     setIsNewCreditNoteOpen(true);
   };
 
-  // Generador de XML oficial SRI (Ficha Técnica Comprobantes Electrónicos v2.1.0 + Firma XAdES-BES)
+  // XML del comprobante: el autorizado por el SRI si existe; si no, el XML generado (aún sin firma/autorización)
   const handleViewXmlForSale = (sale: SaleRecord) => {
-    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
-    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
-    const sec = (sale.invoiceNumber.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9);
-    const rucEmisor = (settings.ruc || settings.taxId || '1790012345001').replace(/\D/g, '').padEnd(13, '0').slice(0, 13);
-    const amb = settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1';
-    const dObj = new Date(sale.date);
-    const fechaEmisionSri = `${String(dObj.getDate()).padStart(2, '0')}/${String(dObj.getMonth() + 1).padStart(2, '0')}/${dObj.getFullYear()}`;
-
-    const claveAcceso =
-      sale.sriAccessKey ||
-      generateSriClaveAcceso({
-        fechaEmision: dObj,
-        tipoComprobante: '01',
-        ruc: rucEmisor,
-        ambiente: amb,
-        serie: `${estab}${pto}`,
-        secuencial: sec,
-      });
-
-    const subtotalSinImp = Math.max(0, sale.subtotal - (sale.discount || 0));
-    const codigoPorcentajeIva = (sale.taxRate || 0) === 15 ? '4' : (sale.taxRate || 0) === 5 ? '5' : '0';
-    const dniCliente = (sale.clientDni || '9999999999999').trim();
-    const tipoIdComprador =
-      dniCliente === '9999999999999'
-        ? '07'
-        : dniCliente.length === 13
-        ? '04'
-        : dniCliente.length === 10
-        ? '05'
-        : '06';
-
-    const unsignedXml = `<?xml version="1.0" encoding="UTF-8"?>
-<factura id="comprobante" version="2.1.0">
-  <infoTributaria>
-    <ambiente>${amb}</ambiente>
-    <tipoEmision>1</tipoEmision>
-    <razonSocial>${(settings.razonSocial || settings.studioName || 'DEVOLUTION INK TATTOO STUDIO').replace(/&/g, '&amp;')}</razonSocial>
-    <nombreComercial>${(settings.nombreComercial || settings.studioName || 'DEVOLUTION INK QUICENTRO').replace(/&/g, '&amp;')}</nombreComercial>
-    <ruc>${rucEmisor}</ruc>
-    <claveAcceso>${claveAcceso}</claveAcceso>
-    <codDoc>${sale.documentType === 'nota_venta' ? '02' : '01'}</codDoc>
-    <estab>${estab}</estab>
-    <ptoEmi>${pto}</ptoEmi>
-    <secuencial>${sec}</secuencial>
-    <dirMatriz>${(settings.dirMatriz || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirMatriz>
-    <contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>
-  </infoTributaria>
-  <infoFactura>
-    <fechaEmision>${fechaEmisionSri}</fechaEmision>
-    <dirEstablecimiento>${(settings.dirEstablecimiento || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirEstablecimiento>
-    <obligadoContabilidad>${settings.obligadoContabilidad || 'NO'}</obligadoContabilidad>
-    <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
-    <razonSocialComprador>${sale.clientName.replace(/&/g, '&amp;')}</razonSocialComprador>
-    <identificacionComprador>${dniCliente}</identificacionComprador>
-    <totalSinImpuestos>${subtotalSinImp.toFixed(2)}</totalSinImpuestos>
-    <totalDescuento>${(sale.discount || 0).toFixed(2)}</totalDescuento>
-    <totalConImpuestos>
-      <totalImpuesto>
-        <codigo>2</codigo>
-        <codigoPorcentaje>${codigoPorcentajeIva}</codigoPorcentaje>
-        <baseImponible>${subtotalSinImp.toFixed(2)}</baseImponible>
-        <tarifa>${(sale.taxRate || 0).toFixed(2)}</tarifa>
-        <valor>${(sale.taxAmount || 0).toFixed(2)}</valor>
-      </totalImpuesto>
-    </totalConImpuestos>
-    <propina>${(sale.tipAmount || 0).toFixed(2)}</propina>
-    <importeTotal>${sale.total.toFixed(2)}</importeTotal>
-    <moneda>DOLAR</moneda>
-    <pagos>
-      <pago>
-        <formaPago>${sale.paymentMethod === 'cash' ? '01' : sale.paymentMethod === 'card' ? '19' : '20'}</formaPago>
-        <total>${sale.total.toFixed(2)}</total>
-      </pago>
-    </pagos>
-  </infoFactura>
-  <detalles>
-    <detalle>
-      <codigoPrincipal>0001</codigoPrincipal>
-      <codigoAuxiliar>${sale.serviceCategory.toUpperCase()}</codigoAuxiliar>
-      <descripcion>${sale.serviceName.replace(/&/g, '&amp;')}</descripcion>
-      <cantidad>${(sale.pieces || 1).toFixed(2)}</cantidad>
-      <precioUnitario>${((sale.subtotal + (sale.discount || 0)) / (sale.pieces || 1)).toFixed(2)}</precioUnitario>
-      <descuento>${(sale.discount || 0).toFixed(2)}</descuento>
-      <precioTotalSinImpuesto>${subtotalSinImp.toFixed(2)}</precioTotalSinImpuesto>
-      <impuestos>
-        <impuesto>
-          <codigo>2</codigo>
-          <codigoPorcentaje>${codigoPorcentajeIva}</codigoPorcentaje>
-          <tarifa>${(sale.taxRate || 0).toFixed(2)}</tarifa>
-          <baseImponible>${subtotalSinImp.toFixed(2)}</baseImponible>
-          <valor>${(sale.taxAmount || 0).toFixed(2)}</valor>
-        </impuesto>
-      </impuestos>
-    </detalle>
-  </detalles>
-  <infoAdicional>
-    <campoAdicional nombre="Artista">${sale.artistName.replace(/&/g, '&amp;')}</campoAdicional>
-    <campoAdicional nombre="Telefono">${sale.clientPhone || 'S/N'}</campoAdicional>
-    <campoAdicional nombre="FichaSanitaria">${sale.consentFormSigned ? 'Consentimiento Informado Firmado' : 'Simplificada'}</campoAdicional>
-  </infoAdicional>
-</factura>`;
-
-    const { signedXml } = simulateXadesBesXmlSigning(
-      unsignedXml,
-      settings.firmaElectronicaBase64,
-      settings.firmaElectronicaClave
-    );
-
-    const authorizedEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
-<autorizacion>
-  <estado>${sale.creditNoteNumber || sale.status === 'cancelled' ? 'ANULADO POR NOTA DE CREDITO' : SRI_SIMULATION_MODE ? 'SIMULADO - SIN VALIDEZ TRIBUTARIA' : 'AUTORIZADO'}</estado>
-  <numeroAutorizacion>${claveAcceso}</numeroAutorizacion>
-  <fechaAutorizacion>${sale.sriAuthorizationDate || sale.date}</fechaAutorizacion>
-  <ambiente>${amb === '2' ? 'PRODUCCION' : 'PRUEBAS'}</ambiente>
-  <comprobante><![CDATA[
-${signedXml}
-  ]]></comprobante>
-</autorizacion>`;
-
+    const claveAcceso = sale.sriAccessKey || buildAccessKey(settings, '01', sale.invoiceNumber, new Date(sale.date));
+    const authorized = sale.sriStatus === 'AUTORIZADO' && sale.sriAuthorizedXml;
     setXmlViewerDoc({
-      title: sale.documentType === 'nota_venta' ? 'XML Nota de Venta RIMPE (Tipo 02)' : 'XML Factura Electrónica SRI (Tipo 01)',
+      title: 'XML Factura Electrónica SRI (Tipo 01)',
       docNumber: sale.invoiceNumber,
       claveAcceso,
-      authDate: sale.sriAuthorizationDate || sale.date,
-      xmlContent: authorizedEnvelope,
+      authDate: sale.sriAuthorizationDate || '',
+      status: sale.sriStatus || 'PENDIENTE',
+      xmlContent: authorized ? sale.sriAuthorizedXml! : buildFacturaXml(sale, settings, claveAcceso),
     });
   };
 
   const handleViewXmlForCreditNote = (cn: CreditNoteRecord) => {
-    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
-    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
-    const sec = (cn.creditNoteNumber.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9);
-    const rucEmisor = (settings.ruc || settings.taxId || '1790012345001').replace(/\D/g, '').padEnd(13, '0').slice(0, 13);
-    const amb = settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1';
-    const dObj = new Date(cn.date);
-    const fechaEmisionSri = `${String(dObj.getDate()).padStart(2, '0')}/${String(dObj.getMonth() + 1).padStart(2, '0')}/${dObj.getFullYear()}`;
-
-    const claveAcceso =
-      cn.sriAccessKey ||
-      generateSriClaveAcceso({
-        fechaEmision: dObj,
-        tipoComprobante: '04',
-        ruc: rucEmisor,
-        ambiente: amb,
-        serie: `${estab}${pto}`,
-        secuencial: sec,
-      });
-
-    const dniCliente = (cn.clientDni || '9999999999999').trim();
-    const tipoIdComprador =
-      dniCliente === '9999999999999'
-        ? '07'
-        : dniCliente.length === 13
-        ? '04'
-        : dniCliente.length === 10
-        ? '05'
-        : '06';
-
-    const unsignedXml = `<?xml version="1.0" encoding="UTF-8"?>
-<notaCredito id="comprobante" version="1.1.0">
-  <infoTributaria>
-    <ambiente>${amb}</ambiente>
-    <tipoEmision>1</tipoEmision>
-    <razonSocial>${(settings.razonSocial || settings.studioName || 'DEVOLUTION INK TATTOO STUDIO').replace(/&/g, '&amp;')}</razonSocial>
-    <nombreComercial>${(settings.nombreComercial || settings.studioName || 'DEVOLUTION INK QUICENTRO').replace(/&/g, '&amp;')}</nombreComercial>
-    <ruc>${rucEmisor}</ruc>
-    <claveAcceso>${claveAcceso}</claveAcceso>
-    <codDoc>04</codDoc>
-    <estab>${estab}</estab>
-    <ptoEmi>${pto}</ptoEmi>
-    <secuencial>${sec}</secuencial>
-    <dirMatriz>${(settings.dirMatriz || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirMatriz>
-  </infoTributaria>
-  <infoNotaCredito>
-    <fechaEmision>${fechaEmisionSri}</fechaEmision>
-    <dirEstablecimiento>${(settings.dirEstablecimiento || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirEstablecimiento>
-    <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
-    <razonSocialComprador>${cn.clientName.replace(/&/g, '&amp;')}</razonSocialComprador>
-    <identificacionComprador>${dniCliente}</identificacionComprador>
-    <obligadoContabilidad>${settings.obligadoContabilidad || 'NO'}</obligadoContabilidad>
-    <codDocModificado>01</codDocModificado>
-    <numDocModificado>${cn.affectedInvoiceNumber}</numDocModificado>
-    <fechaEmisionDocSustento>${cn.affectedInvoiceDate}</fechaEmisionDocSustento>
-    <totalSinImpuestos>${cn.subtotal.toFixed(2)}</totalSinImpuestos>
-    <valorModificacion>${cn.total.toFixed(2)}</valorModificacion>
-    <moneda>DOLAR</moneda>
-    <totalConImpuestos>
-      <totalImpuesto>
-        <codigo>2</codigo>
-        <codigoPorcentaje>4</codigoPorcentaje>
-        <baseImponible>${cn.subtotal.toFixed(2)}</baseImponible>
-        <valor>${cn.taxAmount.toFixed(2)}</valor>
-      </totalImpuesto>
-    </totalConImpuestos>
-    <motivo>${cn.reasonDescription.replace(/&/g, '&amp;')}</motivo>
-  </infoNotaCredito>
-</notaCredito>`;
-
-    const { signedXml } = simulateXadesBesXmlSigning(
-      unsignedXml,
-      settings.firmaElectronicaBase64,
-      settings.firmaElectronicaClave
-    );
-
-    const authorizedEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
-<autorizacion>
-  <estado>${SRI_SIMULATION_MODE ? 'SIMULADO - SIN VALIDEZ TRIBUTARIA' : 'AUTORIZADO'}</estado>
-  <numeroAutorizacion>${claveAcceso}</numeroAutorizacion>
-  <fechaAutorizacion>${cn.sriAuthorizationDate || cn.date}</fechaAutorizacion>
-  <ambiente>${amb === '2' ? 'PRODUCCION' : 'PRUEBAS'}</ambiente>
-  <comprobante><![CDATA[
-${signedXml}
-  ]]></comprobante>
-</autorizacion>`;
-
+    const claveAcceso = cn.sriAccessKey || buildAccessKey(settings, '04', cn.creditNoteNumber, new Date(cn.date));
+    const authorized = cn.sriStatus === 'AUTORIZADO' && cn.sriAuthorizedXml;
+    const sale = allSales.find(s => s.id === cn.affectedInvoiceId);
     setXmlViewerDoc({
       title: 'XML Nota de Crédito Electrónica SRI (Tipo 04)',
       docNumber: cn.creditNoteNumber,
       claveAcceso,
-      authDate: cn.sriAuthorizationDate || cn.date,
-      xmlContent: authorizedEnvelope,
+      authDate: cn.sriAuthorizationDate || '',
+      status: cn.sriStatus || 'PENDIENTE',
+      xmlContent: authorized ? cn.sriAuthorizedXml! : buildNotaCreditoXml(cn, settings, claveAcceso, sale),
     });
   };
 
@@ -656,10 +463,11 @@ ${signedXml}
                             ANULADA CON NC
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>{SRI_EMITTED_STATUS_LABEL}</span>
-                          </span>
+                          <SriStatusBadge
+                            status={sale.sriStatus}
+                            messages={sale.sriMessages}
+                            onRetry={() => emitSaleToSri(sale.id)}
+                          />
                         )}
                       </div>
                     </div>
@@ -805,10 +613,12 @@ ${signedXml}
                               ANULADA CON NC
                             </span>
                           ) : (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>{SRI_EMITTED_STATUS_LABEL}</span>
-                            </span>
+                            <SriStatusBadge
+                              center
+                              status={sale.sriStatus}
+                              messages={sale.sriMessages}
+                              onRetry={() => emitSaleToSri(sale.id)}
+                            />
                           )}
                         </td>
                         <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
@@ -950,14 +760,6 @@ ${signedXml}
                           <span>RIDE</span>
                         </button>
                         <button
-                          onClick={() => handleViewXmlForSale(sale)}
-                          className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                          title="Ver XML de respaldo del comprobante"
-                        >
-                          <Code2 className="w-3.5 h-3.5" />
-                          <span>XML</span>
-                        </button>
-                        <button
                           onClick={() => {
                             setSelectedSalesNoteFormat('THERMAL');
                             setSelectedSalesNoteToPrint(sale);
@@ -1050,14 +852,6 @@ ${signedXml}
                               <span>RIDE</span>
                             </button>
                             <button
-                              onClick={() => handleViewXmlForSale(sale)}
-                              className="px-2.5 py-1 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-                              title="Ver XML de respaldo del comprobante"
-                            >
-                              <Code2 className="w-3.5 h-3.5 text-blue-400" />
-                              <span>Ver XML</span>
-                            </button>
-                            <button
                               onClick={() => {
                                 setSelectedSalesNoteFormat('THERMAL');
                                 setSelectedSalesNoteToPrint(sale);
@@ -1106,10 +900,11 @@ ${signedXml}
                         })}
                       </div>
                     </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>{SRI_EMITTED_STATUS_LABEL}</span>
-                    </span>
+                    <SriStatusBadge
+                      status={cn.sriStatus}
+                      messages={cn.sriMessages}
+                      onRetry={() => emitCreditNoteToSri(cn.id)}
+                    />
                   </div>
 
                   <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1.5">
@@ -1247,10 +1042,12 @@ ${signedXml}
                         )}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                          <span>{SRI_EMITTED_STATUS_LABEL}</span>
-                        </span>
+                        <SriStatusBadge
+                          center
+                          status={cn.sriStatus}
+                          messages={cn.sriMessages}
+                          onRetry={() => emitCreditNoteToSri(cn.id)}
+                        />
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
                         {formatMoney(cn.subtotal)}
@@ -1334,7 +1131,7 @@ ${signedXml}
         onClose={() => setSelectedSalesNoteToPrint(null)}
       />
 
-      {/* MODAL: VISOR Y DESCARGA DE XML OFICIAL FIRMADO XAdES-BES AUTORIZADO POR EL SRI */}
+      {/* MODAL: VISOR Y DESCARGA DEL XML DEL COMPROBANTE ELECTRÓNICO */}
       {xmlViewerDoc && (
         <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-4xl w-full shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
@@ -1349,10 +1146,16 @@ ${signedXml}
                     <span className="font-mono text-xs font-bold text-[#FF3366] bg-[#FF3366]/10 px-2 py-0.5 rounded-md border border-[#FF3366]/25">
                       {xmlViewerDoc.docNumber}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      <span>XAdES-BES FIRMADO</span>
-                    </span>
+                    {xmlViewerDoc.status === 'AUTORIZADO' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        <span>AUTORIZADO POR EL SRI</span>
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1">
+                        <span>SIN AUTORIZACIÓN · XML generado sin firma</span>
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-neutral-400 font-mono truncate mt-0.5">
                     Clave de Acceso SRI: <strong className="text-neutral-200">{xmlViewerDoc.claveAcceso}</strong>

@@ -24,13 +24,13 @@ export const ReportsView: React.FC = () => {
   const {
     filteredSales,
     filteredExpenses,
+    accountingEntries,
     artists,
     inventory,
     formatMoney,
     settings,
     dateFilter,
     setDateFilter,
-    resetToDemo,
     exportBackup,
     importBackup,
   } = useStudio();
@@ -96,11 +96,30 @@ export const ReportsView: React.FC = () => {
   );
 
   // Expenses Categorization
+  // Costo de insumos = consumo real registrado en contabilidad (cuenta 5102):
+  // salidas de kardex + compras directas de insumos sin ingreso a bodega.
   const supplyExpenses = useMemo(() => {
-    return filteredExpenses
-      .filter(e => ['supplies_tattoo', 'supplies_piercing', 'jewelry_restock'].includes(e.category))
-      .reduce((acc, e) => acc + e.amount, 0);
-  }, [filteredExpenses]);
+    return accountingEntries.reduce(
+      (acc, e) => acc + e.lines.filter(l => l.accountCode === '5102').reduce((a, l) => a + (l.debit || 0) - (l.credit || 0), 0),
+      0
+    );
+  }, [accountingEntries]);
+
+  // Margen real por departamento: ingreso neto − comisión de artistas de esas ventas
+  const deptMargin = useMemo(() => {
+    const calc = (cats: string[]) => {
+      const list = validSales.filter(s => cats.includes(s.serviceCategory));
+      const revenue = list.reduce((acc, s) => acc + (s.subtotal - s.discount), 0);
+      const cost = list.reduce((acc, s) => acc + (s.artistShare || 0), 0);
+      return { revenue, cost, margin: revenue - cost };
+    };
+    return {
+      tattoo: calc(['tattoo']),
+      piercing: calc(['piercing']),
+      jewelry: calc(['jewelry']),
+      aftercare: calc(['aftercare']),
+    };
+  }, [validSales]);
 
   const rentExpense = useMemo(() => {
     return filteredExpenses.filter(e => e.category === 'rent_studio').reduce((acc, e) => acc + e.amount, 0);
@@ -280,26 +299,26 @@ export const ReportsView: React.FC = () => {
           {
             id: 'dept_tattoo',
             label: 'Tatuajes',
-            value1: tattooRevenue * 0.65,
-            value2: tattooRevenue * 0.35,
+            value1: deptMargin.tattoo.margin,
+            value2: deptMargin.tattoo.cost,
           },
           {
             id: 'dept_piercing',
             label: 'Piercing',
-            value1: piercingRevenue * 0.5,
-            value2: piercingRevenue * 0.5,
+            value1: deptMargin.piercing.margin,
+            value2: deptMargin.piercing.cost,
           },
           {
             id: 'dept_jewelry',
             label: 'Joyería',
-            value1: jewelryRevenue,
-            value2: supplyExpenses * 0.35,
+            value1: deptMargin.jewelry.margin,
+            value2: deptMargin.jewelry.cost,
           },
           {
             id: 'dept_aftercare',
             label: 'Aftercare',
-            value1: aftercareRevenue,
-            value2: supplyExpenses * 0.15,
+            value1: deptMargin.aftercare.margin,
+            value2: deptMargin.aftercare.cost,
           },
         ],
         title: 'Gráfica de Barras: Rendimiento por Departamento',
@@ -610,7 +629,7 @@ export const ReportsView: React.FC = () => {
                     <th className="py-1 px-2 text-left">Departamento</th>
                     <th className="py-1 px-2 text-right">Facturación ($ USD)</th>
                     <th className="py-1 px-2 text-center">% del Total</th>
-                    <th className="py-1 px-2 text-right">Margen Estimado ($)</th>
+                    <th className="py-1 px-2 text-right">Margen (− comisiones)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
@@ -618,25 +637,25 @@ export const ReportsView: React.FC = () => {
                     <td className="py-1 px-2 font-medium">Tatuajes Artísticos</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(tattooRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((tattooRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(tattooRevenue * 0.65)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.tattoo.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Body Piercing & Perforaciones</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(piercingRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((piercingRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(piercingRevenue * 0.50)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.piercing.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Venta Joyería Mostrador (Titanio / Oro)</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(jewelryRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((jewelryRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(jewelryRevenue * 0.55)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.jewelry.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Venta Aftercare & Bálsamos Cicatrizantes</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(aftercareRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((aftercareRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(aftercareRevenue * 0.50)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.aftercare.margin)}</td>
                   </tr>
                   {otherRevenue > 0 && (
                     <tr>
@@ -930,7 +949,7 @@ export const ReportsView: React.FC = () => {
                     <th className="py-1 px-2 text-left">Departamento</th>
                     <th className="py-1 px-2 text-right">Facturación ($ USD)</th>
                     <th className="py-1 px-2 text-center">% del Total</th>
-                    <th className="py-1 px-2 text-right">Margen Estimado ($)</th>
+                    <th className="py-1 px-2 text-right">Margen (− comisiones)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
@@ -938,25 +957,25 @@ export const ReportsView: React.FC = () => {
                     <td className="py-1 px-2 font-medium">Tatuajes Artísticos</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(tattooRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((tattooRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(tattooRevenue * 0.65)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.tattoo.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Procedimientos Body Piercing</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(piercingRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((piercingRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(piercingRevenue * 0.50)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.piercing.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Venta Joyería Mostrador (Titanio / Oro)</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(jewelryRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((jewelryRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(jewelryRevenue * 0.55)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.jewelry.margin)}</td>
                   </tr>
                   <tr>
                     <td className="py-1 px-2 font-medium">Venta Aftercare & Bálsamos</td>
                     <td className="py-1 px-2 text-right font-mono font-bold">{formatMoney(aftercareRevenue)}</td>
                     <td className="py-1 px-2 text-center font-mono">{totalGrossRevenue > 0 ? ((aftercareRevenue / totalGrossRevenue) * 100).toFixed(1) : 0}%</td>
-                    <td className="py-1 px-2 text-right font-mono">{formatMoney(aftercareRevenue * 0.50)}</td>
+                    <td className="py-1 px-2 text-right font-mono">{formatMoney(deptMargin.aftercare.margin)}</td>
                   </tr>
                   {otherRevenue > 0 && (
                     <tr>
@@ -1473,20 +1492,20 @@ export const ReportsView: React.FC = () => {
                 {
                   id: 'tattoo_dept',
                   label: 'Tatuajes',
-                  value1: tattooRevenue * 0.65,
-                  value2: tattooRevenue * 0.35,
+                  value1: deptMargin.tattoo.margin,
+                  value2: deptMargin.tattoo.cost,
                 },
                 {
                   id: 'piercing_dept',
                   label: 'Piercing',
-                  value1: piercingRevenue * 0.5,
-                  value2: piercingRevenue * 0.5,
+                  value1: deptMargin.piercing.margin,
+                  value2: deptMargin.piercing.cost,
                 },
                 {
                   id: 'retail_dept',
                   label: 'Joyería/Cremas',
-                  value1: jewelryRevenue + aftercareRevenue,
-                  value2: supplyExpenses,
+                  value1: deptMargin.jewelry.margin + deptMargin.aftercare.margin,
+                  value2: deptMargin.jewelry.cost + deptMargin.aftercare.cost,
                 },
               ]}
               formatMoney={formatMoney}
@@ -1920,17 +1939,6 @@ export const ReportsView: React.FC = () => {
             className="hidden"
           />
 
-          <button
-            onClick={() => {
-              if (confirm('¿Restablecer el sistema con los datos de ejemplo del estudio?')) {
-                resetToDemo();
-              }
-            }}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#272730] bg-[#121215] hover:border-[#FF3366] text-white text-xs font-semibold transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-[#FF3366]" />
-            <span>Recargar Demo</span>
-          </button>
         </div>
       </div>
     </div>

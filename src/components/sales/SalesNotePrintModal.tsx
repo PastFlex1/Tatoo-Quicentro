@@ -190,7 +190,7 @@ export const SalesNotePrintModal: React.FC<SalesNotePrintModalProps> = ({
                 {settings.razonSocial || 'DEVOLUTION INK TATTOO STUDIO S.A.S.'}
               </p>
               <p className="font-mono text-[10px] text-neutral-800 font-bold mt-0.5">
-                R.U.C.: {settings.ruc || settings.taxId || '1792847102001'}
+                R.U.C.: {settings.ruc || settings.taxId || '—'}
               </p>
               <p className="text-[10px] text-neutral-600">
                 {settings.dirMatriz || settings.address || 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito'}

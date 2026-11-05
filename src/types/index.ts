@@ -48,9 +48,14 @@ export interface SaleRecord {
   consentFileName?: string; // Nombre del archivo del consentimiento firmado
   consentSignedAt?: string; // Fecha/hora de subida del consentimiento firmado
   documentType?: 'factura' | 'nota_venta'; // Factura (Tipo 01) o Nota de Venta RIMPE (Tipo 02)
-  sriStatus?: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  sriStatus?: SriDocumentStatus;
   sriAccessKey?: string;
   sriAuthorizationDate?: string;
+  sriAuthorizationNumber?: string;
+  /** Mensajes devueltos por el SRI (errores / advertencias) */
+  sriMessages?: string[];
+  /** XML autorizado devuelto por el SRI */
+  sriAuthorizedXml?: string;
   creditNoteId?: string;
   creditNoteNumber?: string;
   notes?: string;
@@ -61,6 +66,13 @@ export type CreditNoteReason =
   | 'DEVOLUCION_MERCADERIA'
   | 'DESCUENTO_BONIFICACION'
   | 'ERROR_DATOS';
+
+/**
+ * Estado del comprobante electrónico ante el SRI.
+ * PENDIENTE = aún no enviado · EN_PROCESO = enviado, esperando autorización
+ * RECHAZADO = devuelto / no autorizado · ERROR = falla de conexión o configuración
+ */
+export type SriDocumentStatus = 'PENDIENTE' | 'EN_PROCESO' | 'AUTORIZADO' | 'RECHAZADO' | 'ERROR' | 'ANULADO';
 
 export interface CreditNoteRecord {
   id: string;
@@ -80,8 +92,11 @@ export interface CreditNoteRecord {
   taxAmount: number;
   total: number;
   sriAccessKey?: string;
-  sriStatus: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
+  sriStatus: SriDocumentStatus;
   sriAuthorizationDate?: string;
+  sriAuthorizationNumber?: string;
+  sriMessages?: string[];
+  sriAuthorizedXml?: string;
   revertInventory?: boolean;
   notes?: string;
   createdAt: string;
@@ -426,6 +441,8 @@ export interface CompanyConfig {
   email?: string;
   telefono?: string;
   logoUrl?: string;
+  /** URL de la API Java de facturación electrónica SRI (por defecto http://localhost:8081) */
+  sriApiUrl?: string;
   /** Nombre del representante legal (firma en comprobantes de pago a artistas) */
   representanteLegal?: string;
   representanteLegalCedula?: string;

@@ -30,7 +30,7 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
   onClose,
   preselectedUser = null,
 }) => {
-  const { users, currentUser, switchUser } = useStudio();
+  const { users, currentUser, switchUser, settings } = useStudio();
   const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
@@ -277,8 +277,8 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-[#24242C] bg-[#121215] flex items-center justify-between text-[11px] text-neutral-400">
-          <span>Estudio: <strong>Devolution Ink (Quicentro)</strong></span>
-          <span>PIN Demo por defecto: <strong>1234 / 2026</strong></span>
+          <span>Estudio: <strong>{settings.nombreComercial || settings.studioName}</strong></span>
+          <span>Los usuarios con PIN deben ingresarlo para cambiar de sesión</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { DEFAULT_SRI_API_URL } from '../../services/sriElectronicService';
 import {
   Save,
   CheckCircle,
@@ -41,7 +42,7 @@ export const SettingsView: React.FC = () => {
   const [activeDocType, setActiveDocType] = useState<'factura' | 'nota_venta' | 'retencion'>('factura');
 
   // Datos Fiscales SRI (CompanyConfig)
-  const [ruc, setRuc] = useState(settings.ruc || settings.taxId || '1792847102001');
+  const [ruc, setRuc] = useState(settings.ruc || settings.taxId || '');
   const [razonSocial, setRazonSocial] = useState(settings.razonSocial || 'DEVOLUTION INK TATTOO STUDIO S.A.S.');
   const [nombreComercial, setNombreComercial] = useState(settings.nombreComercial || settings.studioName || 'Devolution Ink Tattoo Studio');
   const [dirMatriz, setDirMatriz] = useState(settings.dirMatriz || settings.address || 'Av. Naciones Unidas y Av. 6 de Diciembre, C.C. Quicentro Shopping, Quito, Ecuador');
@@ -61,6 +62,7 @@ export const SettingsView: React.FC = () => {
   const [agenteRetencion, setAgenteRetencion] = useState<'SI' | 'NO'>(settings.agenteRetencion === 'SI' ? 'SI' : 'NO');
   const [contribuyenteEspecial, setContribuyenteEspecial] = useState(settings.contribuyenteEspecial || '');
   const [ambiente, setAmbiente] = useState<SriAmbiente>(settings.ambiente || 'PRUEBAS');
+  const [sriApiUrl, setSriApiUrl] = useState(settings.sriApiUrl || DEFAULT_SRI_API_URL);
 
   // Firma Electrónica (.p12 / .pfx)
   const [firmaElectronicaBase64, setFirmaElectronicaBase64] = useState<string | undefined>(settings.firmaElectronicaBase64);
@@ -121,6 +123,7 @@ export const SettingsView: React.FC = () => {
     agenteRetencion,
     contribuyenteEspecial: contribuyenteEspecial.trim() || undefined,
     ambiente,
+    sriApiUrl: sriApiUrl.trim() || DEFAULT_SRI_API_URL,
     logoUrl: logoUrl.trim() || undefined,
     firmaElectronicaBase64,
     firmaElectronicaNombre: firmaElectronicaNombreArchivo || firmaElectronicaNombre,
@@ -151,6 +154,7 @@ export const SettingsView: React.FC = () => {
     agenteRetencion,
     contribuyenteEspecial,
     ambiente,
+    sriApiUrl,
     logoUrl,
     firmaElectronicaBase64,
     firmaElectronicaNombre,
@@ -328,6 +332,7 @@ export const SettingsView: React.FC = () => {
       agenteRetencion,
       contribuyenteEspecial: contribuyenteEspecial.trim() || undefined,
       ambiente,
+      sriApiUrl: sriApiUrl.trim() || DEFAULT_SRI_API_URL,
       tipoEmision: 'NORMAL',
       firmaElectronicaBase64,
       firmaElectronicaNombre: firmaElectronicaNombreArchivo || firmaElectronicaNombre,
@@ -763,6 +768,23 @@ export const SettingsView: React.FC = () => {
                   <option value="PRUEBAS">1 - PRUEBAS (Ambiente de Pruebas / Certificación)</option>
                   <option value="PRODUCCION">2 - PRODUCCIÓN (Emisión Legal en Vivo)</option>
                 </select>
+              </div>
+
+              {/* URL de la API Java de facturación electrónica */}
+              <div>
+                <label className="block font-semibold text-neutral-300 mb-1.5">
+                  URL de la API de Facturación Electrónica (Java)
+                </label>
+                <input
+                  type="url"
+                  value={sriApiUrl}
+                  onChange={e => setSriApiUrl(e.target.value)}
+                  placeholder={DEFAULT_SRI_API_URL}
+                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60 font-mono"
+                />
+                <p className="text-[10px] text-neutral-500 mt-1">
+                  Servidor API-SRI que firma (XAdES-BES) y envía los comprobantes al SRI. Por defecto {DEFAULT_SRI_API_URL}.
+                </p>
               </div>
 
               {/* Obligado a Llevar Contabilidad */}

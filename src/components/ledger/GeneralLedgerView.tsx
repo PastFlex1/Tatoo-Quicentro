@@ -19,75 +19,32 @@ import {
   Filter,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { ManualJournalEntry, JournalEntryLine } from '../../types';
+import { ManualJournalEntry } from '../../types';
+import {
+  AccountDefinition,
+  CHART_OF_ACCOUNTS,
+  JOURNAL_SOURCE_LABELS,
+  JournalSource,
+  LedgerPosting,
+  UnifiedJournalEntry,
+} from '../../utils/accountingEngine';
 import { NewJournalEntryModal } from './NewJournalEntryModal';
 import { JournalEntryPrintModal } from './JournalEntryPrintModal';
 
-export interface AccountDefinition {
-  code: string;
-  name: string;
-  group: 'Activo' | 'Pasivo' | 'Patrimonio' | 'Ingresos' | 'Costos' | 'Gastos';
-  nature: 'debit' | 'credit'; // Deudora o Acreedora
-}
-
-export const CHART_OF_ACCOUNTS: AccountDefinition[] = [
-  { code: '1101', name: 'Caja General (Efectivo en Estudio)', group: 'Activo', nature: 'debit' },
-  { code: '1102', name: 'Bancos, Datáfono POS & Transferencias', group: 'Activo', nature: 'debit' },
-  { code: '1105', name: 'Inventario de Insumos, Tintas & Joyería', group: 'Activo', nature: 'debit' },
-  { code: '1201', name: 'Mobiliario, Camillas & Autoclaves (Activo Fijo)', group: 'Activo', nature: 'debit' },
-  { code: '2101', name: 'Comisiones por Pagar a Artistas', group: 'Pasivo', nature: 'credit' },
-  { code: '2102', name: 'IVA / Impuestos Fiscales por Liquidar', group: 'Pasivo', nature: 'credit' },
-  { code: '2103', name: 'Cuentas y Proveedores por Pagar', group: 'Pasivo', nature: 'credit' },
-  { code: '3101', name: 'Capital & Fondo Operativo del Estudio', group: 'Patrimonio', nature: 'credit' },
-  { code: '4101', name: 'Ingresos por Servicios de Tatuaje', group: 'Ingresos', nature: 'credit' },
-  { code: '4102', name: 'Ingresos por Servicios de Body Piercing', group: 'Ingresos', nature: 'credit' },
-  { code: '4103', name: 'Ingresos por Venta de Joyería & Aftercare', group: 'Ingresos', nature: 'credit' },
-  { code: '5101', name: 'Costo Directo: Comisiones de Artistas', group: 'Costos', nature: 'debit' },
-  { code: '5102', name: 'Costo Directo: Insumos, Agujas & Joyería', group: 'Costos', nature: 'debit' },
-  { code: '5201', name: 'Gastos Operativos (Alquiler, Luz, Sanidad)', group: 'Gastos', nature: 'debit' },
-  { code: '5202', name: 'Gastos Financieros & Comisiones Datáfono/TPV', group: 'Gastos', nature: 'debit' },
-];
-
-export interface LedgerPosting {
-  id: string;
-  date: string;
-  reference: string;
-  accountCode: string;
-  concept: string;
-  debit: number;
-  credit: number;
-  source: 'sale' | 'expense' | 'kardex' | 'shift' | 'manual';
-  manualId?: string;
-}
-
-export interface UnifiedJournalEntry {
-  id: string;
-  entryNumber: string;
-  date: string;
-  reference: string;
-  concept: string;
-  source: 'manual' | 'sale' | 'expense' | 'shift';
-  entryType: string;
-  lines: JournalEntryLine[];
-  totalDebit: number;
-  totalCredit: number;
-  isBalanced: boolean;
-  manualRecord?: ManualJournalEntry;
-}
+export { CHART_OF_ACCOUNTS } from '../../utils/accountingEngine';
+export type { AccountDefinition, LedgerPosting, UnifiedJournalEntry } from '../../utils/accountingEngine';
 
 export const GeneralLedgerView: React.FC = () => {
   const {
-    filteredSales,
-    filteredExpenses,
-    manualJournalEntries,
-    currentShift,
+    accountingEntries,
+    accountingPostings,
     formatMoney,
     deleteManualJournalEntry,
   } = useStudio();
 
   // Active top tab: default to 'journal' (Libro Diario / Asientos Contables)
   const [activeTab, setActiveTab] = useState<'journal' | 'mayor' | 'trial_balance' | 'chart_of_accounts'>('journal');
-  const [journalFilter, setJournalFilter] = useState<'all' | 'manual' | 'sale' | 'expense' | 'shift'>('all');
+  const [journalFilter, setJournalFilter] = useState<'all' | JournalSource>('all');
   const [journalSearch, setJournalSearch] = useState<string>('');
 
   const [selectedAccountCode, setSelectedAccountCode] = useState<string>('all');
@@ -102,248 +59,8 @@ export const GeneralLedgerView: React.FC = () => {
     return found ? found.name : 'Cuenta Contable';
   };
 
-  // 1. Build Unified Journal Entries for Libro Diario
-  const unifiedJournalEntries = useMemo<UnifiedJournalEntry[]>(() => {
-    const list: UnifiedJournalEntry[] = [];
-
-    // A. Manual Journal Entries
-    manualJournalEntries.forEach(mj => {
-      if (mj.status === 'anulado') return;
-
-      const lines: JournalEntryLine[] =
-        mj.lines && mj.lines.length > 0
-          ? mj.lines
-          : [
-              {
-                id: `l1-${mj.id}`,
-                accountCode: mj.debitAccountCode || '1101',
-                accountName: getAccountName(mj.debitAccountCode || '1101'),
-                concept: mj.concept,
-                debit: mj.amount || 0,
-                credit: 0,
-              },
-              {
-                id: `l2-${mj.id}`,
-                accountCode: mj.creditAccountCode || '3101',
-                accountName: getAccountName(mj.creditAccountCode || '3101'),
-                concept: mj.concept,
-                debit: 0,
-                credit: mj.amount || 0,
-              },
-            ];
-
-      const totDeb = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
-      const totCred = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
-
-      list.push({
-        id: mj.id,
-        entryNumber: mj.entryNumber || mj.reference || `ASI-${mj.id.slice(-4)}`,
-        date: mj.date,
-        reference: mj.reference || 'S/R',
-        concept: mj.concept,
-        source: 'manual',
-        entryType: mj.entryType ? mj.entryType.toUpperCase() : 'MANUAL',
-        lines,
-        totalDebit: totDeb,
-        totalCredit: totCred,
-        isBalanced: Math.abs(totDeb - totCred) < 0.05,
-        manualRecord: mj,
-      });
-    });
-
-    // B. Sales Automatic Entries
-    filteredSales
-      .filter(s => s.status !== 'cancelled')
-      .forEach(s => {
-        const netRevenue = Math.max(0, s.total - s.taxAmount);
-        const revAccount =
-          s.serviceCategory === 'tattoo' ? '4101' : s.serviceCategory === 'piercing' ? '4102' : '4103';
-
-        const lines: JournalEntryLine[] = [];
-
-        // Debit asset
-        if (s.paymentMethod === 'cash') {
-          lines.push({
-            id: `s-c-${s.id}`,
-            accountCode: '1101',
-            accountName: getAccountName('1101'),
-            concept: `Cobro en efectivo: ${s.serviceName}`,
-            debit: s.total,
-            credit: 0,
-          });
-        } else if (s.paymentMethod === 'split') {
-          const cashP = s.cashPaid || 0;
-          const bankP = Math.max(0, s.total - cashP);
-          if (cashP > 0) {
-            lines.push({
-              id: `s-spc-${s.id}`,
-              accountCode: '1101',
-              accountName: getAccountName('1101'),
-              concept: `Cobro mixto (Efectivo)`,
-              debit: cashP,
-              credit: 0,
-            });
-          }
-          if (bankP > 0) {
-            lines.push({
-              id: `s-spb-${s.id}`,
-              accountCode: '1102',
-              accountName: getAccountName('1102'),
-              concept: `Cobro mixto (POS/Banco)`,
-              debit: bankP,
-              credit: 0,
-            });
-          }
-        } else {
-          lines.push({
-            id: `s-b-${s.id}`,
-            accountCode: '1102',
-            accountName: getAccountName('1102'),
-            concept: `Cobro ${s.paymentMethod === 'card' ? 'Tarjeta Datáfono' : 'Transferencia'}`,
-            debit: s.total,
-            credit: 0,
-          });
-        }
-
-        // Credit revenue
-        lines.push({
-          id: `s-rev-${s.id}`,
-          accountCode: revAccount,
-          accountName: getAccountName(revAccount),
-          concept: `Venta devengada (${s.serviceName})`,
-          debit: 0,
-          credit: netRevenue,
-        });
-
-        // Credit tax
-        if (s.taxAmount > 0) {
-          lines.push({
-            id: `s-tax-${s.id}`,
-            accountCode: '2102',
-            accountName: getAccountName('2102'),
-            concept: `IVA Repercutido (${s.taxRate || 15}%)`,
-            debit: 0,
-            credit: s.taxAmount,
-          });
-        }
-
-        // Commission
-        if (s.artistShare > 0) {
-          lines.push({
-            id: `s-cmd-${s.id}`,
-            accountCode: '5101',
-            accountName: getAccountName('5101'),
-            concept: `Costo comisión ${s.artistName} (${s.artistCommissionPercent}%)`,
-            debit: s.artistShare,
-            credit: 0,
-          });
-          lines.push({
-            id: `s-cmc-${s.id}`,
-            accountCode: '2101',
-            accountName: getAccountName('2101'),
-            concept: `Comisión por pagar a ${s.artistName}`,
-            debit: 0,
-            credit: s.artistShare,
-          });
-        }
-
-        const totDeb = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
-        const totCred = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
-
-        list.push({
-          id: `sale-entry-${s.id}`,
-          entryNumber: s.invoiceNumber,
-          date: s.date,
-          reference: s.invoiceNumber,
-          concept: `Facturación y cobro servicio: ${s.serviceName} - Cliente: ${s.clientName}`,
-          source: 'sale',
-          entryType: s.documentType === 'nota_venta' ? 'NOTA VENTA RIMPE' : 'VENTA / FACTURA',
-          lines,
-          totalDebit: totDeb,
-          totalCredit: totCred,
-          isBalanced: Math.abs(totDeb - totCred) < 0.05,
-        });
-      });
-
-    // C. Operating Expenses Automatic Entries
-    filteredExpenses.forEach(exp => {
-      const isArtistPayout = exp.category === 'artist_payout';
-      const isInventorySupplies =
-        exp.category === 'jewelry_restock' || exp.category === 'supplies_tattoo' || exp.category === 'supplies_piercing';
-      const debitAccount = isArtistPayout ? '2101' : isInventorySupplies ? '1105' : '5201';
-      const creditAccount = exp.paymentMethod === 'cash' ? '1101' : '1102';
-      const refCode = exp.invoiceReference || `GAS-${exp.id.slice(-4)}`;
-
-      const lines: JournalEntryLine[] = [
-        {
-          id: `exp-d-${exp.id}`,
-          accountCode: debitAccount,
-          accountName: getAccountName(debitAccount),
-          concept: exp.description,
-          debit: exp.amount,
-          credit: 0,
-        },
-        {
-          id: `exp-c-${exp.id}`,
-          accountCode: creditAccount,
-          accountName: getAccountName(creditAccount),
-          concept: `Pago a proveedor: ${exp.supplier}`,
-          debit: 0,
-          credit: exp.amount,
-        },
-      ];
-
-      list.push({
-        id: `exp-entry-${exp.id}`,
-        entryNumber: refCode,
-        date: exp.date,
-        reference: refCode,
-        concept: `Compra / Gasto: ${exp.description} (${exp.supplier})`,
-        source: 'expense',
-        entryType: isInventorySupplies ? 'COMPRA INVENTARIO' : 'GASTO OPERATIVO',
-        lines,
-        totalDebit: exp.amount,
-        totalCredit: exp.amount,
-        isBalanced: true,
-      });
-    });
-
-    // D. Shift Opening Entry
-    if (currentShift.openingCash > 0) {
-      list.push({
-        id: `shift-open-entry`,
-        entryNumber: 'APE-CAJA',
-        date: currentShift.openedAt,
-        reference: 'APE-CAJA-01',
-        concept: `Apertura de turno y fondo inicial de caja (${currentShift.openedBy})`,
-        source: 'shift',
-        entryType: 'APERTURA CAJA',
-        lines: [
-          {
-            id: 'so-d',
-            accountCode: '1101',
-            accountName: getAccountName('1101'),
-            concept: 'Fondo inicial disponible en caja',
-            debit: currentShift.openingCash,
-            credit: 0,
-          },
-          {
-            id: 'so-c',
-            accountCode: '3101',
-            accountName: getAccountName('3101'),
-            concept: 'Aporte de fondo operativo de turno',
-            debit: 0,
-            credit: currentShift.openingCash,
-          },
-        ],
-        totalDebit: currentShift.openingCash,
-        totalCredit: currentShift.openingCash,
-        isBalanced: true,
-      });
-    }
-
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [manualJournalEntries, filteredSales, filteredExpenses, currentShift]);
+  // 1. Asientos del Libro Diario: vienen del motor contable único (todas las secciones)
+  const unifiedJournalEntries: UnifiedJournalEntry[] = accountingEntries;
 
   // Filtered Journal Entries
   const filteredJournalEntries = useMemo(() => {
@@ -361,52 +78,14 @@ export const GeneralLedgerView: React.FC = () => {
             (l.concept && l.concept.toLowerCase().includes(q))
         );
 
-      const matchSource =
-        journalFilter === 'all' ||
-        (journalFilter === 'manual' && entry.source === 'manual') ||
-        (journalFilter === 'sale' && entry.source === 'sale') ||
-        (journalFilter === 'expense' && entry.source === 'expense') ||
-        (journalFilter === 'shift' && entry.source === 'shift');
+      const matchSource = journalFilter === 'all' || entry.source === journalFilter;
 
       return matchSearch && matchSource;
     });
   }, [unifiedJournalEntries, journalSearch, journalFilter]);
 
-  // 2. Build Postings for Cuentas T and Trial Balance
-  const allPostings = useMemo<LedgerPosting[]>(() => {
-    const list: LedgerPosting[] = [];
-    unifiedJournalEntries.forEach(entry => {
-      entry.lines.forEach((l, idx) => {
-        if (l.debit > 0) {
-          list.push({
-            id: `post-d-${entry.id}-${idx}`,
-            date: entry.date,
-            reference: entry.entryNumber,
-            accountCode: l.accountCode,
-            concept: l.concept || entry.concept,
-            debit: l.debit,
-            credit: 0,
-            source: entry.source,
-            manualId: entry.manualRecord?.id,
-          });
-        }
-        if (l.credit > 0) {
-          list.push({
-            id: `post-c-${entry.id}-${idx}`,
-            date: entry.date,
-            reference: entry.entryNumber,
-            accountCode: l.accountCode,
-            concept: l.concept || entry.concept,
-            debit: 0,
-            credit: l.credit,
-            source: entry.source,
-            manualId: entry.manualRecord?.id,
-          });
-        }
-      });
-    });
-    return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [unifiedJournalEntries]);
+  // 2. Pases al Mayor y Balance de Comprobación (mismo motor contable)
+  const allPostings: LedgerPosting[] = accountingPostings;
 
   // Group postings by account for Cuentas T
   const ledgerAccountsMap = useMemo(() => {
@@ -706,13 +385,24 @@ export const GeneralLedgerView: React.FC = () => {
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <span className="text-[11px] text-neutral-400 block mb-1">Ecuación Contable / Partida Doble</span>
-          <div className="flex items-center gap-2 text-base sm:text-lg font-bold text-emerald-400">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span>100% Cuadrado</span>
-          </div>
-          <span className="text-[10px] text-neutral-500 block mt-1">
-            Activo = Pasivo + Patrimonio
-          </span>
+          {(() => {
+            const totalDebit = allPostings.reduce((acc, p) => acc + p.debit, 0);
+            const totalCredit = allPostings.reduce((acc, p) => acc + p.credit, 0);
+            const unbalanced = unifiedJournalEntries.filter(e => !e.isBalanced).length;
+            const ok = Math.abs(totalDebit - totalCredit) < 0.01 && unbalanced === 0;
+            return (
+              <>
+                <div className={`flex items-center gap-2 text-base sm:text-lg font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {ok ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <X className="w-5 h-5 shrink-0" />}
+                  <span>{ok ? 'Cuadrado' : 'Descuadrado'}</span>
+                </div>
+                <span className="text-[10px] text-neutral-500 block mt-1">
+                  Debe {formatMoney(totalDebit)} · Haber {formatMoney(totalCredit)}
+                  {unbalanced > 0 ? ` · ${unbalanced} asiento(s) descuadrado(s)` : ''}
+                </span>
+              </>
+            );
+          })()}
         </div>
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
@@ -720,7 +410,7 @@ export const GeneralLedgerView: React.FC = () => {
           <div className="text-lg sm:text-xl font-bold font-mono text-white flex items-center justify-between">
             <span>{unifiedJournalEntries.length} asientos</span>
             <span className="text-xs text-[#FF3366] font-normal">
-              ({manualJournalEntries.length} manuales)
+              ({unifiedJournalEntries.filter(e => e.source === 'manual').length} manuales)
             </span>
           </div>
           <span className="text-[10px] text-neutral-500 block mt-1">Sincronizados en tiempo real</span>
@@ -748,10 +438,10 @@ export const GeneralLedgerView: React.FC = () => {
             <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
               {[
                 { id: 'all', label: 'Todos los Asientos' },
-                { id: 'manual', label: 'Manuales / Ajuste' },
-                { id: 'sale', label: 'Ventas / POS' },
-                { id: 'expense', label: 'Compras / Gastos' },
-                { id: 'shift', label: 'Caja' },
+                ...(Object.keys(JOURNAL_SOURCE_LABELS) as JournalSource[]).map(id => ({
+                  id,
+                  label: JOURNAL_SOURCE_LABELS[id],
+                })),
               ].map(tab => (
                 <button
                   key={tab.id}

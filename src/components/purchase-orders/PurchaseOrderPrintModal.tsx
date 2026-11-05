@@ -48,7 +48,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
 
     const message = encodeURIComponent(
       `Estimados *${order.supplierName}*:\n\n` +
-      `Adjuntamos la *Orden de Compra N° ${order.orderNumber}* emitida por *${settings.studioName}* (RUC: ${settings.taxId || '1792847102001'}):\n\n` +
+      `Adjuntamos la *Orden de Compra N° ${order.orderNumber}* emitida por *${settings.studioName}* (RUC: ${settings.ruc || settings.taxId || '—'}):\n\n` +
       `📅 *Fecha de Emisión:* ${order.date}\n` +
       (order.expectedDate ? `🚚 *Fecha Requerida de Entrega:* ${order.expectedDate}\n` : '') +
       `💳 *Condición de Pago:* ${order.paymentTerms || 'Contado'}\n\n` +
@@ -204,7 +204,7 @@ export const PurchaseOrderPrintModal: React.FC<PurchaseOrderPrintModalProps> = (
                 <div className="text-[11px] text-neutral-600 space-y-0.5 pt-1">
                   <p className="flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-neutral-500" />
-                    <span><strong>R.U.C.:</strong> {settings.taxId || '1792847102001'}</span>
+                    <span><strong>R.U.C.:</strong> {settings.ruc || settings.taxId || '—'}</span>
                   </p>
                   <p className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-neutral-500" />

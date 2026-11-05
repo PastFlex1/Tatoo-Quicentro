@@ -88,7 +88,7 @@ export const JournalEntryPrintModal: React.FC<JournalEntryPrintModalProps> = ({ 
                 C.C. Quicentro Shopping, Local 214 · Quito, Ecuador
               </p>
               <p className="text-[11px] text-neutral-600 font-mono">
-                RUC: {settings.taxId || '1792847102001'} · Tel: {settings.phone || '+593 99 123 4567'}
+                RUC: {settings.ruc || settings.taxId || '—'} · Tel: {settings.phone || settings.telefono || '—'}
               </p>
             </div>
 

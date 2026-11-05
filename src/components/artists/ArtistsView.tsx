@@ -1083,10 +1083,10 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                 </div>
               </div>
 
-              {/* Simulación visual del reparto */}
+              {/* Ejemplo visual del reparto */}
               <div className="p-3.5 rounded-2xl bg-[#121215] border border-[#272730] space-y-2">
                 <span className="text-[10px] text-neutral-400 uppercase font-semibold tracking-wider block">
-                  Simulación de Reparto (por cada $100 facturados):
+                  Ejemplo de reparto (por cada $100 facturados):
                 </span>
                 <div className="flex justify-between items-center text-xs font-mono">
                   <span className="text-[#FF3366] font-bold">

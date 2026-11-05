@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { escapeXml, signXml } from '../../services/sriElectronicService';
 import {
   Key,
   UploadCloud,
@@ -22,7 +23,6 @@ import { CompanyConfig } from '../../types';
 import {
   convertFileToBase64,
   detectEcuadorianCertificateIssuer,
-  simulateXadesBesXmlSigning,
   ECUADOR_CERTIFIERS,
 } from '../../utils/sriCalculations';
 import { useAlertModal } from '../../context/AlertModalContext';
@@ -159,50 +159,40 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
     });
   };
 
-  const handleTestXmlSign = () => {
+  // Prueba REAL: envía un XML de prueba a la API Java para firmarlo con el certificado cargado
+  const [isTestingSign, setIsTestingSign] = useState(false);
+  const handleTestXmlSign = async () => {
     if (!company.firmaElectronicaBase64) {
-      showAlert({
-        title: 'Certificado no encontrado',
-        message: 'Debes cargar primero un archivo de firma electrónica (.p12 o .pfx).',
-        type: 'warning',
-      });
+      showAlert({ title: 'Firma no cargada', message: 'Cargue primero el archivo .p12 / .pfx.', type: 'warning' });
       return;
     }
-
+    if (!(company.firmaElectronicaClave || '').trim()) {
+      showAlert({ title: 'Contraseña requerida', message: 'Ingrese la contraseña del certificado para probar la firma.', type: 'warning' });
+      return;
+    }
     const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
-<factura id="comprobante" version="1.1.0">
+<factura id="comprobante" version="2.1.0">
   <infoTributaria>
-    <ambiente>${company.ambiente === 'PRODUCCION' || company.ambiente === '2' ? '2' : '1'}</ambiente>
+    <ambiente>1</ambiente>
     <tipoEmision>1</tipoEmision>
-    <razonSocial>${company.razonSocial || 'DEVOLUTION INK TATTOO STUDIO S.A.S.'}</razonSocial>
-    <nombreComercial>${company.nombreComercial || 'Devolution Ink Tattoo Studio'}</nombreComercial>
-    <ruc>${company.ruc || '1792847102001'}</ruc>
-    <claveAcceso>0809202601${company.ruc || '1792847102001'}10010010000000011234567813</claveAcceso>
-    <codDoc>01</codDoc>
-    <estab>${company.codigoEstablecimiento || '001'}</estab>
-    <ptoEmi>${company.puntoEmision || '001'}</ptoEmi>
-    <secuencial>000000001</secuencial>
-    <dirMatriz>${company.dirMatriz || 'C.C. Quicentro Shopping, Quito, Ecuador'}</dirMatriz>
+    <razonSocial>${escapeXml(company.razonSocial || 'PRUEBA')}</razonSocial>
+    <ruc>${(company.ruc || '').replace(/\D/g, '')}</ruc>
   </infoTributaria>
-  <infoFactura>
-    <fechaEmision>08/09/2026</fechaEmision>
-    <dirEstablecimiento>${company.dirEstablecimiento || company.dirMatriz || 'C.C. Quicentro Shopping, Local 214'}</dirEstablecimiento>
-    <obligadoContabilidad>${company.obligadoContabilidad || 'NO'}</obligadoContabilidad>
-    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
-    <razonSocialComprador>CONSUMIDOR FINAL</razonSocialComprador>
-    <identificacionComprador>9999999999999</identificacionComprador>
-    <totalSinImpuestos>100.00</totalSinImpuestos>
-    <importeTotal>115.00</importeTotal>
-  </infoFactura>
 </factura>`;
-
-    const { signedXml } = simulateXadesBesXmlSigning(
-      sampleXml,
-      company.firmaElectronicaBase64,
-      company.firmaElectronicaClave
-    );
-    setTestSignedXmlResult(signedXml);
-    setTestSignModalOpen(true);
+    setIsTestingSign(true);
+    try {
+      const signedXml = await signXml(sampleXml, company);
+      setTestSignedXmlResult(signedXml);
+      setTestSignModalOpen(true);
+    } catch (err: any) {
+      showAlert({
+        title: 'No se pudo firmar',
+        message: err?.message || 'La API de facturación electrónica no respondió.',
+        type: 'error',
+      });
+    } finally {
+      setIsTestingSign(false);
+    }
   };
 
   return (
@@ -309,11 +299,12 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
               <button
                 type="button"
                 onClick={handleTestXmlSign}
+                disabled={isTestingSign}
                 className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-                title="Probar firma digital XAdES-BES con comprobante de prueba"
+                title="Firmar un XML de prueba con la API de facturación electrónica"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Simular Firma XML</span>
+                <Sparkles className={`w-3.5 h-3.5 text-emerald-400 ${isTestingSign ? 'animate-spin' : ''}`} />
+                <span>{isTestingSign ? 'Firmando…' : 'Probar Firma (API)'}</span>
               </button>
 
               <button
@@ -413,7 +404,7 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
         </div>
       )}
 
-      {/* MODAL: XML Signing Simulation */}
+      {/* MODAL: resultado de la prueba de firma con la API */}
       {testSignModalOpen && testSignedXmlResult && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-[#18181D] border border-[#272730] rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -421,7 +412,7 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-300" />
                 <h3 className="font-bold text-sm">
-                  Simulación de Firma Digital XAdES-BES SRI Exitosa
+                  Firma XAdES-BES realizada por la API correctamente
                 </h3>
               </div>
               <button
@@ -437,11 +428,10 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
                 <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
                   <p className="font-bold">
-                    El comprobante XML ha sido firmado digitalmente con tu certificado en Base64.
+                    La API firmó el XML de prueba con tu certificado .p12 y la contraseña ingresada.
                   </p>
                   <p className="text-[11px] text-emerald-300/80">
-                    Estructura <code className="font-mono font-bold text-emerald-200">ds:Signature</code> y{' '}
-                    <code className="font-mono font-bold text-emerald-200">xades:QualifyingProperties</code> inyectadas según Ficha Técnica SRI Off-line.
+                    Este XML es solo una prueba de firma; no se envió al SRI.
                   </p>
                 </div>
               </div>

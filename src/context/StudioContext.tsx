@@ -42,10 +42,19 @@ import {
   INITIAL_PURCHASE_ORDERS,
   INITIAL_USERS,
   INITIAL_JOURNAL_ENTRIES,
+  LEGACY_DEMO_IDS,
+  LEGACY_DEMO_USER_IDS,
   getDefaultTabsForRole,
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
-import { generateSriClaveAcceso } from '../utils/sriCalculations';
+import { buildJournalEntries, buildPostings, LedgerPosting, UnifiedJournalEntry } from '../utils/accountingEngine';
+import {
+  buildAccessKey,
+  buildFacturaXml,
+  buildNotaCreditoXml,
+  emitElectronicDocument,
+  SriEmissionResult,
+} from '../services/sriElectronicService';
 
 interface StudioContextType {
   // Data
@@ -114,6 +123,10 @@ interface StudioContextType {
   deleteSale: (id: string) => void;
 
   // Actions - Credit Notes / Notas de Crédito
+  /** Envía (o reintenta) una factura al SRI usando la API Java */
+  emitSaleToSri: (saleId: string) => Promise<SriEmissionResult | null>;
+  /** Envía (o reintenta) una nota de crédito al SRI usando la API Java */
+  emitCreditNoteToSri: (creditNoteId: string) => Promise<SriEmissionResult | null>;
   addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => CreditNoteRecord;
   deleteCreditNote: (id: string) => void;
 
@@ -203,7 +216,6 @@ interface StudioContextType {
   // Settings & Utilities
   updateSettings: (newSettings: Partial<StudioSettings>) => void;
   formatMoney: (amount: number | undefined | null) => string;
-  resetToDemo: () => void;
   clearAllData: () => void;
   exportBackup: () => void;
   importBackup: (jsonString: string) => boolean;
@@ -212,6 +224,9 @@ interface StudioContextType {
   filteredSales: SaleRecord[];
   filteredCreditNotes: CreditNoteRecord[];
   filteredExpenses: ExpenseRecord[];
+  /** Asientos contables automáticos de todas las secciones (según el filtro de fechas) */
+  accountingEntries: UnifiedJournalEntry[];
+  accountingPostings: LedgerPosting[];
 }
 
 const StudioContext: React.Context<StudioContextType | undefined> =
@@ -229,6 +244,61 @@ function safeLoadFromStorage<T>(key: string, fallback: T): T {
   } catch (err) {
     console.warn(`[StudioContext] Error al parsear "${key}" desde localStorage:`, err);
     return fallback;
+  }
+}
+
+/**
+ * Limpieza única de los datos de demostración que guardaban versiones anteriores.
+ * Solo elimina registros cuyos IDs coinciden con los de la demo; los datos reales se conservan.
+ */
+function purgeLegacyDemoData(keys: Record<string, string>) {
+  try {
+    const FLAG = 'inkledger_demo_purged_v1';
+    if (localStorage.getItem(FLAG)) return;
+    const byKey: Record<string, string[]> = {
+      [keys.SALES]: LEGACY_DEMO_IDS.INITIAL_SALES,
+      [keys.CREDIT_NOTES]: LEGACY_DEMO_IDS.INITIAL_CREDIT_NOTES,
+      [keys.EXPENSES]: LEGACY_DEMO_IDS.INITIAL_EXPENSES,
+      [keys.ARTISTS]: LEGACY_DEMO_IDS.INITIAL_ARTISTS,
+      [keys.INVENTORY]: LEGACY_DEMO_IDS.INITIAL_INVENTORY,
+      [keys.KARDEX]: LEGACY_DEMO_IDS.INITIAL_KARDEX,
+      [keys.APPOINTMENTS]: LEGACY_DEMO_IDS.INITIAL_APPOINTMENTS,
+      [keys.CLIENTS]: LEGACY_DEMO_IDS.INITIAL_CLIENTS,
+      [keys.PROFORMAS]: LEGACY_DEMO_IDS.INITIAL_PROFORMAS,
+      [keys.GALLERY]: LEGACY_DEMO_IDS.INITIAL_GALLERY_PHOTOS,
+      [keys.SUPPLIERS]: LEGACY_DEMO_IDS.INITIAL_SUPPLIERS,
+      [keys.PURCHASE_ORDERS]: LEGACY_DEMO_IDS.INITIAL_PURCHASE_ORDERS,
+      [keys.JOURNAL]: LEGACY_DEMO_IDS.INITIAL_JOURNAL_ENTRIES,
+      [keys.USERS]: LEGACY_DEMO_USER_IDS,
+    };
+    Object.entries(byKey).forEach(([storageKey, demoIds]) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw || !demoIds) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const ids = new Set(demoIds);
+      localStorage.setItem(storageKey, JSON.stringify(parsed.filter((r: { id?: string }) => !ids.has(r?.id || ''))));
+    });
+    // Liquidaciones de artistas demo
+    const demoArtists = new Set(LEGACY_DEMO_IDS.INITIAL_ARTISTS);
+    const rawSt = localStorage.getItem(keys.SETTLEMENTS);
+    if (rawSt) {
+      const st = JSON.parse(rawSt);
+      if (Array.isArray(st)) {
+        localStorage.setItem(
+          keys.SETTLEMENTS,
+          JSON.stringify(st.filter((r: { artistId?: string }) => !demoArtists.has(r?.artistId || '')))
+        );
+      }
+    }
+    // Turno de caja demo y usuario demo activo
+    const rawShift = localStorage.getItem(keys.CURRENT_SHIFT);
+    if (rawShift && JSON.parse(rawShift)?.id === 'shift-today') localStorage.removeItem(keys.CURRENT_SHIFT);
+    const rawUser = localStorage.getItem(keys.CURRENT_USER);
+    if (rawUser && LEGACY_DEMO_USER_IDS.includes(JSON.parse(rawUser)?.id)) localStorage.removeItem(keys.CURRENT_USER);
+    localStorage.setItem(FLAG, new Date().toISOString());
+  } catch (err) {
+    console.warn('[StudioContext] No se pudo limpiar la data demo:', err);
   }
 }
 
@@ -254,6 +324,10 @@ const STORAGE_KEYS = {
   SETTINGS: 'inkledger_settings_v1',
   THEME: 'inkledger_theme_v1',
 };
+
+if (typeof window !== 'undefined') {
+  purgeLegacyDemoData(STORAGE_KEYS);
+}
 
 export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Load initial from localStorage safely or fall back to defaults
@@ -289,8 +363,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   );
 
   const [manualJournalEntries, setManualJournalEntries] = useState<ManualJournalEntry[]>(() => {
-    const loaded = safeLoadFromStorage<ManualJournalEntry[]>(STORAGE_KEYS.JOURNAL, INITIAL_JOURNAL_ENTRIES);
-    return loaded && loaded.length > 0 ? loaded : INITIAL_JOURNAL_ENTRIES;
+    return safeLoadFromStorage<ManualJournalEntry[]>(STORAGE_KEYS.JOURNAL, INITIAL_JOURNAL_ENTRIES);
   });
 
   const [appointments, setAppointments] = useState<Appointment[]>(() =>
@@ -554,6 +627,33 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => isDateInFilter(e.date, dateFilter));
   }, [expenses, dateFilter]);
+
+  // Motor contable único: todas las secciones generan sus asientos aquí
+  const accountingEntries = useMemo<UnifiedJournalEntry[]>(() => {
+    const inRange = (d: string) => isDateInFilter(d, dateFilter);
+    return buildJournalEntries({
+      sales: filteredSales,
+      creditNotes: filteredCreditNotes,
+      expenses: filteredExpenses,
+      settlements: settlements.filter(st => inRange(st.date)),
+      kardexMovements: kardexMovements.filter(m => inRange(m.date)),
+      manualJournalEntries: manualJournalEntries.filter(j => inRange(j.date)),
+      purchaseOrders,
+      shifts: [...pastShifts, currentShift].filter(sh => sh && inRange(sh.openedAt)),
+    });
+  }, [
+    filteredSales,
+    filteredCreditNotes,
+    filteredExpenses,
+    settlements,
+    kardexMovements,
+    manualJournalEntries,
+    purchaseOrders,
+    pastShifts,
+    currentShift,
+    dateFilter,
+  ]);
+  const accountingPostings = useMemo(() => buildPostings(accountingEntries), [accountingEntries]);
 
   // Format currency helper
   const formatMoney = (amount: number | undefined | null): string => {
@@ -1296,6 +1396,70 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return sale;
   };
 
+  // ===================== FACTURACIÓN ELECTRÓNICA REAL (API Java SRI) =====================
+  // Referencias al estado más reciente para los procesos asíncronos de envío al SRI
+  const salesRef = useRef(sales);
+  salesRef.current = sales;
+  const creditNotesRef = useRef(creditNotes);
+  creditNotesRef.current = creditNotes;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const sriInFlight = useRef<Set<string>>(new Set());
+
+  const applySriResult = (result: SriEmissionResult) => ({
+    sriStatus: result.status,
+    sriAuthorizationNumber: result.authorizationNumber,
+    sriAuthorizationDate: result.authorizationDate,
+    sriMessages: result.messages,
+    sriAuthorizedXml: result.xml,
+  });
+
+  /** Firma, envía y consulta la autorización de una factura en el SRI. */
+  const emitSaleToSri = async (saleId: string, saleSnapshot?: SaleRecord): Promise<SriEmissionResult | null> => {
+    const sale = saleSnapshot || salesRef.current.find(s => s.id === saleId);
+    if (!sale || sale.documentType === 'nota_venta' || sale.sriStatus === 'AUTORIZADO') return null;
+    if (sriInFlight.current.has(saleId)) return null;
+    sriInFlight.current.add(saleId);
+    try {
+      const cfg = settingsRef.current;
+      const claveAcceso = sale.sriAccessKey || buildAccessKey(cfg, '01', sale.invoiceNumber, new Date(sale.date));
+      const wasInProcess = sale.sriStatus === 'EN_PROCESO';
+      setSales(prev => prev.map(s => (s.id === saleId ? { ...s, sriAccessKey: claveAcceso, sriStatus: 'EN_PROCESO' } : s)));
+      const xml = buildFacturaXml({ ...sale, sriAccessKey: claveAcceso }, cfg, claveAcceso);
+      const result = await emitElectronicDocument(xml, claveAcceso, cfg, { alreadyReceived: wasInProcess });
+      setSales(prev => prev.map(s => (s.id === saleId ? { ...s, ...applySriResult(result) } : s)));
+      return result;
+    } finally {
+      sriInFlight.current.delete(saleId);
+    }
+  };
+
+  /** Firma, envía y consulta la autorización de una nota de crédito en el SRI. */
+  const emitCreditNoteToSri = async (
+    cnId: string,
+    cnSnapshot?: CreditNoteRecord
+  ): Promise<SriEmissionResult | null> => {
+    const cn = cnSnapshot || creditNotesRef.current.find(c => c.id === cnId);
+    if (!cn || cn.sriStatus === 'AUTORIZADO' || cn.sriStatus === 'ANULADO') return null;
+    if (sriInFlight.current.has(cnId)) return null;
+    sriInFlight.current.add(cnId);
+    try {
+      const cfg = settingsRef.current;
+      const claveAcceso = cn.sriAccessKey || buildAccessKey(cfg, '04', cn.creditNoteNumber, new Date(cn.date));
+      const wasInProcess = cn.sriStatus === 'EN_PROCESO';
+      setCreditNotes(prev =>
+        prev.map(c => (c.id === cnId ? { ...c, sriAccessKey: claveAcceso, sriStatus: 'EN_PROCESO' } : c))
+      );
+      const sale = salesRef.current.find(s => s.id === cn.affectedInvoiceId);
+      const xml = buildNotaCreditoXml(cn, cfg, claveAcceso, sale);
+      const result = await emitElectronicDocument(xml, claveAcceso, cfg, { alreadyReceived: wasInProcess });
+      setCreditNotes(prev => prev.map(c => (c.id === cnId ? { ...c, ...applySriResult(result) } : c)));
+      return result;
+    } finally {
+      sriInFlight.current.delete(cnId);
+    }
+  };
+
   // Último secuencial asignado en esta sesión (evita duplicados si addSale se llama
   // varias veces antes de que React actualice `settings`).
   const lastAssignedSeqRef = useRef<{ notaVenta: number; factura: number }>({ notaVenta: 0, factura: 0 });
@@ -1344,7 +1508,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (isNotaVenta) {
       currentSeqNum = getNextSaleSequential(
         true,
-        sales.filter(s => s.documentType === 'nota_venta').length + 46
+        1
       );
       const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
       invoiceNumber = `NV-${estab}-${pto}-${secuencialPadded}`;
@@ -1358,7 +1522,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } else {
       currentSeqNum = getNextSaleSequential(
         false,
-        sales.filter(s => s.documentType !== 'nota_venta').length + 184
+        1
       );
       const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
       invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
@@ -1371,41 +1535,27 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }));
     }
 
-    const rucLimpio = (settings.ruc || settings.taxId || '1792847102001')
-      .replace(/\D/g, '')
-      .padEnd(13, '0')
-      .slice(0, 13);
-
     const now = new Date();
-    let sriAccessKey = saleData.sriAccessKey;
-    if (!isNotaVenta && !sriAccessKey) {
-      try {
-        const sec9 = String(currentSeqNum).padStart(9, '0').slice(-9);
-        sriAccessKey = generateSriClaveAcceso({
-          fechaEmision: now,
-          tipoComprobante: '01',
-          ruc: rucLimpio,
-          ambiente: settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1',
-          serie: `${estab}${pto}`,
-          secuencial: sec9,
-          codigoNumerico: '12345678',
-          tipoEmision: '1',
-        });
-      } catch {
-        sriAccessKey = undefined;
-      }
-    }
+    // Clave de acceso de 49 dígitos (código numérico aleatorio). Las notas de venta RIMPE no son electrónicas.
+    const sriAccessKey = isNotaVenta
+      ? undefined
+      : saleData.sriAccessKey || buildAccessKey(settings, '01', invoiceNumber, new Date(saleData.date || now));
 
     const newSale: SaleRecord = {
       ...saleData,
       id: `sale-${Date.now()}`,
       invoiceNumber,
       documentType: isNotaVenta ? 'nota_venta' : 'factura',
-      sriStatus: isNotaVenta ? undefined : 'AUTORIZADO',
+      // La factura queda PENDIENTE hasta que el SRI responda la autorización real
+      sriStatus: isNotaVenta ? undefined : 'PENDIENTE',
       sriAccessKey,
-      sriAuthorizationDate: isNotaVenta ? undefined : now.toISOString(),
+      sriAuthorizationDate: undefined,
     };
     setSales(prev => [newSale, ...prev]);
+    if (!isNotaVenta) {
+      // Envío automático al SRI (firma → recepción → autorización) mediante la API Java
+      setTimeout(() => void emitSaleToSri(newSale.id, newSale), 0);
+    }
 
     // Ensure client profile is synced in client directory
     if (saleData.clientName) {
@@ -1597,45 +1747,30 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   ): CreditNoteRecord => {
     const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
     const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
-    const currentSeqNum = creditNotes.length + 1;
+    // Secuencial: siguiente al mayor ya emitido (evita duplicados)
+    const currentSeqNum =
+      creditNotes.reduce(
+        (max, c) => Math.max(max, parseInt((c.creditNoteNumber || '').split('-').pop() || '0', 10) || 0),
+        0
+      ) + 1;
     const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
     const creditNoteNumber = `${estab}-${pto}-${secuencialPadded}`;
 
-    const rucLimpio = (settings.ruc || settings.taxId || '1792847102001')
-      .replace(/\D/g, '')
-      .padEnd(13, '0')
-      .slice(0, 13);
-
     const now = new Date();
-    let sriAccessKey = cnData.sriAccessKey;
-    if (!sriAccessKey) {
-      try {
-        sriAccessKey = generateSriClaveAcceso({
-          fechaEmision: now,
-          tipoComprobante: '04', // 04 = Nota de Crédito SRI
-          ruc: rucLimpio,
-          ambiente: settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1',
-          serie: `${estab}${pto}`,
-          secuencial: secuencialPadded,
-          codigoNumerico: '12345678',
-          tipoEmision: '1',
-        });
-      } catch {
-        sriAccessKey = '0101202604179284710200110010010000000011234567814';
-      }
-    }
+    const sriAccessKey = cnData.sriAccessKey || buildAccessKey(settings, '04', creditNoteNumber, now);
 
     const newCN: CreditNoteRecord = {
       ...cnData,
       id: `cn-${Date.now()}`,
       creditNoteNumber,
       sriAccessKey,
-      sriStatus: 'AUTORIZADO',
-      sriAuthorizationDate: now.toISOString(),
+      sriStatus: 'PENDIENTE',
+      sriAuthorizationDate: undefined,
       createdAt: now.toISOString(),
     };
 
     setCreditNotes(prev => [newCN, ...prev]);
+    setTimeout(() => void emitCreditNoteToSri(newCN.id, newCN), 0);
 
     // 1. Modificar la factura afectada
     if (cnData.affectedInvoiceId) {
@@ -2140,27 +2275,6 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSettings(prev => ({ ...prev, ...newSettings }));
   };
 
-  // Reset to Demo
-  const resetToDemo = () => {
-    setSales(INITIAL_SALES);
-    setExpenses(INITIAL_EXPENSES);
-    setArtists(INITIAL_ARTISTS);
-    setInventory(INITIAL_INVENTORY);
-    setKardexMovements(INITIAL_KARDEX);
-    setManualJournalEntries(INITIAL_JOURNAL_ENTRIES);
-    setAppointments(INITIAL_APPOINTMENTS);
-    setClients(INITIAL_CLIENTS);
-    setProformas(INITIAL_PROFORMAS);
-    setGalleryPhotos(INITIAL_GALLERY_PHOTOS);
-    setSuppliers(INITIAL_SUPPLIERS);
-    setPurchaseOrders(INITIAL_PURCHASE_ORDERS);
-    setUsers(INITIAL_USERS);
-    setCurrentUser(INITIAL_USERS[0]);
-    setCurrentShift(INITIAL_CASH_SHIFT);
-    setSettlements([]);
-    setSettings(INITIAL_SETTINGS);
-  };
-
   // Clear all data (blank start)
   const clearAllData = () => {
     setSales([]);
@@ -2335,13 +2449,16 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         closeCashShift,
         updateSettings,
         formatMoney,
-        resetToDemo,
         clearAllData,
         exportBackup,
         importBackup,
         filteredSales,
         filteredCreditNotes,
         filteredExpenses,
+        accountingEntries,
+        accountingPostings,
+        emitSaleToSri,
+        emitCreditNoteToSri,
       }}
     >
       {children}
@@ -2430,13 +2547,16 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   closeCashShift: () => {},
   updateSettings: () => {},
   formatMoney: (val) => `$${Number(val || 0).toFixed(2)}`,
-  resetToDemo: () => {},
   clearAllData: () => {},
   exportBackup: () => {},
   importBackup: () => false,
   filteredSales: INITIAL_SALES,
   filteredCreditNotes: INITIAL_CREDIT_NOTES,
   filteredExpenses: INITIAL_EXPENSES,
+  accountingEntries: [],
+  accountingPostings: [],
+  emitSaleToSri: async () => null,
+  emitCreditNoteToSri: async () => null,
 };
 
 export const useStudio = (): StudioContextType => {

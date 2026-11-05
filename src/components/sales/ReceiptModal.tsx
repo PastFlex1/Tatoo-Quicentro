@@ -16,8 +16,6 @@ import {
 import { SaleRecord } from '../../types';
 import { useStudio } from '../../context/StudioContext';
 import { SriBarcodeSvg } from '../common/SriBarcodeSvg';
-import { generateSriClaveAcceso } from '../../utils/sriCalculations';
-import { SRI_SIMULATION_MODE } from '../../utils/sriCalculations';
 
 interface ReceiptModalProps {
   sale: SaleRecord | null;
@@ -52,32 +50,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
     return `${estab}-${pto}-${sec}`;
   }, [sale?.invoiceNumber, settings.codigoEstablecimiento, settings.puntoEmision]);
 
-  // Official SRI 49-digit access key
-  const claveAccesoCalculada = useMemo(() => {
-    if (!sale) return '';
-    try {
-      const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
-      const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
-      const sec = (sale.invoiceNumber.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9);
-      const rucLimpio = (settings.ruc || settings.taxId || '1790012345001')
-        .replace(/\D/g, '')
-        .padEnd(13, '0')
-        .slice(0, 13);
-
-      return generateSriClaveAcceso({
-        fechaEmision: sale.date || new Date(),
-        tipoComprobante: '01',
-        ruc: rucLimpio,
-        ambiente: settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1',
-        serie: `${estab}${pto}`,
-        secuencial: sec,
-        codigoNumerico: '12345678',
-        tipoEmision: '1',
-      });
-    } catch {
-      return '0101202601179001234500110010010000000011234567812';
-    }
-  }, [sale, settings]);
+  // Clave de acceso real del comprobante (generada al emitir la factura)
+  const claveAccesoCalculada = sale?.sriAccessKey || '';
+  const isAuthorized = sale?.sriStatus === 'AUTORIZADO';
+  const authDate = sale?.sriAuthorizationDate ? new Date(sale.sriAuthorizationDate) : null;
 
   if (!sale) return null;
 
@@ -220,9 +196,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                   <span className="font-mono text-xs font-bold text-[#FF3366] bg-[#FF3366]/10 px-2 py-0.5 rounded-md border border-[#FF3366]/20">
                     {fullInvoiceNumber}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
-                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    <span>{SRI_SIMULATION_MODE ? 'SRI SIMULADO · SIN VALIDEZ' : 'SRI AUTORIZADO'}</span>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
+                      isAuthorized
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{isAuthorized ? 'AUTORIZADO SRI' : `SRI: ${(sale.sriStatus || 'PENDIENTE').replace('_', ' ')}`}</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
@@ -378,7 +360,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                 <div className="border border-black rounded-2xl p-3.5 flex flex-col justify-between text-[10.5px] bg-white">
                   <div>
                     <div className="text-[14px] font-bold text-black tracking-tight">
-                      R.U.C.: <span className="font-bold">{settings.ruc || settings.taxId || '1790012345001'}</span>
+                      R.U.C.: <span className="font-bold">{settings.ruc || settings.taxId || '—'}</span>
                     </div>
                     <div className="text-[17px] font-bold text-black tracking-normal mt-1 uppercase">
                       FACTURA
@@ -392,13 +374,13 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                     <div className="text-[10px] font-bold text-black uppercase tracking-tight">
                       NÚMERO DE AUTORIZACIÓN:
                     </div>
-                    {SRI_SIMULATION_MODE && (
+                    {!isAuthorized && (
                       <div className="text-[9px] font-bold text-red-700 uppercase">
-                        Documento simulado · sin validez tributaria
+                        Pendiente de autorización del SRI
                       </div>
                     )}
                     <div className="text-[9px] font-mono text-neutral-900 leading-tight mt-0.5 mb-2 select-all break-all tracking-normal">
-                      {claveAccesoCalculada}
+                      {isAuthorized ? sale.sriAuthorizationNumber || claveAccesoCalculada : '—'}
                     </div>
                   </div>
 
@@ -407,7 +389,9 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                       FECHA Y HORA DE AUTORIZACIÓN:
                     </div>
                     <div className="text-[10px] text-neutral-900 mt-0.5 mb-2 font-normal">
-                      {formattedDate} {formattedTime}
+                      {isAuthorized && authDate && !isNaN(authDate.getTime())
+                        ? authDate.toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'medium' })
+                        : '—'}
                     </div>
                   </div>
 
@@ -663,7 +647,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                   </p>
                 )}
                 <p className="text-[10px] text-neutral-600">
-                  RUC: <span className="font-bold">{settings.ruc || settings.taxId || '1790012345001'}</span>
+                  RUC: <span className="font-bold">{settings.ruc || settings.taxId || '—'}</span>
                 </p>
                 <p className="text-[10px] text-neutral-600">Tel: {settings.phone || '0991234567'}</p>
                 <p className="text-[9px] text-neutral-500 uppercase">
