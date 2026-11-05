@@ -162,18 +162,18 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
     setIsBillingModalOpen(true);
   };
 
-  const handleProcessBilling = () => {
+  const handleProcessBilling = async () => {
     if (!guardPermission('proformas.convert')) return;
     if (!billingProforma) return;
     try {
-      const sale = convertProformaToSale(
+      const sale = await convertProformaToSale(
         billingProforma.id,
         billingPaymentMethod,
         billingTipAmount,
         billingFinalPrice
       );
       setIsBillingModalOpen(false);
-      setBillingSuccessNotice(`¡Factura #${sale.invoiceNumber} emitida exitosamente para ${sale.clientName}!`);
+      setBillingSuccessNotice(`¡Factura ${sale.invoiceNumber} emitida exitosamente para ${sale.clientName}!`);
       setTimeout(() => setBillingSuccessNotice(null), 5000);
 
       if (onOpenReceipt) {
@@ -543,7 +543,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                               title="Ver comprobante de la factura emitida"
                             >
                               <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Factura #{proforma.invoiceNumber}</span>
+                              <span>Factura {proforma.invoiceNumber}</span>
                             </button>
                           ) : (
                             <button

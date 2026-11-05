@@ -33,6 +33,8 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 
   const { guard: guardPermission } = usePermission();
   // Form State
+  // Evita doble emisión mientras llega el número del servidor
+  const [saving, setSaving] = useState(false);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
@@ -147,7 +149,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
   const taxAmount = Math.round(((subtotal - discount) * (taxRate / 100)) * 100) / 100;
   const total = Math.max(0, Math.round((subtotal - discount + taxAmount) * 100) / 100);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guardPermission('proformas.create')) return;
     if (!clientName.trim() || !serviceName.trim()) {
@@ -162,7 +164,11 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 
     const totalEstimatedHours = items.reduce((acc, it) => acc + (it.hours || 0), 0);
 
-    const newProforma = addProforma({
+    if (saving) return;
+    setSaving(true);
+    let newProforma: Proforma;
+    try {
+      newProforma = await addProforma({
       date: today.toISOString().split('T')[0],
       validUntil: validUntilDate.toISOString().split('T')[0],
       clientName: clientName.trim(),
@@ -188,7 +194,13 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
       status: autoSchedule ? 'accepted' : 'pending',
       termsAndConditions: 'Proforma y presupuesto oficial. Válida por ' + validDays + ' días. Anticipo requerido para reservar cabina y materiales estériles.',
       notes: notes.trim() || undefined,
-    });
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo crear la proforma.');
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
 
     if (autoSchedule) {
       convertProformaToAppointment(newProforma.id, scheduleDate, scheduleTime, false);

@@ -5,62 +5,13 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { consultarIdentificacionSriBackend, consultarRucSriBackend } from './src/utils/sriServerHandler.ts';
+import { sequenceMiddleware } from './src/utils/sequenceServer.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Persistent counters storage path
-const COUNTERS_FILE = process.env.COUNTERS_PATH || (
-  fs.existsSync(path.join(__dirname, 'data_counters.json'))
-    ? path.join(__dirname, 'data_counters.json')
-    : path.join(process.cwd(), 'data_counters.json')
-);
-
-// Default initial counters
-let documentCounters: Record<string, number> = {
-  nota_venta: 1,
-  cotizacion: 1, // Proformas
-  factura: 1,
-  ticket_pos: 1,
-};
-
-// Load saved counters if available
-try {
-  if (fs.existsSync(COUNTERS_FILE)) {
-    const data = fs.readFileSync(COUNTERS_FILE, 'utf-8');
-    documentCounters = { ...documentCounters, ...JSON.parse(data) };
-  }
-} catch (err) {
-  console.warn('Could not read counters file, using defaults:', err);
-}
-
-// Save counters helper
-function saveCounters() {
-  try {
-    fs.writeFileSync(COUNTERS_FILE, JSON.stringify(documentCounters, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error saving counters to disk:', err);
-  }
-}
-
-// Mutex promise queue for atomic safe sequential allocation
-let sequentialMutex = Promise.resolve();
-
-async function getNextSequentialSafe(docType: string): Promise<number> {
-  return new Promise((resolve) => {
-    sequentialMutex = sequentialMutex.then(async () => {
-      if (typeof documentCounters[docType] !== 'number') {
-        documentCounters[docType] = 1;
-      }
-      const nextVal = documentCounters[docType];
-      documentCounters[docType] = nextVal + 1;
-      saveCounters();
-      resolve(nextVal);
-    });
-  });
-}
 
 async function startServer() {
   const app = express();
@@ -79,41 +30,8 @@ async function startServer() {
     });
   });
 
-  // Query current sequential counters
-  app.get('/api/documents/counters', (req, res) => {
-    res.json({
-      counters: documentCounters,
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  // Atomic safe consecutive sequential generator (#000000 format)
-  app.post('/api/documents/next-sequential', async (req, res) => {
-    try {
-      const { documentType, branchId = '001', registerId = '001' } = req.body;
-      const validTypes = ['nota_venta', 'cotizacion', 'factura', 'ticket_pos'];
-      const typeKey = validTypes.includes(documentType) ? documentType : 'nota_venta';
-      const seqNumber = await getNextSequentialSafe(typeKey);
-
-      // Generate format #000000
-      const formattedCode = `#${String(seqNumber).padStart(6, '0')}`;
-      const sriInvoiceCode = `${branchId.padStart(3, '0')}-${registerId.padStart(3, '0')}-${String(seqNumber).padStart(9, '0')}`;
-
-      res.json({
-        success: true,
-        documentType: typeKey,
-        sequentialNumber: seqNumber,
-        formattedNumber: formattedCode,
-        sriCode: typeKey === 'factura' ? sriInvoiceCode : undefined,
-        branchId,
-        registerId,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err: any) {
-      console.error('Error generating safe sequential:', err);
-      res.status(500).json({ error: 'Error generating sequential number' });
-    }
-  });
+  // Numeración central de documentos: /api/sequence/state · /next · /set · /log
+  app.use(sequenceMiddleware);
 
   // ==============================================================
   // SRI & REGISTRO CIVIL ENDPOINTS (Catastro, Persona, SECAP)

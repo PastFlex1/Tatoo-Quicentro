@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { SequencePanel } from './SequencePanel';
 import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { DEFAULT_SRI_API_URL } from '../../services/sriElectronicService';
@@ -59,8 +60,6 @@ export const SettingsView: React.FC = () => {
   const [email, setEmail] = useState(settings.email || 'contacto@devolutionink.com');
   const [codigoEstablecimiento, setCodigoEstablecimiento] = useState(settings.codigoEstablecimiento || '001');
   const [puntoEmision, setPuntoEmision] = useState(settings.puntoEmision || '001');
-  const [secuencialFactura, setSecuencialFactura] = useState(settings.secuencialFactura || '000000001');
-  const [secuencialNotaVenta, setSecuencialNotaVenta] = useState(settings.secuencialNotaVenta || '000000001');
   const [regimenTributario, setRegimenTributario] = useState<string>(settings.regimenTributario || 'RIMPE_EMPRENDEDOR');
   const [obligadoContabilidad, setObligadoContabilidad] = useState<'SI' | 'NO'>(settings.obligadoContabilidad || 'NO');
   const [agenteRetencion, setAgenteRetencion] = useState<'SI' | 'NO'>(settings.agenteRetencion === 'SI' ? 'SI' : 'NO');
@@ -120,8 +119,6 @@ export const SettingsView: React.FC = () => {
     email: email.trim(),
     codigoEstablecimiento: codigoEstablecimiento.trim(),
     puntoEmision: puntoEmision.trim(),
-    secuencialFactura: (secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
-    secuencialNotaVenta: (secuencialNotaVenta.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
     regimenTributario,
     obligadoContabilidad,
     agenteRetencion,
@@ -151,8 +148,6 @@ export const SettingsView: React.FC = () => {
     email,
     codigoEstablecimiento,
     puntoEmision,
-    secuencialFactura,
-    secuencialNotaVenta,
     regimenTributario,
     obligadoContabilidad,
     agenteRetencion,
@@ -335,9 +330,7 @@ export const SettingsView: React.FC = () => {
       telefono: telefono.trim(),
       codigoEstablecimiento: (codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3),
       puntoEmision: (puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3),
-      secuencialFactura: (secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
-      secuencialNotaVenta: (secuencialNotaVenta.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9),
-      regimenTributario,
+          regimenTributario,
       obligadoContabilidad,
       agenteRetencion,
       contribuyenteEspecial: contribuyenteEspecial.trim() || undefined,
@@ -1033,7 +1026,7 @@ export const SettingsView: React.FC = () => {
                     <span>Serie y Numeración Secuencial de Facturación SRI</span>
                   </h3>
                   <p className="text-[11px] text-neutral-400 mt-0.5">
-                    Estructura oficial del comprobante: [Establecimiento: 3 dígitos] - [Punto Emisión: 3 dígitos] - [Secuencial: 9 dígitos].
+                    Defina la serie de la factura: [Establecimiento: 3 dígitos] - [Punto Emisión: 3 dígitos]. El secuencial lo lleva el servidor.
                   </p>
                 </div>
                 <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono">
@@ -1041,54 +1034,11 @@ export const SettingsView: React.FC = () => {
                 </span>
               </div>
 
-              {/* Live Preview de la Próxima Factura */}
-              <div className="p-4 rounded-xl bg-[#121215] border border-[#2B2B36] flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="space-y-1 text-center md:text-left">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center justify-center md:justify-start gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-[#FF3366]" />
-                    <span>Vista Previa de la Serie & Próxima Factura Oficial</span>
-                  </span>
-                  <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1 font-mono">
-                    <div className="px-3 py-1.5 rounded-lg bg-[#18181D] border border-neutral-700 text-center">
-                      <span className="text-[9px] text-neutral-400 block uppercase font-sans">Establecimiento</span>
-                      <span className="text-sm font-bold text-white">
-                        {(codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}
-                      </span>
-                    </div>
-                    <span className="text-neutral-500 font-bold text-lg">-</span>
-                    <div className="px-3 py-1.5 rounded-lg bg-[#18181D] border border-neutral-700 text-center">
-                      <span className="text-[9px] text-neutral-400 block uppercase font-sans">Pto. Emisión</span>
-                      <span className="text-sm font-bold text-white">
-                        {(puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}
-                      </span>
-                    </div>
-                    <span className="text-neutral-500 font-bold text-lg">-</span>
-                    <div className="px-4 py-1.5 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/40 text-center">
-                      <span className="text-[9px] text-[#FF3366] block uppercase font-sans font-bold">Secuencial Activo</span>
-                      <span className="text-base font-extrabold text-[#FF3366]">
-                        {(secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center md:text-right text-[11px] text-neutral-400 max-w-xs leading-relaxed bg-[#18181D] p-3 rounded-xl border border-[#24242C]">
-                  <p>
-                    <strong className="text-emerald-400">Próxima Factura:</strong>{' '}
-                    <span className="font-mono font-bold text-white">
-                      {(codigoEstablecimiento.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}-
-                      {(puntoEmision.replace(/\D/g, '') || '1').padStart(3, '0').slice(-3)}-
-                      {(secuencialFactura.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9)}
-                    </span>
-                  </p>
-                  <p className="text-[10px] text-neutral-500 mt-1">
-                    Cada vez que se emita una factura en el POS, el correlativo avanzará automáticamente +1.
-                  </p>
-                </div>
-              </div>
+              {/* Numeración central: serie, último emitido, próximo y auditoría */}
+              <SequencePanel />
 
               {/* Form Inputs Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 {/* Código Establecimiento */}
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1.5">
@@ -1129,64 +1079,6 @@ export const SettingsView: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Secuencial Factura */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-semibold text-neutral-300">
-                      Secuencial Factura (9 dígitos) *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setSecuencialFactura('000000001')}
-                      className="text-[10px] text-[#FF3366] hover:underline font-mono"
-                      title="Reiniciar a 000000001"
-                    >
-                      Reset 001
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    maxLength={9}
-                    value={secuencialFactura}
-                    onChange={e => setSecuencialFactura(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                    onBlur={() => setSecuencialFactura(prev => (prev.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9))}
-                    placeholder="000000001"
-                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-[#FF3366] font-mono focus:border-[#FF3366] text-center text-sm font-extrabold tracking-wider shadow-inner"
-                  />
-                  <span className="text-[10px] text-neutral-500 mt-1 block">
-                    9 dígitos numéricos: ej. <strong>000000001</strong>
-                  </span>
-                </div>
-
-                {/* Secuencial Nota de Venta */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-semibold text-neutral-300">
-                      Secuencial Nota Venta (9 dígitos)
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setSecuencialNotaVenta('000000001')}
-                      className="text-[10px] text-neutral-400 hover:text-white font-mono"
-                      title="Reiniciar a 000000001"
-                    >
-                      Reset 001
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    maxLength={9}
-                    value={secuencialNotaVenta}
-                    onChange={e => setSecuencialNotaVenta(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                    onBlur={() => setSecuencialNotaVenta(prev => (prev.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9))}
-                    placeholder="000000001"
-                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 text-center text-sm font-bold"
-                  />
-                  <span className="text-[10px] text-neutral-500 mt-1 block">
-                    Correlativo para notas de venta RIMPE
-                  </span>
-                </div>
               </div>
             </div>
           </div>

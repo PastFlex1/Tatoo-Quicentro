@@ -58,6 +58,8 @@ import {
   getDefaultTabsForRole,
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
+import { reserveDocumentNumber } from '../services/sequenceService';
+import { SequenceType, padCode, parseDocumentSequential } from '../utils/documentNumber';
 import { computeShiftSummary, ShiftTransaction } from '../utils/cashShift';
 import { buildJournalEntries, buildPostings, LedgerPosting, UnifiedJournalEntry } from '../utils/accountingEngine';
 import {
@@ -108,10 +110,10 @@ interface StudioContextType {
     paymentMethod: PaymentMethod,
     tipAmount?: number,
     finalTotal?: number
-  ) => SaleRecord;
+  ) => Promise<SaleRecord>;
 
   // Actions - Cotizaciones & Proformas
-  addProforma: (proforma: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>) => Proforma;
+  addProforma: (proforma: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>) => Promise<Proforma>;
   updateProforma: (id: string, updated: Partial<Proforma>) => void;
   deleteProforma: (id: string) => void;
   convertProformaToAppointment: (
@@ -126,11 +128,11 @@ interface StudioContextType {
     paymentMethod?: PaymentMethod,
     tipAmount?: number,
     finalTotal?: number
-  ) => SaleRecord;
+  ) => Promise<SaleRecord>;
   getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
   // Actions - Sales
-  addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>) => SaleRecord;
+  addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>) => Promise<SaleRecord>;
   updateSale: (id: string, updated: Partial<SaleRecord>) => void;
   deleteSale: (id: string) => void;
 
@@ -139,7 +141,7 @@ interface StudioContextType {
   emitSaleToSri: (saleId: string) => Promise<SriEmissionResult | null>;
   /** Envía (o reintenta) una nota de crédito al SRI usando la API Java */
   emitCreditNoteToSri: (creditNoteId: string) => Promise<SriEmissionResult | null>;
-  addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => CreditNoteRecord;
+  addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => Promise<CreditNoteRecord>;
   deleteCreditNote: (id: string) => void;
 
   // Actions - Expenses
@@ -331,6 +333,9 @@ function purgeLegacyDemoData(keys: Record<string, string>) {
     console.warn('[StudioContext] No se pudo limpiar la data demo:', err);
   }
 }
+
+/** Marca de una proforma cuyo número oficial aún no llegó del servidor de numeración */
+const PENDING_DOC_NUMBER = '#PENDIENTE';
 
 const STORAGE_KEYS = {
   SALES: 'inkledger_sales_v1',
@@ -1124,10 +1129,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
 
     // Automatically generate and attach a Proforma for this appointment
-    const currentYear = new Date().getFullYear();
+    // (el número oficial lo asigna el servidor central un instante después)
     const aptProforma: Proforma = {
       id: `prof-apt-${newApt.id}`,
-      proformaNumber: `PROF-${currentYear}-${String(Date.now()).slice(-4)}`,
+      proformaNumber: PENDING_DOC_NUMBER,
       date: aptData.date || new Date().toISOString().split('T')[0],
       validUntil: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
       clientName: aptData.clientName,
@@ -1167,6 +1172,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       createdAt: newApt.createdAt,
     };
     setProformas(prev => [aptProforma, ...prev]);
+    void assignPendingProformaNumbers();
 
     return newApt;
   };
@@ -1183,12 +1189,12 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setAppointments(prev => prev.map(a => (a.id === id ? { ...a, status } : a)));
   };
 
-  const completeAndBillAppointment = (
+  const completeAndBillAppointment = async (
     appointmentId: string,
     paymentMethod: PaymentMethod,
     tipAmount: number = 0,
     finalTotal?: number
-  ): SaleRecord => {
+  ): Promise<SaleRecord> => {
     const apt = appointments.find(a => a.id === appointmentId);
     if (!apt) throw new Error('Cita no encontrada');
 
@@ -1206,7 +1212,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const artistShare = ((total - taxAmount) * commissionPercent) / 100;
     const studioShare = total - artistShare;
 
-    const sale = addSale({
+    const sale = await addSale({
       date: new Date().toISOString(),
       clientName: apt.clientName,
       clientPhone: apt.clientPhone,
@@ -1258,13 +1264,12 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Cotizaciones & Proformas Operations
-  const addProforma = (profData: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>): Proforma => {
-    const currentYear = new Date().getFullYear();
-    const nextSeq = String(proformas.length + 45).padStart(4, '0');
+  const addProforma = async (profData: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>): Promise<Proforma> => {
+    const proformaNumber = await nextDocumentNumber('proforma');
     const newProf: Proforma = {
       ...profData,
       id: `prof-${Date.now()}`,
-      proformaNumber: `PROF-${currentYear}-${nextSeq}`,
+      proformaNumber,
       createdAt: new Date().toISOString(),
     };
     setProformas(prev => [newProf, ...prev]);
@@ -1298,10 +1303,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const apt = appointments.find(a => a.id === appointmentId);
     if (!apt) return undefined;
 
-    const currentYear = new Date().getFullYear();
     const fallbackProf: Proforma = {
       id: `prof-apt-${apt.id}`,
-      proformaNumber: `PROF-${currentYear}-${apt.id.slice(-4).toUpperCase()}`,
+      proformaNumber: PENDING_DOC_NUMBER,
       date: apt.date || new Date().toISOString().split('T')[0],
       validUntil: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
       clientName: apt.clientName,
@@ -1396,12 +1400,12 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return newApt;
   };
 
-  const convertProformaToSale = (
+  const convertProformaToSale = async (
     proformaId: string,
     paymentMethod: PaymentMethod = 'card',
     tipAmount: number = 0,
     finalTotal?: number
-  ): SaleRecord => {
+  ): Promise<SaleRecord> => {
     const prof = proformas.find(p => p.id === proformaId);
     if (!prof) throw new Error('Cotización / Proforma no encontrada');
 
@@ -1419,7 +1423,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const artistShare = ((total - taxAmount) * commissionPercent) / 100;
     const studioShare = total - artistShare;
 
-    const sale = addSale({
+    const sale = await addSale({
       date: new Date().toISOString(),
       clientName: prof.clientName,
       clientPhone: prof.clientPhone,
@@ -1534,80 +1538,73 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // Último secuencial asignado en esta sesión (evita duplicados si addSale se llama
-  // varias veces antes de que React actualice `settings`).
-  const lastAssignedSeqRef = useRef<{ notaVenta: number; factura: number }>({ notaVenta: 0, factura: 0 });
+  // ===================== NUMERACIÓN CENTRAL DE DOCUMENTOS =====================
+  // Proformas #000001 · Notas de venta #0000001 · Facturas y notas de crédito 001-001-000000001.
+  // Cada número lo entrega el SERVIDOR de forma atómica: varios trabajadores pueden emitir a la vez
+  // (cada uno desde su equipo) y nunca reciben el mismo número.
+  const proformasRef = useRef(proformas);
+  proformasRef.current = proformas;
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
 
-  /**
-   * Calcula el siguiente secuencial libre tomando el máximo entre:
-   * - el valor configurado en settings (estado actual y lo guardado en localStorage por otra pestaña),
-   * - el mayor secuencial ya usado en las ventas (estado actual y localStorage),
-   * - el último asignado en esta sesión.
-   * Así nunca se reutiliza un número ya emitido en este navegador.
-   * NOTA: entre distintos equipos sigue siendo necesario un contador central en el servidor.
-   */
-  const getNextSaleSequential = (isNotaVenta: boolean, fallbackStart: number): number => {
-    const field = isNotaVenta ? 'secuencialNotaVenta' : 'secuencialFactura';
-    const parseSeq = (v: unknown) => parseInt(String(v ?? '').replace(/\D/g, ''), 10) || 0;
-
-    const storedSettings = safeLoadFromStorage<Partial<StudioSettings>>(STORAGE_KEYS.SETTINGS, {});
-    const storedSales = safeLoadFromStorage<SaleRecord[]>(STORAGE_KEYS.SALES, []);
-
-    const maxUsed = [...sales, ...(Array.isArray(storedSales) ? storedSales : [])]
-      .filter(s => (s.documentType === 'nota_venta') === isNotaVenta)
-      .reduce((max, s) => {
-        const lastSegment = (s.invoiceNumber || '').split('-').pop() || '';
-        return Math.max(max, parseSeq(lastSegment));
-      }, 0);
-
-    const configured = Math.max(parseSeq((settings as any)[field]), parseSeq((storedSettings as any)[field]));
-    const lastAssigned = isNotaVenta ? lastAssignedSeqRef.current.notaVenta : lastAssignedSeqRef.current.factura;
-
-    const next = Math.max(configured || fallbackStart, maxUsed + 1, lastAssigned + 1);
-    if (isNotaVenta) lastAssignedSeqRef.current.notaVenta = next;
-    else lastAssignedSeqRef.current.factura = next;
-    return next;
+  /** Mayor secuencial que este equipo ya conoce de la serie (sube el contador central si hay documentos previos). */
+  const localMaxSequential = (type: SequenceType, estab: string, pto: string): number => {
+    const numbers: string[] =
+      type === 'factura'
+        ? salesRef.current.filter(x => x.documentType !== 'nota_venta').map(x => x.invoiceNumber)
+        : type === 'nota_venta'
+        ? salesRef.current.filter(x => x.documentType === 'nota_venta').map(x => x.invoiceNumber)
+        : type === 'nota_credito'
+        ? creditNotesRef.current.map(x => x.creditNoteNumber)
+        : proformasRef.current.map(x => x.proformaNumber);
+    return numbers.reduce((max, n) => Math.max(max, parseDocumentSequential(type, n, estab, pto)), 0);
   };
 
-  // Sale Operations
-  const addSale = (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): SaleRecord => {
-    const isNotaVenta = saleData.documentType === 'nota_venta';
-    // Código de serie SRI (Establecimiento y Punto de Emisión)
-    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
-    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
+  const nextDocumentNumber = async (type: SequenceType): Promise<string> => {
+    const cfg = settingsRef.current;
+    const estab = padCode(cfg.codigoEstablecimiento, 3, '001');
+    const pto = padCode(cfg.puntoEmision, 3, '001');
+    const u = currentUserRef.current;
+    const reserved = await reserveDocumentNumber({
+      type,
+      estab,
+      pto,
+      atLeast: localMaxSequential(type, estab, pto),
+      user: `${u?.nombres || ''} ${u?.apellidos || ''}`.trim() || u?.username,
+    });
+    return reserved.formatted;
+  };
 
-    let invoiceNumber = '';
-    let currentSeqNum = 1;
-
-    if (isNotaVenta) {
-      currentSeqNum = getNextSaleSequential(
-        true,
-        1
-      );
-      const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
-      invoiceNumber = `NV-${estab}-${pto}-${secuencialPadded}`;
-
-      // Incrementar secuencialNotaVenta
-      const nextSecuencialPadded = String(currentSeqNum + 1).padStart(9, '0').slice(-9);
-      setSettings(prev => ({
-        ...prev,
-        secuencialNotaVenta: nextSecuencialPadded,
-      }));
-    } else {
-      currentSeqNum = getNextSaleSequential(
-        false,
-        1
-      );
-      const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
-      invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
-
-      // Incrementar secuencialFactura
-      const nextSecuencialPadded = String(currentSeqNum + 1).padStart(9, '0').slice(-9);
-      setSettings(prev => ({
-        ...prev,
-        secuencialFactura: nextSecuencialPadded,
-      }));
+  // Asigna el número oficial a las proformas que se crearon sin él (p. ej. las automáticas de cada cita).
+  // Si el servidor no responde, se reintenta solo cada pocos segundos.
+  const assigningProformas = useRef(false);
+  const assignPendingProformaNumbers = async () => {
+    if (assigningProformas.current) return;
+    assigningProformas.current = true;
+    try {
+      // Se esperan al siguiente ciclo para leer el estado más reciente
+      await new Promise(r => setTimeout(r, 0));
+      for (const prof of proformasRef.current.filter(x => x.proformaNumber === PENDING_DOC_NUMBER)) {
+        const number = await nextDocumentNumber('proforma');
+        setProformas(prev => prev.map(x => (x.id === prof.id ? { ...x, proformaNumber: number } : x)));
+        proformasRef.current = proformasRef.current.map(x => (x.id === prof.id ? { ...x, proformaNumber: number } : x));
+      }
+    } catch {
+      setTimeout(() => void assignPendingProformaNumbers(), 5000);
+    } finally {
+      assigningProformas.current = false;
     }
+  };
+  useEffect(() => {
+    if (proformas.some(x => x.proformaNumber === PENDING_DOC_NUMBER)) void assignPendingProformaNumbers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proformas.length]);
+
+  // Sale Operations
+  const addSale = async (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): Promise<SaleRecord> => {
+    const isNotaVenta = saleData.documentType === 'nota_venta';
+    // El servidor central entrega el número: atómico y consecutivo aunque varios trabajadores facturen a la vez
+    const invoiceNumber = await nextDocumentNumber(isNotaVenta ? 'nota_venta' : 'factura');
 
     const now = new Date();
     // Clave de acceso de 49 dígitos (código numérico aleatorio). Las notas de venta RIMPE no son electrónicas.
@@ -1832,19 +1829,11 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Credit Note Operations / Notas de Crédito
-  const addCreditNote = (
+  const addCreditNote = async (
     cnData: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }
-  ): CreditNoteRecord => {
-    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
-    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
-    // Secuencial: siguiente al mayor ya emitido (evita duplicados)
-    const currentSeqNum =
-      creditNotes.reduce(
-        (max, c) => Math.max(max, parseInt((c.creditNoteNumber || '').split('-').pop() || '0', 10) || 0),
-        0
-      ) + 1;
-    const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
-    const creditNoteNumber = `${estab}-${pto}-${secuencialPadded}`;
+  ): Promise<CreditNoteRecord> => {
+    // Serie propia de notas de crédito (001-001-000000001), independiente de la de facturas
+    const creditNoteNumber = await nextDocumentNumber('nota_credito');
 
     const now = new Date();
     const sriAccessKey = cnData.sriAccessKey || buildAccessKey(settings, '04', creditNoteNumber, now);
@@ -2653,17 +2642,17 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   updateAppointment: () => {},
   deleteAppointment: () => {},
   updateAppointmentStatus: () => {},
-  completeAndBillAppointment: () => ({} as any),
-  addProforma: (prof) => ({ ...prof, id: 'temp-' + Date.now(), createdAt: new Date().toISOString(), proformaNumber: 'PROF-0001' }),
+  completeAndBillAppointment: async () => ({} as any),
+  addProforma: async prof => ({ ...prof, id: 'temp-' + Date.now(), createdAt: new Date().toISOString(), proformaNumber: '#000001' }),
   updateProforma: () => {},
   deleteProforma: () => {},
   convertProformaToAppointment: () => ({} as any),
-  convertProformaToSale: () => ({} as any),
+  convertProformaToSale: async () => ({} as any),
   getProformaByAppointmentId: () => undefined,
-  addSale: (sale) => ({ ...sale, id: 'temp-' + Date.now(), invoiceNumber: 'INV-0001' }),
+  addSale: async sale => ({ ...sale, id: 'temp-' + Date.now(), invoiceNumber: '001-001-000000001' }),
   updateSale: () => {},
   deleteSale: () => {},
-  addCreditNote: (cn) => ({ ...cn, sriStatus: cn.sriStatus || 'PENDIENTE', id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
+  addCreditNote: async cn => ({ ...cn, sriStatus: cn.sriStatus || 'PENDIENTE', id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
   deleteCreditNote: () => {},
   addExpense: (exp) => ({ ...exp, id: 'temp-' + Date.now() }),
   updateExpense: () => {},

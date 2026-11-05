@@ -392,7 +392,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     return null;
   };
 
-  const handleCharge = () => {
+  // Evita emitir dos veces si se hace doble clic (o se pulsa F9 de nuevo) mientras llega el número del servidor
+  const [charging, setCharging] = useState(false);
+  const chargingRef = useRef(false);
+
+  const handleCharge = async () => {
+    if (chargingRef.current) return;
     if (!guardPermission('pos.charge')) return;
     if (computed.discount > 0 && !guardPermission('pos.discount')) return;
     if (commissionEdited && !guardPermission('pos.change_commission')) return;
@@ -413,7 +418,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     const cardPaid = method === 'card' ? toCollect : method === 'split' ? parseFloat(split.card) || 0 : 0;
     const transferPaid = method === 'transfer' ? toCollect : method === 'split' ? parseFloat(split.transfer) || 0 : 0;
 
-    const sale = addSale({
+    chargingRef.current = true;
+    setCharging(true);
+    let sale: SaleRecord;
+    try {
+      sale = await addSale({
       date: new Date().toISOString(),
       documentType,
       clientName: clientName.trim(),
@@ -447,7 +456,15 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       status: deposit > 0 && toPay === 0 ? 'deposit_only' : 'completed',
       consentFormSigned: consentSigned || clientHasConsent,
       notes: notes.trim() || undefined,
-    });
+      });
+    } catch (err) {
+      // Sin número del servidor no se emite nada: así nunca se repite ni se salta un secuencial
+      setError(err instanceof Error ? err.message : 'No se pudo emitir el documento.');
+      return;
+    } finally {
+      chargingRef.current = false;
+      setCharging(false);
+    }
 
     if (linkedAppointment) {
       updateAppointment(linkedAppointment.id, { status: 'completed', saleId: sale.id });
@@ -1102,11 +1119,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             <button
               type="button"
               onClick={handleCharge}
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 || charging}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#FF4D7D] hover:to-[#FF3366] text-white font-black text-base flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,51,102,0.35)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ReceiptText className="w-5 h-5" />
-              Cobrar {formatMoney(toCollect)} · F9
+              {charging ? 'Emitiendo…' : <>Cobrar {formatMoney(toCollect)} · F9</>}
             </button>
             <p className="text-[10px] text-neutral-500 text-center">
               {isNotaVenta ? 'Se emitirá una nota de venta RIMPE.' : 'La factura se enviará automáticamente al SRI.'}

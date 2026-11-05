@@ -16,6 +16,8 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
 
   const { guard: guardPermission } = usePermission();
   // Form states
+  // Evita doble emisión mientras llega el número del servidor
+  const [saving, setSaving] = useState(false);
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
   const [clientName, setClientName] = useState('');
@@ -80,7 +82,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
   const artistCalculatedShare = Math.round(((taxableBase * customCommission) / 100) * 100) / 100;
   const studioCalculatedShare = Math.round((taxableBase - artistCalculatedShare) * 100) / 100;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guardPermission('sales.create')) return;
     if (!clientName.trim()) {
@@ -91,7 +93,11 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
     const selectedArtist = artists.find(a => a.id === artistId);
     const artistName = selectedArtist ? selectedArtist.name : 'Artista del Estudio';
 
-    const saleRecord = addSale({
+    if (saving) return;
+    setSaving(true);
+    let saleRecord: SaleRecord;
+    try {
+      saleRecord = await addSale({
       date: new Date().toISOString(),
       clientName: clientName.trim(),
       clientPhone: clientPhone.trim() || undefined,
@@ -118,7 +124,13 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
       status: depositAmount > 0 && balanceToPay === 0 ? 'deposit_only' : 'completed',
       consentFormSigned,
       notes: notes.trim() || undefined,
-    });
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo emitir la venta.');
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
 
     if (onSaleCreated) {
       onSaleCreated(saleRecord);

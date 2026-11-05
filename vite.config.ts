@@ -3,11 +3,17 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, type Plugin } from 'vite';
 import { consultarIdentificacionSriBackend, consultarRucSriBackend } from './src/utils/sriServerHandler.ts';
+import { sequenceMiddleware } from './src/utils/sequenceServer.ts';
 
 function sriDevApiPlugin(): Plugin {
   return {
     name: 'sri-dev-api',
+    // Numeración central de documentos (también disponible con `vite preview`)
+    configurePreviewServer(server) {
+      server.middlewares.use(sequenceMiddleware);
+    },
     configureServer(server) {
+      server.middlewares.use(sequenceMiddleware);
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url || '';
         const urlObj = new URL(rawUrl, 'http://localhost:3000');

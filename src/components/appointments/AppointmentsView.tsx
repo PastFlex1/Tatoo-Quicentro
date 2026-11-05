@@ -194,11 +194,11 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
     setIsBillingModalOpen(true);
   };
 
-  const handleConfirmBilling = () => {
+  const handleConfirmBilling = async () => {
     if (!guardPermission('pos.charge')) return;
     if (!selectedAppointment) return;
     try {
-      const sale = completeAndBillAppointment(
+      const sale = await completeAndBillAppointment(
         selectedAppointment.id,
         billingPaymentMethod,
         billingTipAmount,

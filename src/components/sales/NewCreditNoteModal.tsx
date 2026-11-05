@@ -3,7 +3,7 @@ import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { X, RefreshCw, AlertCircle, FileText, CheckCircle2, Boxes } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { SaleRecord, CreditNoteReason } from '../../types';
+import { SaleRecord, CreditNoteReason, CreditNoteRecord } from '../../types';
 
 interface NewCreditNoteModalProps {
   isOpen: boolean;
@@ -20,6 +20,8 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
 
   const { guard: guardPermission } = usePermission();
   // Selected Invoice
+  // Evita doble emisión mientras llega el número del servidor
+  const [saving, setSaving] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [reason, setReason] = useState<CreditNoteReason>('ANULACION_TOTAL');
   const [reasonDescription, setReasonDescription] = useState<string>('Anulación total de la operación comercial y servicio.');
@@ -88,7 +90,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
 
   const creditTotal = creditSubtotal + creditTax;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guardPermission('sales.credit_note')) return;
     if (!activeSale) {
@@ -101,7 +103,11 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
       return;
     }
 
-    const created = addCreditNote({
+    if (saving) return;
+    setSaving(true);
+    let created: CreditNoteRecord;
+    try {
+      created = await addCreditNote({
       date: new Date().toISOString(),
       affectedInvoiceId: activeSale.id,
       affectedInvoiceNumber: activeSale.invoiceNumber,
@@ -118,7 +124,13 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
       total: creditTotal,
       revertInventory,
       notes: notes.trim() || undefined,
-    });
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo emitir la nota de crédito.');
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
 
     alert(`✓ Nota de Crédito ${created.creditNoteNumber} emitida exitosamente en el sistema.`);
     onClose();

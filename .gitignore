@@ -5,3 +5,7 @@ coverage/
 .DS_Store
 *.log
 .env*
+# Numeración central (datos de ejecución)
+data_counters.json
+data_counters.json.tmp
+data_sequence_log.jsonl

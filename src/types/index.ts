@@ -735,7 +735,7 @@ export interface ProformaItem {
 
 export interface Proforma {
   id: string;
-  proformaNumber: string; // Ej: PROF-2026-0042
+  proformaNumber: string; // Ej: #000042 (serie central)
   date: string;
   validUntil: string;
   clientName: string;
