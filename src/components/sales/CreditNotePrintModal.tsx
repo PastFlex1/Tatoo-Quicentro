@@ -3,18 +3,21 @@ import { X, Printer, Download, CheckCircle2, ShieldCheck, Share2 } from 'lucide-
 import { useStudio } from '../../context/StudioContext';
 import { CreditNoteRecord } from '../../types';
 import { SriBarcodeSvg } from '../common/SriBarcodeSvg';
+import { SRI_SIMULATION_MODE } from '../../utils/sriCalculations';
 
 interface CreditNotePrintModalProps {
   creditNote: CreditNoteRecord | null;
   onClose: () => void;
+  initialFormat?: 'THERMAL' | 'A4';
 }
 
 export const CreditNotePrintModal: React.FC<CreditNotePrintModalProps> = ({
   creditNote,
   onClose,
+  initialFormat = 'THERMAL',
 }) => {
   const { settings, formatMoney } = useStudio();
-  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>('THERMAL');
+  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>(initialFormat);
 
   if (!creditNote) return null;
 
@@ -227,7 +230,7 @@ export const CreditNotePrintModal: React.FC<CreditNotePrintModalProps> = ({
                 {creditNote.sriAccessKey || '0101202604179284710200110010010000000011234567814'}
               </span>
               <span className="text-[9px] text-emerald-700 font-bold block mt-0.5">
-                ✓ ESTADO: AUTORIZADO POR EL SRI
+                {SRI_SIMULATION_MODE ? '⚠ ESTADO: SIMULADO · SIN VALIDEZ TRIBUTARIA' : '✓ ESTADO: AUTORIZADO POR EL SRI'}
               </span>
             </div>
 

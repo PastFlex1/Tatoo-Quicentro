@@ -4,22 +4,23 @@ import {
   PlusCircle,
   Download,
   Eye,
-  Trash2,
   ShieldCheck,
-  ShieldAlert,
   FileText,
   Receipt,
   RotateCcw,
   CheckCircle2,
-  AlertCircle,
-  Share2,
-  Filter,
+  Code2,
+  Printer,
+  Copy,
+  X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { SaleRecord, CreditNoteRecord } from '../../types';
 import { NewCreditNoteModal } from './NewCreditNoteModal';
 import { CreditNotePrintModal } from './CreditNotePrintModal';
 import { SalesNotePrintModal } from './SalesNotePrintModal';
+import { ReceiptModal } from './ReceiptModal';
+import { generateSriClaveAcceso, simulateXadesBesXmlSigning, SRI_SIMULATION_MODE, SRI_EMITTED_STATUS_LABEL } from '../../utils/sriCalculations';
 
 interface SalesViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -32,8 +33,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   const {
     filteredSales,
     filteredCreditNotes,
-    deleteSale,
-    deleteCreditNote,
+    settings,
     formatMoney,
   } = useStudio();
 
@@ -47,7 +47,21 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   const [isNewCreditNoteOpen, setIsNewCreditNoteOpen] = useState(false);
   const [creditNoteToPreselect, setCreditNoteToPreselect] = useState<SaleRecord | null>(null);
   const [selectedCreditNoteToPrint, setSelectedCreditNoteToPrint] = useState<CreditNoteRecord | null>(null);
+  const [selectedCreditNoteFormat, setSelectedCreditNoteFormat] = useState<'THERMAL' | 'A4'>('A4');
   const [selectedSalesNoteToPrint, setSelectedSalesNoteToPrint] = useState<SaleRecord | null>(null);
+  const [selectedSalesNoteFormat, setSelectedSalesNoteFormat] = useState<'THERMAL' | 'A4'>('A4');
+  const [selectedInvoiceForRide, setSelectedInvoiceForRide] = useState<SaleRecord | null>(null);
+  const [selectedInvoiceFormat, setSelectedInvoiceFormat] = useState<'THERMAL' | 'A4'>('A4');
+
+  // Modal de Visualización de XML Firmado XAdES-BES Autorizado SRI
+  const [xmlViewerDoc, setXmlViewerDoc] = useState<{
+    title: string;
+    docNumber: string;
+    claveAcceso: string;
+    authDate: string;
+    xmlContent: string;
+  } | null>(null);
+  const [copiedXml, setCopiedXml] = useState(false);
 
   // 1. Facturas Electrónicas (Tipo 01)
   const invoicesList = useMemo(() => {
@@ -180,21 +194,247 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
     document.body.removeChild(link);
   };
 
-  const handleDelete = (id: string, invoice: string) => {
-    if (confirm(`¿Estás seguro de anular el comprobante ${invoice}?`)) {
-      deleteSale(id);
-    }
-  };
-
-  const handleDeleteCreditNote = (id: string, number: string) => {
-    if (confirm(`¿Estás seguro de eliminar el registro de Nota de Crédito ${number}?`)) {
-      deleteCreditNote(id);
-    }
-  };
-
   const handleOpenEmitCreditNote = (sale?: SaleRecord) => {
     setCreditNoteToPreselect(sale || null);
     setIsNewCreditNoteOpen(true);
+  };
+
+  // Generador de XML oficial SRI (Ficha Técnica Comprobantes Electrónicos v2.1.0 + Firma XAdES-BES)
+  const handleViewXmlForSale = (sale: SaleRecord) => {
+    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
+    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
+    const sec = (sale.invoiceNumber.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9);
+    const rucEmisor = (settings.ruc || settings.taxId || '1790012345001').replace(/\D/g, '').padEnd(13, '0').slice(0, 13);
+    const amb = settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1';
+    const dObj = new Date(sale.date);
+    const fechaEmisionSri = `${String(dObj.getDate()).padStart(2, '0')}/${String(dObj.getMonth() + 1).padStart(2, '0')}/${dObj.getFullYear()}`;
+
+    const claveAcceso =
+      sale.sriAccessKey ||
+      generateSriClaveAcceso({
+        fechaEmision: dObj,
+        tipoComprobante: '01',
+        ruc: rucEmisor,
+        ambiente: amb,
+        serie: `${estab}${pto}`,
+        secuencial: sec,
+      });
+
+    const subtotalSinImp = Math.max(0, sale.subtotal - (sale.discount || 0));
+    const codigoPorcentajeIva = (sale.taxRate || 0) === 15 ? '4' : (sale.taxRate || 0) === 5 ? '5' : '0';
+    const dniCliente = (sale.clientDni || '9999999999999').trim();
+    const tipoIdComprador =
+      dniCliente === '9999999999999'
+        ? '07'
+        : dniCliente.length === 13
+        ? '04'
+        : dniCliente.length === 10
+        ? '05'
+        : '06';
+
+    const unsignedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="2.1.0">
+  <infoTributaria>
+    <ambiente>${amb}</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>${(settings.razonSocial || settings.studioName || 'DEVOLUTION INK TATTOO STUDIO').replace(/&/g, '&amp;')}</razonSocial>
+    <nombreComercial>${(settings.nombreComercial || settings.studioName || 'DEVOLUTION INK QUICENTRO').replace(/&/g, '&amp;')}</nombreComercial>
+    <ruc>${rucEmisor}</ruc>
+    <claveAcceso>${claveAcceso}</claveAcceso>
+    <codDoc>${sale.documentType === 'nota_venta' ? '02' : '01'}</codDoc>
+    <estab>${estab}</estab>
+    <ptoEmi>${pto}</ptoEmi>
+    <secuencial>${sec}</secuencial>
+    <dirMatriz>${(settings.dirMatriz || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirMatriz>
+    <contribuyenteRimpe>CONTRIBUYENTE RÉGIMEN RIMPE</contribuyenteRimpe>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>${fechaEmisionSri}</fechaEmision>
+    <dirEstablecimiento>${(settings.dirEstablecimiento || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirEstablecimiento>
+    <obligadoContabilidad>${settings.obligadoContabilidad || 'NO'}</obligadoContabilidad>
+    <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
+    <razonSocialComprador>${sale.clientName.replace(/&/g, '&amp;')}</razonSocialComprador>
+    <identificacionComprador>${dniCliente}</identificacionComprador>
+    <totalSinImpuestos>${subtotalSinImp.toFixed(2)}</totalSinImpuestos>
+    <totalDescuento>${(sale.discount || 0).toFixed(2)}</totalDescuento>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>${codigoPorcentajeIva}</codigoPorcentaje>
+        <baseImponible>${subtotalSinImp.toFixed(2)}</baseImponible>
+        <tarifa>${(sale.taxRate || 0).toFixed(2)}</tarifa>
+        <valor>${(sale.taxAmount || 0).toFixed(2)}</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <propina>${(sale.tipAmount || 0).toFixed(2)}</propina>
+    <importeTotal>${sale.total.toFixed(2)}</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>${sale.paymentMethod === 'cash' ? '01' : sale.paymentMethod === 'card' ? '19' : '20'}</formaPago>
+        <total>${sale.total.toFixed(2)}</total>
+      </pago>
+    </pagos>
+  </infoFactura>
+  <detalles>
+    <detalle>
+      <codigoPrincipal>0001</codigoPrincipal>
+      <codigoAuxiliar>${sale.serviceCategory.toUpperCase()}</codigoAuxiliar>
+      <descripcion>${sale.serviceName.replace(/&/g, '&amp;')}</descripcion>
+      <cantidad>${(sale.pieces || 1).toFixed(2)}</cantidad>
+      <precioUnitario>${((sale.subtotal + (sale.discount || 0)) / (sale.pieces || 1)).toFixed(2)}</precioUnitario>
+      <descuento>${(sale.discount || 0).toFixed(2)}</descuento>
+      <precioTotalSinImpuesto>${subtotalSinImp.toFixed(2)}</precioTotalSinImpuesto>
+      <impuestos>
+        <impuesto>
+          <codigo>2</codigo>
+          <codigoPorcentaje>${codigoPorcentajeIva}</codigoPorcentaje>
+          <tarifa>${(sale.taxRate || 0).toFixed(2)}</tarifa>
+          <baseImponible>${subtotalSinImp.toFixed(2)}</baseImponible>
+          <valor>${(sale.taxAmount || 0).toFixed(2)}</valor>
+        </impuesto>
+      </impuestos>
+    </detalle>
+  </detalles>
+  <infoAdicional>
+    <campoAdicional nombre="Artista">${sale.artistName.replace(/&/g, '&amp;')}</campoAdicional>
+    <campoAdicional nombre="Telefono">${sale.clientPhone || 'S/N'}</campoAdicional>
+    <campoAdicional nombre="FichaSanitaria">${sale.consentFormSigned ? 'Consentimiento Informado Firmado' : 'Simplificada'}</campoAdicional>
+  </infoAdicional>
+</factura>`;
+
+    const { signedXml } = simulateXadesBesXmlSigning(
+      unsignedXml,
+      settings.firmaElectronicaBase64,
+      settings.firmaElectronicaClave
+    );
+
+    const authorizedEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
+<autorizacion>
+  <estado>${sale.creditNoteNumber || sale.status === 'cancelled' ? 'ANULADO POR NOTA DE CREDITO' : SRI_SIMULATION_MODE ? 'SIMULADO - SIN VALIDEZ TRIBUTARIA' : 'AUTORIZADO'}</estado>
+  <numeroAutorizacion>${claveAcceso}</numeroAutorizacion>
+  <fechaAutorizacion>${sale.sriAuthorizationDate || sale.date}</fechaAutorizacion>
+  <ambiente>${amb === '2' ? 'PRODUCCION' : 'PRUEBAS'}</ambiente>
+  <comprobante><![CDATA[
+${signedXml}
+  ]]></comprobante>
+</autorizacion>`;
+
+    setXmlViewerDoc({
+      title: sale.documentType === 'nota_venta' ? 'XML Nota de Venta RIMPE (Tipo 02)' : 'XML Factura Electrónica SRI (Tipo 01)',
+      docNumber: sale.invoiceNumber,
+      claveAcceso,
+      authDate: sale.sriAuthorizationDate || sale.date,
+      xmlContent: authorizedEnvelope,
+    });
+  };
+
+  const handleViewXmlForCreditNote = (cn: CreditNoteRecord) => {
+    const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
+    const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
+    const sec = (cn.creditNoteNumber.replace(/\D/g, '') || '1').padStart(9, '0').slice(-9);
+    const rucEmisor = (settings.ruc || settings.taxId || '1790012345001').replace(/\D/g, '').padEnd(13, '0').slice(0, 13);
+    const amb = settings.ambiente === '2' || settings.ambiente === 'PRODUCCION' ? '2' : '1';
+    const dObj = new Date(cn.date);
+    const fechaEmisionSri = `${String(dObj.getDate()).padStart(2, '0')}/${String(dObj.getMonth() + 1).padStart(2, '0')}/${dObj.getFullYear()}`;
+
+    const claveAcceso =
+      cn.sriAccessKey ||
+      generateSriClaveAcceso({
+        fechaEmision: dObj,
+        tipoComprobante: '04',
+        ruc: rucEmisor,
+        ambiente: amb,
+        serie: `${estab}${pto}`,
+        secuencial: sec,
+      });
+
+    const dniCliente = (cn.clientDni || '9999999999999').trim();
+    const tipoIdComprador =
+      dniCliente === '9999999999999'
+        ? '07'
+        : dniCliente.length === 13
+        ? '04'
+        : dniCliente.length === 10
+        ? '05'
+        : '06';
+
+    const unsignedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<notaCredito id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>${amb}</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>${(settings.razonSocial || settings.studioName || 'DEVOLUTION INK TATTOO STUDIO').replace(/&/g, '&amp;')}</razonSocial>
+    <nombreComercial>${(settings.nombreComercial || settings.studioName || 'DEVOLUTION INK QUICENTRO').replace(/&/g, '&amp;')}</nombreComercial>
+    <ruc>${rucEmisor}</ruc>
+    <claveAcceso>${claveAcceso}</claveAcceso>
+    <codDoc>04</codDoc>
+    <estab>${estab}</estab>
+    <ptoEmi>${pto}</ptoEmi>
+    <secuencial>${sec}</secuencial>
+    <dirMatriz>${(settings.dirMatriz || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirMatriz>
+  </infoTributaria>
+  <infoNotaCredito>
+    <fechaEmision>${fechaEmisionSri}</fechaEmision>
+    <dirEstablecimiento>${(settings.dirEstablecimiento || settings.address || 'Quicentro Shopping, Quito - Ecuador').replace(/&/g, '&amp;')}</dirEstablecimiento>
+    <tipoIdentificacionComprador>${tipoIdComprador}</tipoIdentificacionComprador>
+    <razonSocialComprador>${cn.clientName.replace(/&/g, '&amp;')}</razonSocialComprador>
+    <identificacionComprador>${dniCliente}</identificacionComprador>
+    <obligadoContabilidad>${settings.obligadoContabilidad || 'NO'}</obligadoContabilidad>
+    <codDocModificado>01</codDocModificado>
+    <numDocModificado>${cn.affectedInvoiceNumber}</numDocModificado>
+    <fechaEmisionDocSustento>${cn.affectedInvoiceDate}</fechaEmisionDocSustento>
+    <totalSinImpuestos>${cn.subtotal.toFixed(2)}</totalSinImpuestos>
+    <valorModificacion>${cn.total.toFixed(2)}</valorModificacion>
+    <moneda>DOLAR</moneda>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>${cn.subtotal.toFixed(2)}</baseImponible>
+        <valor>${cn.taxAmount.toFixed(2)}</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <motivo>${cn.reasonDescription.replace(/&/g, '&amp;')}</motivo>
+  </infoNotaCredito>
+</notaCredito>`;
+
+    const { signedXml } = simulateXadesBesXmlSigning(
+      unsignedXml,
+      settings.firmaElectronicaBase64,
+      settings.firmaElectronicaClave
+    );
+
+    const authorizedEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
+<autorizacion>
+  <estado>${SRI_SIMULATION_MODE ? 'SIMULADO - SIN VALIDEZ TRIBUTARIA' : 'AUTORIZADO'}</estado>
+  <numeroAutorizacion>${claveAcceso}</numeroAutorizacion>
+  <fechaAutorizacion>${cn.sriAuthorizationDate || cn.date}</fechaAutorizacion>
+  <ambiente>${amb === '2' ? 'PRODUCCION' : 'PRUEBAS'}</ambiente>
+  <comprobante><![CDATA[
+${signedXml}
+  ]]></comprobante>
+</autorizacion>`;
+
+    setXmlViewerDoc({
+      title: 'XML Nota de Crédito Electrónica SRI (Tipo 04)',
+      docNumber: cn.creditNoteNumber,
+      claveAcceso,
+      authDate: cn.sriAuthorizationDate || cn.date,
+      xmlContent: authorizedEnvelope,
+    });
+  };
+
+  const handleDownloadXml = (docNumber: string, xmlContent: string) => {
+    const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SRI_XML_${docNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -418,7 +658,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         ) : (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                            <span>AUTORIZADO</span>
+                            <span>{SRI_EMITTED_STATUS_LABEL}</span>
                           </span>
                         )}
                       </div>
@@ -454,30 +694,42 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedInvoiceFormat('A4');
+                            setSelectedInvoiceForRide(sale);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          title="Ver e imprimir RIDE A4 Oficial SRI"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>RIDE</span>
+                        </button>
+                        <button
+                          onClick={() => handleViewXmlForSale(sale)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          title="Ver y descargar XML Firmado XAdES-BES autorizado por el SRI"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                          <span>XML</span>
+                        </button>
                         <button
                           onClick={() => onOpenReceipt(sale)}
                           className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
-                          title="Ver / Imprimir Factura RIDE"
+                          title="Ver Ticket Térmico 80mm"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                         </button>
                         {!hasCreditNote && !isCancelled && (
                           <button
                             onClick={() => handleOpenEmitCreditNote(sale)}
                             className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 cursor-pointer"
-                            title="Emitir Nota de Crédito para esta factura"
+                            title="Emitir Nota de Crédito (reverso tributario legal SRI)"
                           >
-                            <RotateCcw className="w-4 h-4" />
+                            <RotateCcw className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
-                          className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
-                          title="Anular Factura"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -555,7 +807,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>AUTORIZADO</span>
+                              <span>{SRI_EMITTED_STATUS_LABEL}</span>
                             </span>
                           )}
                         </td>
@@ -571,9 +823,30 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <td className="py-3 px-4 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
+                              onClick={() => {
+                                setSelectedInvoiceFormat('A4');
+                                setSelectedInvoiceForRide(sale);
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Ver e imprimir RIDE A4 Oficial autorizado por el SRI"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>RIDE</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleViewXmlForSale(sale)}
+                              className="px-2.5 py-1 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Ver y descargar XML Firmado XAdES-BES autorizado por el SRI"
+                            >
+                              <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                              <span>Ver XML</span>
+                            </button>
+
+                            <button
                               onClick={() => onOpenReceipt(sale)}
-                              className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
-                              title="Ver / Imprimir Factura RIDE"
+                              className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
+                              title="Ver Ticket Térmico POS 80mm"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
@@ -581,20 +854,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                             {!hasCreditNote && !isCancelled && (
                               <button
                                 onClick={() => handleOpenEmitCreditNote(sale)}
-                                className="p-1.5 rounded-full text-neutral-400 hover:text-amber-400 hover:bg-[#282834] transition-colors cursor-pointer"
-                                title="Emitir Nota de Crédito para esta factura"
+                                className="px-2 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Emitir Nota de Crédito (único mecanismo legal del SRI para anular/reversar una factura autorizada)"
                               >
-                                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                                <RotateCcw className="w-3 h-3 text-amber-400" />
+                                <span>Nota Crédito</span>
                               </button>
                             )}
-
-                            <button
-                              onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
-                              className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
-                              title="Anular Factura"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -671,20 +937,35 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <span className="text-[9px] text-neutral-400 block uppercase font-bold">Valor Total</span>
                         <span className="font-mono font-bold text-white text-base">{formatMoney(sale.total)}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center flex-wrap gap-1.5">
                         <button
-                          onClick={() => setSelectedSalesNoteToPrint(sale)}
-                          className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
-                          title="Ver / Imprimir Nota de Venta"
+                          onClick={() => {
+                            setSelectedSalesNoteFormat('A4');
+                            setSelectedSalesNoteToPrint(sale);
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          title="Ver e imprimir RIDE A4 Nota de Venta"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>RIDE</span>
                         </button>
                         <button
-                          onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
-                          className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
-                          title="Anular Nota de Venta"
+                          onClick={() => handleViewXmlForSale(sale)}
+                          className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                          title="Ver XML de respaldo del comprobante"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Code2 className="w-3.5 h-3.5" />
+                          <span>XML</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedSalesNoteFormat('THERMAL');
+                            setSelectedSalesNoteToPrint(sale);
+                          }}
+                          className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                          title="Ver Ticket Térmico 80mm"
+                        >
+                          <Eye className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -758,18 +1039,33 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <td className="py-3 px-4 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
-                              onClick={() => setSelectedSalesNoteToPrint(sale)}
-                              className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
-                              title="Ver / Imprimir Nota de Venta"
+                              onClick={() => {
+                                setSelectedSalesNoteFormat('A4');
+                                setSelectedSalesNoteToPrint(sale);
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Ver e imprimir RIDE A4 Nota de Venta RIMPE"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>RIDE</span>
                             </button>
                             <button
-                              onClick={() => handleDelete(sale.id, sale.invoiceNumber)}
-                              className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
-                              title="Anular Nota de Venta"
+                              onClick={() => handleViewXmlForSale(sale)}
+                              className="px-2.5 py-1 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                              title="Ver XML de respaldo del comprobante"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                              <span>Ver XML</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedSalesNoteFormat('THERMAL');
+                                setSelectedSalesNoteToPrint(sale);
+                              }}
+                              className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
+                              title="Ver Ticket Térmico 80mm"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -812,7 +1108,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                     </div>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>AUTORIZADO</span>
+                      <span>{SRI_EMITTED_STATUS_LABEL}</span>
                     </span>
                   </div>
 
@@ -848,20 +1144,35 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <span className="font-mono font-bold text-[#FF3366] text-sm">-{formatMoney(cn.total)}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center flex-wrap gap-1.5">
                       <button
-                        onClick={() => setSelectedCreditNoteToPrint(cn)}
-                        className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
-                        title="Ver / Imprimir RIDE Nota de Crédito"
+                        onClick={() => {
+                          setSelectedCreditNoteFormat('A4');
+                          setSelectedCreditNoteToPrint(cn);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                        title="Ver e imprimir RIDE A4 Nota de Crédito"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>RIDE</span>
                       </button>
                       <button
-                        onClick={() => handleDeleteCreditNote(cn.id, cn.creditNoteNumber)}
-                        className="p-2 rounded-xl bg-rose-500/10 text-[#FF3366] border border-rose-500/20 cursor-pointer"
-                        title="Eliminar registro"
+                        onClick={() => handleViewXmlForCreditNote(cn)}
+                        className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                        title="Ver y descargar XML Firmado XAdES-BES autorizado por el SRI"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Code2 className="w-3.5 h-3.5" />
+                        <span>XML</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedCreditNoteFormat('THERMAL');
+                          setSelectedCreditNoteToPrint(cn);
+                        }}
+                        className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
+                        title="Ver Ticket 80mm Nota de Crédito"
+                      >
+                        <Eye className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -938,7 +1249,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 justify-center">
                           <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                          <span>AUTORIZADO</span>
+                          <span>{SRI_EMITTED_STATUS_LABEL}</span>
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
@@ -953,18 +1264,33 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
-                            onClick={() => setSelectedCreditNoteToPrint(cn)}
-                            className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
-                            title="Ver / Imprimir RIDE Nota de Crédito"
+                            onClick={() => {
+                              setSelectedCreditNoteFormat('A4');
+                              setSelectedCreditNoteToPrint(cn);
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Ver e imprimir RIDE A4 Nota de Crédito autorizada por el SRI"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>RIDE</span>
                           </button>
                           <button
-                            onClick={() => handleDeleteCreditNote(cn.id, cn.creditNoteNumber)}
-                            className="p-1.5 rounded-full text-neutral-500 hover:text-[#FF3366] hover:bg-[#282834] transition-colors cursor-pointer"
-                            title="Eliminar registro"
+                            onClick={() => handleViewXmlForCreditNote(cn)}
+                            className="px-2.5 py-1 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                            title="Ver y descargar XML Firmado XAdES-BES autorizado por el SRI"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Ver XML</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedCreditNoteFormat('THERMAL');
+                              setSelectedCreditNoteToPrint(cn);
+                            }}
+                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
+                            title="Ver Ticket Térmico 80mm"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -987,17 +1313,105 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
         preselectedSale={creditNoteToPreselect}
       />
 
+      {/* MODAL: VER / IMPRIMIR FACTURA EN MODO RIDE A4 OFICIAL SRI */}
+      <ReceiptModal
+        sale={selectedInvoiceForRide}
+        initialFormat={selectedInvoiceFormat}
+        onClose={() => setSelectedInvoiceForRide(null)}
+      />
+
       {/* MODAL: VER / IMPRIMIR NOTA DE CRÉDITO RIDE */}
       <CreditNotePrintModal
         creditNote={selectedCreditNoteToPrint}
+        initialFormat={selectedCreditNoteFormat}
         onClose={() => setSelectedCreditNoteToPrint(null)}
       />
 
       {/* MODAL: VER / IMPRIMIR NOTA DE VENTA */}
       <SalesNotePrintModal
         sale={selectedSalesNoteToPrint}
+        initialFormat={selectedSalesNoteFormat}
         onClose={() => setSelectedSalesNoteToPrint(null)}
       />
+
+      {/* MODAL: VISOR Y DESCARGA DE XML OFICIAL FIRMADO XAdES-BES AUTORIZADO POR EL SRI */}
+      {xmlViewerDoc && (
+        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-4xl w-full shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
+            <div className="px-5 py-3.5 bg-[#121215] border-b border-[#25252E] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-blue-500/15 border border-blue-500/35 text-blue-400 shrink-0">
+                  <Code2 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white">{xmlViewerDoc.title}</h3>
+                    <span className="font-mono text-xs font-bold text-[#FF3366] bg-[#FF3366]/10 px-2 py-0.5 rounded-md border border-[#FF3366]/25">
+                      {xmlViewerDoc.docNumber}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>XAdES-BES FIRMADO</span>
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 font-mono truncate mt-0.5">
+                    Clave de Acceso SRI: <strong className="text-neutral-200">{xmlViewerDoc.claveAcceso}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(xmlViewerDoc.xmlContent);
+                    setCopiedXml(true);
+                    setTimeout(() => setCopiedXml(false), 2500);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-[#20202A] hover:bg-[#2B2B38] text-neutral-200 hover:text-white border border-[#2E2E3A] text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{copiedXml ? '✓ Copiado' : 'Copiar XML'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadXml(xmlViewerDoc.docNumber, xmlViewerDoc.xmlContent)}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar .XML</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setXmlViewerDoc(null)}
+                  className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-5 overflow-y-auto flex-1 bg-[#0D0D10] custom-scrollbar">
+              <pre className="text-[11px] font-mono text-emerald-300/95 leading-relaxed whitespace-pre-wrap break-all select-all p-4 rounded-2xl bg-[#121216] border border-[#23232C]">
+                {xmlViewerDoc.xmlContent}
+              </pre>
+            </div>
+
+            <div className="px-5 py-3 bg-[#121215] border-t border-[#25252E] flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-400">
+              <span>
+                Estándar SRI: Ficha Técnica de Comprobantes Electrónicos Esquema Offline v2.1.0 • Firma Electrónica XAdES-BES
+              </span>
+              <button
+                type="button"
+                onClick={() => setXmlViewerDoc(null)}
+                className="px-4 py-1.5 rounded-xl bg-[#252530] hover:bg-[#30303E] text-white font-semibold text-xs cursor-pointer"
+              >
+                Cerrar Visor XML
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

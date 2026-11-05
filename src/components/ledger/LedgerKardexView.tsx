@@ -385,6 +385,31 @@ export const LedgerKardexView: React.FC<LedgerKardexViewProps> = ({ initialSecti
 
     // 5. Manual Journal Entries
     manualJournalEntries.forEach(j => {
+      if (j.status === 'anulado') return;
+
+      // Formato nuevo: asiento con varias líneas (partida doble compuesta)
+      if (j.lines && j.lines.length > 0) {
+        j.lines.forEach((line, idx) => {
+          const debit = line.debit || line.debe || 0;
+          const credit = line.credit || line.haber || 0;
+          if (!line.accountCode || (debit === 0 && credit === 0)) return;
+          list.push({
+            id: `post-jrnl-${j.id}-${line.id || idx}`,
+            date: j.date,
+            reference: j.reference,
+            accountCode: line.accountCode,
+            concept: line.concept || line.detalle || j.concept,
+            debit,
+            credit,
+            source: 'manual',
+            manualId: j.id,
+          });
+        });
+        return;
+      }
+
+      // Formato antiguo: una cuenta al Debe y otra al Haber
+      if (!j.debitAccountCode || !j.creditAccountCode || !j.amount) return;
       list.push(
         {
           id: `post-jrnl-d-${j.id}`,

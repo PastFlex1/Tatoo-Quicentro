@@ -17,15 +17,21 @@ import { SaleRecord } from '../../types';
 import { useStudio } from '../../context/StudioContext';
 import { SriBarcodeSvg } from '../common/SriBarcodeSvg';
 import { generateSriClaveAcceso } from '../../utils/sriCalculations';
+import { SRI_SIMULATION_MODE } from '../../utils/sriCalculations';
 
 interface ReceiptModalProps {
   sale: SaleRecord | null;
   onClose: () => void;
+  initialFormat?: 'THERMAL' | 'A4';
 }
 
-export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => {
+export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initialFormat = 'THERMAL' }) => {
   const { settings, formatMoney } = useStudio();
-  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>('THERMAL');
+  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>(initialFormat);
+
+  useEffect(() => {
+    setTicketFormat(initialFormat);
+  }, [initialFormat, sale?.id]);
 
   // Close on Escape key press
   useEffect(() => {
@@ -216,7 +222,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => 
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                    <span>SRI AUTORIZADO</span>
+                    <span>{SRI_SIMULATION_MODE ? 'SRI SIMULADO · SIN VALIDEZ' : 'SRI AUTORIZADO'}</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
@@ -386,6 +392,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose }) => 
                     <div className="text-[10px] font-bold text-black uppercase tracking-tight">
                       NÚMERO DE AUTORIZACIÓN:
                     </div>
+                    {SRI_SIMULATION_MODE && (
+                      <div className="text-[9px] font-bold text-red-700 uppercase">
+                        Documento simulado · sin validez tributaria
+                      </div>
+                    )}
                     <div className="text-[9px] font-mono text-neutral-900 leading-tight mt-0.5 mb-2 select-all break-all tracking-normal">
                       {claveAccesoCalculada}
                     </div>

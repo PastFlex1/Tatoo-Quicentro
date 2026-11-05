@@ -3,6 +3,18 @@
  * Utilidades de criptografía, codificación y cálculo para comprobantes y firma electrónica SRI Ecuador.
  */
 
+/**
+ * IMPORTANTE: la firma XAdES-BES y la autorización del SRI de este sistema son SIMULADAS.
+ * No se firma con el certificado .p12 real ni se envía nada a los web services del SRI
+ * (RecepcionComprobantesOffline / AutorizacionComprobantesOffline).
+ * Mientras esto sea `true`, los documentos se rotulan como "SIMULADO" y NO tienen validez tributaria.
+ * Cambiar a `false` solo cuando exista una integración real con el SRI.
+ */
+export const SRI_SIMULATION_MODE = true;
+
+/** Texto de estado a mostrar para comprobantes electrónicos emitidos. */
+export const SRI_EMITTED_STATUS_LABEL = SRI_SIMULATION_MODE ? 'SIMULADO · SIN VALIDEZ SRI' : 'AUTORIZADO';
+
 export const ECUADOR_CERTIFIERS = [
   'BANCO CENTRAL DEL ECUADOR (BCE)',
   'SECURITY DATA SEGURIDAD EN DATOS Y FIRMA DIGITAL',

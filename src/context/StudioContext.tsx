@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, ReactNode } from 'react';
 import {
   Artist,
   ArtistSettlement,
@@ -113,7 +113,7 @@ interface StudioContextType {
   deleteSale: (id: string) => void;
 
   // Actions - Credit Notes / Notas de Crédito
-  addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt'>) => CreditNoteRecord;
+  addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => CreditNoteRecord;
   deleteCreditNote: (id: string) => void;
 
   // Actions - Expenses
@@ -190,7 +190,7 @@ interface StudioContextType {
   canAccessTab: (tabId: string) => boolean;
 
   // Actions - General Ledger Manual Entries
-  addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id'>) => void;
+  addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id' | 'entryNumber'> & { entryNumber?: string }) => void;
   updateManualJournalEntry: (id: string, updates: Partial<ManualJournalEntry>) => void;
   deleteManualJournalEntry: (id: string) => void;
 
@@ -307,9 +307,17 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     safeLoadFromStorage(STORAGE_KEYS.GALLERY, INITIAL_GALLERY_PHOTOS)
   );
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() =>
-    safeLoadFromStorage(STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS)
-  );
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
+    const loaded = safeLoadFromStorage<Supplier[]>(STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
+    return loaded.map(sup => {
+      if (sup.cupoCredito !== undefined) return sup;
+      const initialMatch = INITIAL_SUPPLIERS.find(i => i.id === sup.id || i.ruc === sup.ruc);
+      return {
+        ...sup,
+        cupoCredito: initialMatch?.cupoCredito ?? ((sup.diasCredito ?? 0) > 0 ? 1500 : 0),
+      };
+    });
+  });
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() =>
     safeLoadFromStorage(STORAGE_KEYS.PURCHASE_ORDERS, INITIAL_PURCHASE_ORDERS)
@@ -342,6 +350,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // Seguridad: la clave del certificado .p12 nunca debe venir de localStorage
+        // (limpia valores guardados por versiones anteriores).
+        delete parsed.firmaElectronicaClave;
         // En Ecuador la moneda oficial es el Dólar estadounidense ($ USD)
         parsed.currency = '$';
         parsed.currencyCode = 'USD';
@@ -476,7 +487,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [pastShifts]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    // Seguridad: la clave del certificado .p12 se mantiene solo en memoria
+    // durante la sesión y no se persiste en el navegador.
+    const { firmaElectronicaClave: _omitClave, ...persistable } = settings;
+    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(persistable));
   }, [settings]);
 
   useEffect(() => {
@@ -852,7 +866,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const targetUser = users.find(u => u.id === userId && u.estado === 'ACTIVO');
     if (!targetUser) return false;
 
-    if (targetUser.pin && pin !== undefined && pin !== targetUser.pin) {
+    // Si el usuario tiene PIN, siempre es obligatorio (no se puede omitir)
+    if (targetUser.pin && pin !== targetUser.pin) {
       return false;
     }
 
@@ -1053,6 +1068,16 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       saleId: sale.id,
     });
 
+    // If there is a proforma linked to this appointment, also mark it as invoiced with the invoice number
+    const linkedProforma = proformas.find(p => p.appointmentId === appointmentId);
+    if (linkedProforma) {
+      updateProforma(linkedProforma.id, {
+        status: 'invoiced',
+        saleId: sale.id,
+        invoiceNumber: sale.invoiceNumber,
+      });
+    }
+
     return sale;
   };
 
@@ -1251,14 +1276,57 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       notes: `Factura oficial generada desde Proforma ${prof.proformaNumber}. ${prof.notes || ''}`.trim(),
     });
 
-    // Mark proforma as converted with reference to sale
+    // Mark proforma as invoiced with reference to sale and its official invoice number
     updateProforma(proformaId, {
-      status: 'converted',
+      status: 'invoiced',
       saleId: sale.id,
       invoiceNumber: sale.invoiceNumber,
     });
 
+    // If the proforma had a linked appointment, mark it completed with saleId too
+    if (prof.appointmentId) {
+      updateAppointment(prof.appointmentId, {
+        status: 'completed',
+        saleId: sale.id,
+      });
+    }
+
     return sale;
+  };
+
+  // Último secuencial asignado en esta sesión (evita duplicados si addSale se llama
+  // varias veces antes de que React actualice `settings`).
+  const lastAssignedSeqRef = useRef<{ notaVenta: number; factura: number }>({ notaVenta: 0, factura: 0 });
+
+  /**
+   * Calcula el siguiente secuencial libre tomando el máximo entre:
+   * - el valor configurado en settings (estado actual y lo guardado en localStorage por otra pestaña),
+   * - el mayor secuencial ya usado en las ventas (estado actual y localStorage),
+   * - el último asignado en esta sesión.
+   * Así nunca se reutiliza un número ya emitido en este navegador.
+   * NOTA: entre distintos equipos sigue siendo necesario un contador central en el servidor.
+   */
+  const getNextSaleSequential = (isNotaVenta: boolean, fallbackStart: number): number => {
+    const field = isNotaVenta ? 'secuencialNotaVenta' : 'secuencialFactura';
+    const parseSeq = (v: unknown) => parseInt(String(v ?? '').replace(/\D/g, ''), 10) || 0;
+
+    const storedSettings = safeLoadFromStorage<Partial<StudioSettings>>(STORAGE_KEYS.SETTINGS, {});
+    const storedSales = safeLoadFromStorage<SaleRecord[]>(STORAGE_KEYS.SALES, []);
+
+    const maxUsed = [...sales, ...(Array.isArray(storedSales) ? storedSales : [])]
+      .filter(s => (s.documentType === 'nota_venta') === isNotaVenta)
+      .reduce((max, s) => {
+        const lastSegment = (s.invoiceNumber || '').split('-').pop() || '';
+        return Math.max(max, parseSeq(lastSegment));
+      }, 0);
+
+    const configured = Math.max(parseSeq((settings as any)[field]), parseSeq((storedSettings as any)[field]));
+    const lastAssigned = isNotaVenta ? lastAssignedSeqRef.current.notaVenta : lastAssignedSeqRef.current.factura;
+
+    const next = Math.max(configured || fallbackStart, maxUsed + 1, lastAssigned + 1);
+    if (isNotaVenta) lastAssignedSeqRef.current.notaVenta = next;
+    else lastAssignedSeqRef.current.factura = next;
+    return next;
   };
 
   // Sale Operations
@@ -1272,9 +1340,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     let currentSeqNum = 1;
 
     if (isNotaVenta) {
-      currentSeqNum =
-        parseInt(settings.secuencialNotaVenta?.replace(/\D/g, '') || '', 10) ||
-        (sales.filter(s => s.documentType === 'nota_venta').length + 46);
+      currentSeqNum = getNextSaleSequential(
+        true,
+        sales.filter(s => s.documentType === 'nota_venta').length + 46
+      );
       const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
       invoiceNumber = `NV-${estab}-${pto}-${secuencialPadded}`;
 
@@ -1285,9 +1354,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         secuencialNotaVenta: nextSecuencialPadded,
       }));
     } else {
-      currentSeqNum =
-        parseInt(settings.secuencialFactura?.replace(/\D/g, '') || '', 10) ||
-        (sales.filter(s => s.documentType !== 'nota_venta').length + 184);
+      currentSeqNum = getNextSaleSequential(
+        false,
+        sales.filter(s => s.documentType !== 'nota_venta').length + 184
+      );
       const secuencialPadded = String(currentSeqNum).padStart(9, '0').slice(-9);
       invoiceNumber = `${estab}-${pto}-${secuencialPadded}`;
 
@@ -1521,7 +1591,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   // Credit Note Operations / Notas de Crédito
   const addCreditNote = (
-    cnData: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt'>
+    cnData: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }
   ): CreditNoteRecord => {
     const estab = (settings.codigoEstablecimiento || '001').padStart(3, '0').slice(-3);
     const pto = (settings.puntoEmision || '001').padStart(3, '0').slice(-3);
@@ -1971,7 +2041,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Manual Journal Entries for General Ledger & Libro Diario
-  const addManualJournalEntry = (entryData: Omit<ManualJournalEntry, 'id'>) => {
+  const addManualJournalEntry = (entryData: Omit<ManualJournalEntry, 'id' | 'entryNumber'> & { entryNumber?: string }) => {
     const year = new Date().getFullYear();
     const nextNumber = entryData.entryNumber || `ASI-${year}-${String(manualJournalEntries.length + 1).padStart(4, '0')}`;
     const newEntry: ManualJournalEntry = {
@@ -2286,7 +2356,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   addSale: (sale) => ({ ...sale, id: 'temp-' + Date.now(), invoiceNumber: 'INV-0001' }),
   updateSale: () => {},
   deleteSale: () => {},
-  addCreditNote: (cn) => ({ ...cn, id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
+  addCreditNote: (cn) => ({ ...cn, sriStatus: cn.sriStatus || 'PENDIENTE', id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
   deleteCreditNote: () => {},
   addExpense: (exp) => ({ ...exp, id: 'temp-' + Date.now() }),
   updateExpense: () => {},

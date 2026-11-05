@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Users,
@@ -21,16 +21,27 @@ import { SystemUser, UserRole } from '../../types';
 interface UserSwitcherModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Usuario a preseleccionar (abre directamente la pantalla de PIN) */
+  preselectedUser?: SystemUser | null;
 }
 
 export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
   isOpen,
   onClose,
+  preselectedUser = null,
 }) => {
   const { users, currentUser, switchUser } = useStudio();
   const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedUser(preselectedUser && preselectedUser.pin ? preselectedUser : null);
+      setPinInput('');
+      setPinError(null);
+    }
+  }, [isOpen, preselectedUser]);
 
   if (!isOpen) return null;
 

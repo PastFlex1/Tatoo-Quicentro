@@ -337,7 +337,7 @@ export const ElectronicSignatureUploader: React.FC<ElectronicSignatureUploaderPr
                   <Lock className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Contraseña de la Firma Electrónica:</span>
                 </span>
-                <span className="text-[10px] text-neutral-400 font-normal">Requerida para firmar XML</span>
+                <span className="text-[10px] text-neutral-400 font-normal">Requerida para firmar XML · por seguridad no se guarda, se pide en cada sesión</span>
               </label>
               <div className="relative">
                 <input

@@ -44,6 +44,7 @@ export const UsersView: React.FC = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<SystemUser | null>(null);
   const [isSwitcherModalOpen, setIsSwitcherModalOpen] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState<SystemUser | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Filtered Users
@@ -114,7 +115,13 @@ export const UsersView: React.FC = () => {
   };
 
   const handleQuickSwitch = (u: SystemUser) => {
-    switchUser(u.id);
+    // Usuarios con PIN: abrir el modal para que se ingrese el PIN
+    if (u.pin) {
+      setSwitchTarget(u);
+      setIsSwitcherModalOpen(true);
+      return;
+    }
+    if (!switchUser(u.id)) return;
     setSuccessNotice(`Sesión cambiada a @${u.username} (${u.nombres} ${u.apellidos})`);
     setTimeout(() => setSuccessNotice(null), 4000);
   };
@@ -469,7 +476,11 @@ export const UsersView: React.FC = () => {
       {/* Modal 2: Selector Rápido de Usuario */}
       <UserSwitcherModal
         isOpen={isSwitcherModalOpen}
-        onClose={() => setIsSwitcherModalOpen(false)}
+        onClose={() => {
+          setIsSwitcherModalOpen(false);
+          setSwitchTarget(null);
+        }}
+        preselectedUser={switchTarget}
       />
     </div>
   );
