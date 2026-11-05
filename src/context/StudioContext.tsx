@@ -44,6 +44,7 @@ import {
   INITIAL_JOURNAL_ENTRIES,
   getDefaultTabsForRole,
 } from '../data/initialData';
+import { computeArtistBalance } from '../utils/artistBalance';
 import { generateSriClaveAcceso } from '../utils/sriCalculations';
 
 interface StudioContextType {
@@ -131,8 +132,9 @@ interface StudioContextType {
     tips: number,
     deductions: number,
     paymentMethod: 'cash' | 'transfer',
-    notes?: string
-  ) => void;
+    notes?: string,
+    type?: 'liquidacion' | 'anticipo'
+  ) => ArtistSettlement | null;
 
   // Actions - Inventory & Kardex
   addInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
@@ -1760,46 +1762,77 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     tips: number,
     deductions: number,
     paymentMethod: 'cash' | 'transfer',
-    notes?: string
-  ) => {
+    notes?: string,
+    type: 'liquidacion' | 'anticipo' = 'liquidacion'
+  ): ArtistSettlement | null => {
     const artist = artists.find(a => a.id === artistId);
-    if (!artist) return;
+    if (!artist) return null;
 
-    const netPaid = amount + tips - deductions;
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const isAdvance = type === 'anticipo';
+    const commission = round2(Math.max(0, amount));
+    const tipsApplied = isAdvance ? 0 : round2(Math.max(0, tips));
+    const deductionsApplied = isAdvance ? 0 : round2(Math.max(0, deductions));
+    const netPaid = round2(Math.max(0, commission + tipsApplied - deductionsApplied));
+    if (commission + tipsApplied <= 0) return null;
+
     const now = new Date().toISOString();
+    const { balance: balanceBefore } = computeArtistBalance(artistId, sales, settlements);
+    const balanceAfter = round2(balanceBefore - (commission + tipsApplied));
+
+    // Correlativo independiente para liquidaciones (LIQ) y anticipos (ANT)
+    const prefix = isAdvance ? 'ANT' : 'LIQ';
+    const lastSeq = settlements.reduce((max, st) => {
+      const m = (st.receiptNumber || '').match(isAdvance ? /^ANT-(\d+)$/ : /^LIQ-(\d+)$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0);
+    const receiptNumber = `${prefix}-${String(lastSeq + 1).padStart(6, '0')}`;
 
     const settlement: ArtistSettlement = {
-      id: `settle-${Date.now()}`,
+      id: `settle-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       artistId,
       artistName: artist.name,
       date: now,
       periodStart: 'Histórico pendiente',
       periodEnd: now.split('T')[0],
       grossSales: 0,
-      commissionEarned: amount,
-      tipsEarned: tips,
-      deductions,
+      commissionEarned: commission,
+      tipsEarned: tipsApplied,
+      deductions: deductionsApplied,
       amountPaid: netPaid,
       paymentMethod,
       status: 'paid',
-      notes: notes || `Liquidación de comisiones acumuladas para ${artist.name}`,
+      type,
+      receiptNumber,
+      balanceBefore,
+      balanceAfter,
+      registeredBy: currentUser ? `${currentUser.nombres} ${currentUser.apellidos}`.trim() : undefined,
+      notes:
+        notes ||
+        (isAdvance
+          ? `Anticipo de comisiones para ${artist.name}`
+          : `Liquidación de comisiones acumuladas para ${artist.name}`),
     };
 
     setSettlements(prev => [settlement, ...prev]);
 
-    // Automatically record an expense for studio accounting
+    // Registrar el egreso en contabilidad del estudio
     addExpense({
       date: now,
       category: 'artist_payout',
-      description: `Pago de Liquidación de Comisiones: ${artist.name}`,
+      description: `${isAdvance ? 'Anticipo de Comisiones' : 'Pago de Liquidación de Comisiones'}: ${artist.name}`,
       supplier: artist.name,
       amount: netPaid,
       taxDeductible: true,
       taxAmount: 0,
       paymentMethod: paymentMethod === 'cash' ? 'cash' : 'bank_transfer',
-      invoiceReference: `LIQ-${Date.now().toString().slice(-6)}`,
-      notes: `Liquidación comisiones: ${formatMoney(amount)} + Propinas: ${formatMoney(tips)} - Descuentos: ${formatMoney(deductions)}`,
+      invoiceReference: receiptNumber,
+      notes: isAdvance
+        ? `Anticipo (pago parcial) ${receiptNumber}: ${formatMoney(netPaid)}`
+        : `Liquidación ${receiptNumber}: comisiones ${formatMoney(commission)} + propinas ${formatMoney(tipsApplied)} - descuentos ${formatMoney(deductionsApplied)}`,
     });
+
+    return settlement;
   };
 
   // Inventory & Kardex Operations
@@ -2364,7 +2397,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   addArtist: () => {},
   updateArtist: () => {},
   toggleArtistStatus: () => {},
-  settleArtistCommissions: () => {},
+  settleArtistCommissions: () => null,
   addInventoryItem: () => {},
   updateInventoryItem: () => {},
   adjustStock: () => {},

@@ -207,6 +207,8 @@ export interface Artist {
   stationRentMonthly?: number; // Tarifa fija de alquiler de cabina si aplica
   phone: string;
   email?: string;
+  /** Cédula / pasaporte del artista (aparece en el comprobante de pago) */
+  dni?: string;
   active: boolean;
   avatarColor: string;
 }
@@ -226,6 +228,15 @@ export interface ArtistSettlement {
   paymentMethod: 'cash' | 'transfer';
   status: 'paid' | 'pending';
   notes?: string;
+  /** 'liquidacion' = pago total/normal de comisiones; 'anticipo' = pago parcial adelantado */
+  type?: 'liquidacion' | 'anticipo';
+  /** Número correlativo del comprobante de pago (LIQ-000001 / ANT-000001) */
+  receiptNumber?: string;
+  /** Saldo pendiente del artista antes y después de este pago */
+  balanceBefore?: number;
+  balanceAfter?: number;
+  /** Usuario del sistema que registró el pago */
+  registeredBy?: string;
 }
 
 export type InventoryCategory =
@@ -415,6 +426,9 @@ export interface CompanyConfig {
   email?: string;
   telefono?: string;
   logoUrl?: string;
+  /** Nombre del representante legal (firma en comprobantes de pago a artistas) */
+  representanteLegal?: string;
+  representanteLegalCedula?: string;
   tarifaIvaPredeterminada?: VatRateType; // Permite elegir entre 15, 5, 0, etc. como predeterminado
   // Firma Electrónica (.p12 / .pfx) y Base64
   firmaElectronicaBase64?: string;

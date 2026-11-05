@@ -20,9 +20,13 @@ import {
   Sparkles,
   Users,
   TrendingUp,
+  HandCoins,
+  Printer,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { Artist, SaleRecord } from '../../types';
+import { Artist, ArtistSettlement, SaleRecord } from '../../types';
+import { computeArtistBalance } from '../../utils/artistBalance';
+import { ArtistPaymentTicketModal } from './ArtistPaymentTicketModal';
 
 interface ArtistsViewProps {
   onOpenReceipt?: (sale: SaleRecord) => void;
@@ -65,6 +69,14 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   const [settleDeductions, setSettleDeductions] = useState<number>(0);
   const [settleMethod, setSettleMethod] = useState<'cash' | 'transfer'>('transfer');
   const [settleNotes, setSettleNotes] = useState('');
+  const [settleType, setSettleType] = useState<'liquidacion' | 'anticipo'>('liquidacion');
+  const [settleBalance, setSettleBalance] = useState<number>(0);
+  const [settleError, setSettleError] = useState<string | null>(null);
+
+  // Comprobante de pago a imprimir (firma representante legal + artista)
+  const [ticketSettlement, setTicketSettlement] = useState<ArtistSettlement | null>(null);
+  const [ticketArtist, setTicketArtist] = useState<Artist | null>(null);
+  const [ticketJustCreated, setTicketJustCreated] = useState(false);
 
   // Add/Edit Artist form state
   const [name, setName] = useState('');
@@ -74,6 +86,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   const [defaultCommissionRate, setDefaultCommissionRate] = useState<number>(80);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [dni, setDni] = useState('');
 
   // Helper to determine if a date falls in selected period
   const isDateInPeriod = (dateStr: string, p: SettlementPeriod): boolean => {
@@ -97,11 +110,10 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
       mon.setDate(now.getDate() - distToMon);
       mon.setHours(0, 0, 0, 0);
 
-      const sun = new Date(mon);
-      sun.setDate(mon.getDate() + 7);
-      sun.setHours(23, 59, 59, 999);
+      const nextMon = new Date(mon);
+      nextMon.setDate(mon.getDate() + 7);
 
-      return d >= mon && d <= sun;
+      return d >= mon && d < nextMon;
     }
 
     if (p === 'month') {
@@ -148,10 +160,15 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
       const periodSettlements = allSettlements.filter(st => isDateInPeriod(st.date, period));
       const alreadyPaidPeriod = periodSettlements.reduce((acc, st) => acc + st.amountPaid, 0);
 
-      // Total historical pending balance (so artist never loses unpaid backlog)
-      const allEarned = allSales.reduce((acc, s) => acc + s.artistShare + s.tipAmount, 0);
-      const allPaid = allSettlements.reduce((acc, st) => acc + st.amountPaid, 0);
-      const totalPendingAccumulated = Math.max(0, allEarned - allPaid);
+      const advancesPeriod = periodSettlements
+        .filter(st => st.type === 'anticipo')
+        .reduce((acc, st) => acc + st.amountPaid, 0);
+
+      // Saldo histórico: lo ganado menos lo aplicado en liquidaciones y anticipos.
+      // (Las deducciones se descuentan del efectivo, no quedan como deuda con el artista.)
+      const balanceInfo = computeArtistBalance(art.id, sales, settlements);
+      const totalPendingAccumulated = Math.max(0, balanceInfo.balance);
+      const advanceCredit = Math.max(0, -balanceInfo.balance);
 
       // Period pending balance
       const periodPending = Math.max(0, totalEarnedPeriod - alreadyPaidPeriod);
@@ -168,6 +185,9 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
         alreadyPaidPeriod,
         periodPending,
         totalPendingAccumulated,
+        advanceCredit,
+        advancesPeriod,
+        balanceInfo,
         salesCount: periodSales.length,
       };
     });
@@ -195,6 +215,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
     const totalTips = filteredArtists.reduce((acc, a) => acc + a.tipsPeriod, 0);
     const totalStudioKept = filteredArtists.reduce((acc, a) => acc + a.studioSharePeriod, 0);
     const totalPending = filteredArtists.reduce((acc, a) => acc + a.totalPendingAccumulated, 0);
+    const totalPaidPeriod = filteredArtists.reduce((acc, a) => acc + a.alreadyPaidPeriod, 0);
     const totalJobsCount = filteredArtists.reduce((acc, a) => acc + a.salesCount, 0);
 
     return {
@@ -203,35 +224,83 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
       totalTips,
       totalStudioKept,
       totalPending,
+      totalPaidPeriod,
       totalJobsCount,
     };
   }, [filteredArtists]);
 
-  // Handler: Open Settlement Modal
-  const handleOpenSettle = (art: Artist, amountToSettle: number, tipsToSettle: number) => {
+  // Handler: Abrir modal de Liquidación (pago total) o Anticipo (pago parcial)
+  const handleOpenSettle = (art: Artist, type: 'liquidacion' | 'anticipo') => {
+    const { balance, pendingCommission, pendingTips } = computeArtistBalance(art.id, sales, settlements);
     setSettleArtist(art);
-    setSettleAmount(amountToSettle);
-    setSettleTips(tipsToSettle);
+    setSettleType(type);
+    setSettleBalance(balance);
+    setSettleError(null);
     setSettleDeductions(0);
     setSettleMethod('transfer');
-    setSettleNotes(`Liquidación de comisiones (${periodLabel}) para ${art.name}`);
+    if (type === 'liquidacion') {
+      setSettleAmount(pendingCommission);
+      setSettleTips(pendingTips);
+      setSettleNotes(`Liquidación de comisiones pendientes para ${art.name}`);
+    } else {
+      setSettleAmount(0);
+      setSettleTips(0);
+      setSettleNotes(`Anticipo de comisiones para ${art.name}`);
+    }
   };
 
-  // Handler: Confirm Settlement
+  // Handler: Confirmar pago, registrar y abrir el comprobante para firmas
   const handleConfirmSettlement = (e: React.FormEvent) => {
     e.preventDefault();
     if (!settleArtist) return;
 
-    settleArtistCommissions(
+    const isAdvance = settleType === 'anticipo';
+    const applied = settleAmount + (isAdvance ? 0 : settleTips);
+    const pending = Math.max(0, settleBalance);
+
+    if (settleAmount < 0 || settleTips < 0 || settleDeductions < 0) {
+      setSettleError('Los valores no pueden ser negativos.');
+      return;
+    }
+    if (applied <= 0) {
+      setSettleError('El monto a pagar debe ser mayor a 0.');
+      return;
+    }
+    if (!isAdvance && applied > pending + 0.005) {
+      setSettleError(
+        `La liquidación (${formatMoney(applied)}) supera el saldo pendiente (${formatMoney(pending)}). Use "Anticipo" para adelantos.`
+      );
+      return;
+    }
+    if (!isAdvance && settleDeductions > applied) {
+      setSettleError('Las deducciones no pueden ser mayores al monto liquidado.');
+      return;
+    }
+
+    const created = settleArtistCommissions(
       settleArtist.id,
       settleAmount,
-      settleTips,
-      settleDeductions,
+      isAdvance ? 0 : settleTips,
+      isAdvance ? 0 : settleDeductions,
       settleMethod,
-      settleNotes
+      settleNotes,
+      settleType
     );
 
+    const artistForTicket = settleArtist;
     setSettleArtist(null);
+    if (created) {
+      setTicketArtist(artistForTicket);
+      setTicketJustCreated(true);
+      setTicketSettlement(created);
+    }
+  };
+
+  // Reimprimir el comprobante de un pago anterior
+  const openTicketFor = (st: ArtistSettlement) => {
+    setTicketArtist(artists.find(a => a.id === st.artistId) || null);
+    setTicketJustCreated(false);
+    setTicketSettlement(st);
   };
 
   // Handler: Open Commission Adjustment Modal
@@ -262,6 +331,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
     setDefaultCommissionRate(art.defaultCommissionRate);
     setPhone(art.phone);
     setEmail(art.email || '');
+    setDni(art.dni || '');
     setIsNewArtistModalOpen(true);
   };
 
@@ -278,6 +348,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
         defaultCommissionRate,
         phone: phone.trim(),
         email: email.trim() || undefined,
+        dni: dni.trim() || undefined,
       });
       setEditingArtist(null);
     } else {
@@ -289,6 +360,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
         defaultCommissionRate,
         phone: phone.trim() || '+593 99 000 0000',
         email: email.trim() || undefined,
+        dni: dni.trim() || undefined,
         active: true,
         avatarColor: 'bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30',
       });
@@ -311,7 +383,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
             </h2>
           </div>
           <p className="text-[11px] text-neutral-400">
-            Cálculo horizontal de liquidaciones, visualización de facturas, control de porcentajes y pagos periódicos.
+            Comisiones por período, saldos pendientes, anticipos y liquidaciones con comprobante para firma.
           </p>
         </div>
 
@@ -350,6 +422,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
               setSpecialty('');
               setPhone('');
               setEmail('');
+              setDni('');
               setIsNewArtistModalOpen(true);
             }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
@@ -405,7 +478,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <div className="flex items-center justify-between text-neutral-400 text-[10px] mb-1">
-            <span>Pendiente Total de Pago</span>
+            <span>Saldo Pendiente (Histórico)</span>
             <DollarSign className="w-3.5 h-3.5 text-[#FF3366]" />
           </div>
           <span
@@ -416,7 +489,9 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
             {formatMoney(globalSummary.totalPending)}
           </span>
           <span className="text-[10px] text-neutral-500 mt-1 block">
-            {globalSummary.totalPending > 0 ? 'Requiere liquidación' : 'Todos los artistas al día'}
+            {globalSummary.totalPending > 0
+              ? `Pagado en el período: ${formatMoney(globalSummary.totalPaidPeriod)}`
+              : 'Todos los artistas al día'}
           </span>
         </div>
       </div>
@@ -462,227 +537,215 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
       </div>
 
       {/* =========================================================================
-          HORIZONTAL ARTIST SETTLEMENT LIST (DISEÑO HORIZONTAL DE NÓMINA)
+          TABLA DE LIQUIDACIÓN DE ARTISTAS
           ========================================================================= */}
-      <div className="space-y-3">
+      <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
         {filteredArtists.length === 0 ? (
-          <div className="p-12 text-center text-neutral-500 bg-[#18181D] rounded-2xl border border-[#272730]">
+          <div className="p-12 text-center text-neutral-500">
             No se encontraron artistas con los filtros seleccionados.
           </div>
         ) : (
-          filteredArtists.map(item => {
-            const {
-              artist: art,
-              grossBilledPeriod,
-              commissionPeriod,
-              tipsPeriod,
-              studioSharePeriod,
-              alreadyPaidPeriod,
-              totalPendingAccumulated,
-              salesCount,
-            } = item;
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left min-w-[1080px]">
+              <thead>
+                <tr className="bg-[#121215] border-b border-[#272730] text-[10px] uppercase tracking-wider text-neutral-400">
+                  <th className="py-3 px-4 font-semibold">Artista</th>
+                  <th className="py-3 px-3 font-semibold text-center">Comisión</th>
+                  <th className="py-3 px-3 font-semibold text-center">Servicios</th>
+                  <th className="py-3 px-3 font-semibold text-right">Facturado</th>
+                  <th className="py-3 px-3 font-semibold text-right">Comisión artista</th>
+                  <th className="py-3 px-3 font-semibold text-right">Propinas</th>
+                  <th className="py-3 px-3 font-semibold text-right">Retención casa</th>
+                  <th className="py-3 px-3 font-semibold text-right">Pagado período</th>
+                  <th className="py-3 px-3 font-semibold text-right">Saldo pendiente</th>
+                  <th className="py-3 px-4 font-semibold text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#222228]">
+                {filteredArtists.map(item => {
+                  const {
+                    artist: art,
+                    grossBilledPeriod,
+                    commissionPeriod,
+                    tipsPeriod,
+                    studioSharePeriod,
+                    alreadyPaidPeriod,
+                    advancesPeriod,
+                    totalPendingAccumulated,
+                    advanceCredit,
+                    salesCount,
+                  } = item;
+                  const isPending = totalPendingAccumulated > 0;
 
-            const isPending = totalPendingAccumulated > 0;
+                  return (
+                    <tr
+                      key={art.id}
+                      className={`transition-colors hover:bg-[#1E1E25] ${art.active ? '' : 'opacity-55'}`}
+                    >
+                      {/* Artista */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3 min-w-[220px]">
+                          <div className="w-9 h-9 rounded-xl bg-[#FF3366]/15 border border-[#FF3366]/40 flex items-center justify-center font-bold text-[11px] text-[#FF3366] shrink-0">
+                            {art.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-white truncate">
+                              {art.name}
+                              {art.nickname && !art.name.includes(art.nickname) && (
+                                <span className="ml-1.5 text-[11px] text-[#FF3366] font-medium">"{art.nickname}"</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-neutral-400 truncate max-w-[220px]" title={art.specialty}>
+                              {art.role} · {art.specialty}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <button
+                                onClick={() => toggleArtistStatus(art.id)}
+                                className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold cursor-pointer ${
+                                  art.active
+                                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-neutral-800 text-neutral-400 border border-neutral-700'
+                                }`}
+                                title="Activar / desactivar"
+                              >
+                                {art.active ? 'Activo' : 'Inactivo'}
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditArtist(art)}
+                                className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                                title="Editar ficha del artista"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                                Editar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
 
-            return (
-              <div
-                key={art.id}
-                className={`p-4 sm:p-5 rounded-2xl border transition-all ${
-                  art.active
-                    ? 'bg-[#18181D] border-[#272730] hover:border-[#FF3366]/40'
-                    : 'bg-[#141418] border-[#202026] opacity-60'
-                }`}
-              >
-                {/* Horizontal Flex Grid Layout */}
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                  {/* Column 1: Artist Identity & Specialty */}
-                  <div className="flex items-center gap-3.5 min-w-[240px] xl:max-w-[280px]">
-                    <div className="w-12 h-12 rounded-2xl bg-[#FF3366]/15 border border-[#FF3366]/40 flex items-center justify-center font-bold text-sm text-[#FF3366] shadow-[0_0_10px_rgba(255,51,102,0.15)] shrink-0">
-                      {art.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-bold text-sm text-white truncate">{art.name}</h3>
-                        {art.nickname && (
-                          <span className="text-[11px] text-[#FF3366] font-medium">"{art.nickname}"</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-neutral-400 flex items-center gap-1.5 mt-0.5">
-                        <span className="text-white font-semibold shrink-0">{art.role}</span>
-                        <span>•</span>
-                        <span className="truncate">{art.specialty}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
+                      {/* Comisión % */}
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
                         <button
-                          onClick={() => toggleArtistStatus(art.id)}
-                          className={`text-[9px] px-2 py-0.5 rounded-full font-mono font-bold cursor-pointer ${
-                            art.active
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-neutral-800 text-neutral-400'
+                          onClick={() => handleOpenCommissionModal(art)}
+                          className="inline-flex flex-col items-center px-2 py-1 rounded-lg hover:bg-[#25252E] cursor-pointer"
+                          title="Cambiar % de comisión"
+                        >
+                          <span className="font-mono font-bold text-white text-sm">{art.defaultCommissionRate}%</span>
+                          <span className="text-[9px] text-neutral-500 font-mono">Casa {100 - art.defaultCommissionRate}%</span>
+                        </button>
+                      </td>
+
+                      {/* Servicios */}
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          onClick={() => setViewSalesArtist(art)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#121215] border border-[#272730] hover:border-[#FF3366]/50 text-neutral-200 font-mono cursor-pointer"
+                          title="Ver ventas y facturas del artista"
+                        >
+                          <FileText className="w-3 h-3 text-[#FF3366]" />
+                          {salesCount}
+                        </button>
+                      </td>
+
+                      <td className="py-3 px-3 text-right font-mono tabular-nums text-white whitespace-nowrap">
+                        {formatMoney(grossBilledPeriod)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono tabular-nums text-[#FF3366] font-semibold whitespace-nowrap">
+                        {formatMoney(commissionPeriod)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono tabular-nums text-emerald-400 whitespace-nowrap">
+                        {formatMoney(tipsPeriod)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono tabular-nums text-neutral-300 whitespace-nowrap">
+                        {formatMoney(studioSharePeriod)}
+                      </td>
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <div className="font-mono tabular-nums text-neutral-300">{formatMoney(alreadyPaidPeriod)}</div>
+                        {advancesPeriod > 0 && (
+                          <div className="text-[9px] text-amber-400">incl. {formatMoney(advancesPeriod)} anticipo</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <div
+                          className={`font-mono tabular-nums font-bold text-sm ${
+                            isPending ? 'text-[#FF3366]' : 'text-emerald-400'
                           }`}
                         >
-                          {art.active ? 'Activo' : 'Inactivo'}
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditArtist(art)}
-                          className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer"
-                          title="Editar ficha del artista"
-                        >
-                          <Edit2 className="w-3 h-3" />
-                          <span>Editar</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                          {formatMoney(totalPendingAccumulated)}
+                        </div>
+                        <div className="text-[9px] text-neutral-500">
+                          {advanceCredit > 0
+                            ? <span className="text-amber-400">Anticipo a descontar {formatMoney(advanceCredit)}</span>
+                            : isPending ? 'Acumulado' : 'Al día'}
+                        </div>
+                      </td>
 
-                  {/* Column 2: Commission % & Split Display */}
-                  <div className="flex flex-col justify-center min-w-[150px] p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
-                    <div className="flex items-center justify-between text-[11px] mb-1">
-                      <span className="text-neutral-400 flex items-center gap-1">
-                        <Percent className="w-3 h-3 text-[#FF3366]" />
-                        <span>Comisión</span>
-                      </span>
-                      <button
-                        onClick={() => handleOpenCommissionModal(art)}
-                        className="text-[10px] text-[#FF3366] hover:underline cursor-pointer font-bold"
-                        title="Cambiar % de comisión"
-                      >
-                        Cambiar %
-                      </button>
-                    </div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="font-mono font-bold text-base text-white">
-                        {art.defaultCommissionRate}%
-                      </span>
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        (Casa {100 - art.defaultCommissionRate}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-[#252530] h-1.5 rounded-full mt-1.5 overflow-hidden flex">
-                      <div
-                        className="bg-[#FF3366] h-full"
-                        style={{ width: `${art.defaultCommissionRate}%` }}
-                      ></div>
-                      <div
-                        className="bg-neutral-600 h-full"
-                        style={{ width: `${100 - art.defaultCommissionRate}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Column 3: Metrics Strip (Facturación, Comisión ganada, Estudio, Pagado) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 flex-1 text-xs">
-                    {/* Facturación */}
-                    <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
-                      <span className="text-[10px] text-neutral-400 block mb-0.5">
-                        Facturado ({periodLabel})
-                      </span>
-                      <span className="font-mono font-bold text-white text-xs block">
-                        {formatMoney(grossBilledPeriod)}
-                      </span>
-                      <span className="text-[9px] text-neutral-500 block mt-0.5">
-                        {salesCount} factura(s)
-                      </span>
-                    </div>
-
-                    {/* Comisión Ganada */}
-                    <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
-                      <span className="text-[10px] text-neutral-400 block mb-0.5">
-                        Comisión Artista
-                      </span>
-                      <span className="font-mono font-bold text-[#FF3366] text-xs block">
-                        {formatMoney(commissionPeriod)}
-                      </span>
-                      {tipsPeriod > 0 && (
-                        <span className="text-[9px] text-emerald-400 block mt-0.5">
-                          +{formatMoney(tipsPeriod)} propinas
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Retención Casa */}
-                    <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
-                      <span className="text-[10px] text-neutral-400 block mb-0.5">Retención Casa</span>
-                      <span className="font-mono font-bold text-neutral-200 text-xs block">
-                        {formatMoney(studioSharePeriod)}
-                      </span>
-                      <span className="text-[9px] text-neutral-500 block mt-0.5">Estudio</span>
-                    </div>
-
-                    {/* Ya Liquidado */}
-                    <div className="p-2.5 rounded-xl bg-[#121215] border border-[#272730]">
-                      <span className="text-[10px] text-neutral-400 block mb-0.5">Liquidado / Pagado</span>
-                      <span className="font-mono font-bold text-neutral-400 text-xs block">
-                        {formatMoney(alreadyPaidPeriod)}
-                      </span>
-                      <span className="text-[9px] text-neutral-500 block mt-0.5">en el período</span>
-                    </div>
-                  </div>
-
-                  {/* Column 4: Saldo Pendiente */}
-                  <div className="min-w-[140px] p-2.5 rounded-xl bg-[#121215] border border-[#272730] flex flex-col justify-center">
-                    <span className="text-[10px] text-neutral-400 block">Pendiente de Pago:</span>
-                    <span
-                      className={`font-mono font-bold text-sm sm:text-base block ${
-                        isPending ? 'text-[#FF3366]' : 'text-emerald-400'
-                      }`}
-                    >
-                      {formatMoney(totalPendingAccumulated)}
-                    </span>
-                    <span className="text-[9px] text-neutral-500 block">
-                      {isPending ? 'Saldo acumulado' : 'Al día'}
-                    </span>
-                  </div>
-
-                  {/* Column 5: Action Buttons (Ver Ventas, % Comisión, Liquidar) */}
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
-                    {/* Botón 1: Ver Ventas (Facturas) */}
-                    <button
-                      onClick={() => setViewSalesArtist(art)}
-                      className="px-3.5 py-2 rounded-xl bg-[#121215] hover:bg-[#1C1C24] text-neutral-200 hover:text-white border border-[#272730] hover:border-[#FF3366]/50 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
-                      title="Ver todas las ventas y facturas realizadas por este artista"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-[#FF3366]" />
-                      <span>Ver Ventas</span>
-                      <span className="bg-[#252530] px-1.5 py-0.2 rounded text-[10px] font-mono text-neutral-300">
-                        {salesCount}
-                      </span>
-                    </button>
-
-                    {/* Botón 2: % Comisión */}
-                    <button
-                      onClick={() => handleOpenCommissionModal(art)}
-                      className="p-2 rounded-xl bg-[#121215] hover:bg-[#1C1C24] text-neutral-400 hover:text-white border border-[#272730] hover:border-[#FF3366]/50 text-xs transition-all cursor-pointer"
-                      title="Ajustar porcentaje de comisión del artista"
-                    >
-                      <Percent className="w-3.5 h-3.5 text-[#FF3366]" />
-                    </button>
-
-                    {/* Botón 3: Liquidar (Pagar) */}
-                    <button
-                      onClick={() =>
-                        handleOpenSettle(
-                          art,
-                          totalPendingAccumulated > 0 ? totalPendingAccumulated : commissionPeriod,
-                          tipsPeriod
-                        )
-                      }
-                      disabled={totalPendingAccumulated <= 0 && commissionPeriod <= 0}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${
-                        totalPendingAccumulated > 0 || commissionPeriod > 0
-                          ? 'bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#E62557] hover:to-[#CC1F4B] text-white shadow-[0_0_12px_rgba(255,51,102,0.3)]'
-                          : 'bg-[#1E1E26] text-neutral-600 cursor-not-allowed border border-[#272730]'
-                      }`}
-                    >
-                      <DollarSign className="w-3.5 h-3.5" />
-                      <span>Liquidar (Pagar)</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
+                      {/* Acciones */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenSettle(art, 'anticipo')}
+                            disabled={!art.active}
+                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+                            title="Registrar un anticipo (pago parcial)"
+                          >
+                            <HandCoins className="w-3.5 h-3.5" />
+                            Anticipo
+                          </button>
+                          <button
+                            onClick={() => handleOpenSettle(art, 'liquidacion')}
+                            disabled={!isPending}
+                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 whitespace-nowrap ${
+                              isPending
+                                ? 'bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#E62557] hover:to-[#CC1F4B] text-white cursor-pointer'
+                                : 'bg-[#1E1E26] text-neutral-600 border border-[#272730] cursor-not-allowed'
+                            }`}
+                            title="Liquidar el saldo pendiente"
+                          >
+                            <DollarSign className="w-3.5 h-3.5" />
+                            Liquidar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-[#121215] border-t border-[#272730] font-bold">
+                  <td className="py-3 px-4 text-neutral-300 uppercase text-[10px] tracking-wider">
+                    Totales ({filteredArtists.length} artistas)
+                  </td>
+                  <td></td>
+                  <td className="py-3 px-3 text-center font-mono text-neutral-300">{globalSummary.totalJobsCount}</td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-white whitespace-nowrap">
+                    {formatMoney(globalSummary.totalBilled)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-[#FF3366] whitespace-nowrap">
+                    {formatMoney(globalSummary.totalCommissions)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-emerald-400 whitespace-nowrap">
+                    {formatMoney(globalSummary.totalTips)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-neutral-300 whitespace-nowrap">
+                    {formatMoney(globalSummary.totalStudioKept)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-neutral-300 whitespace-nowrap">
+                    {formatMoney(globalSummary.totalPaidPeriod)}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono tabular-nums text-[#FF3366] whitespace-nowrap">
+                    {formatMoney(globalSummary.totalPending)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         )}
+        <div className="px-4 py-2.5 border-t border-[#24242B] text-[10px] text-neutral-500">
+          Las columnas de facturación, comisión, propinas, retención y pagos corresponden a <strong className="text-neutral-300">{periodLabel}</strong>.
+          El saldo pendiente es acumulado histórico (ganado − liquidaciones − anticipos). Facturado incluye IVA y propinas.
+        </div>
       </div>
 
       {/* =========================================================================
@@ -707,6 +770,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
               <thead>
                 <tr className="border-b border-[#24242B] text-neutral-400 font-medium">
                   <th className="py-2.5 px-3 whitespace-nowrap">Fecha de Pago</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">Comprobante</th>
                   <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
                   <th className="py-2.5 px-3 whitespace-nowrap">Comisión Base</th>
                   <th className="py-2.5 px-3 whitespace-nowrap">Propinas</th>
@@ -714,6 +778,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   <th className="py-2.5 px-3 text-right whitespace-nowrap">Neto Pagado</th>
                   <th className="py-2.5 px-3 whitespace-nowrap">Método</th>
                   <th className="py-2.5 px-3 whitespace-nowrap">Justificante / Notas</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap text-center">Ticket</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#222228]">
@@ -724,6 +789,16 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                         dateStyle: 'short',
                         timeStyle: 'short',
                       })}
+                    </td>
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      <div className="font-mono text-neutral-200">{st.receiptNumber || '—'}</div>
+                      <span
+                        className={`text-[9px] font-bold uppercase ${
+                          st.type === 'anticipo' ? 'text-amber-400' : 'text-emerald-400'
+                        }`}
+                      >
+                        {st.type === 'anticipo' ? 'Anticipo' : 'Liquidación'}
+                      </span>
                     </td>
                     <td className="py-2.5 px-3 font-semibold text-white whitespace-nowrap">
                       {st.artistName}
@@ -747,6 +822,15 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                     </td>
                     <td className="py-2.5 px-3 text-neutral-400 text-[11px] truncate max-w-[220px]">
                       {st.notes || '—'}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <button
+                        onClick={() => openTicketFor(st)}
+                        className="p-1.5 rounded-lg border border-[#272730] text-neutral-300 hover:text-white hover:border-[#FF3366]/50 cursor-pointer"
+                        title="Ver / reimprimir comprobante para firmas"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1051,7 +1135,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   <DollarSign className="w-4 h-4" />
                 </div>
                 <h3 className="text-sm font-bold text-white tracking-wide">
-                  Liquidar Pago de Comisiones
+                  {settleType === 'anticipo' ? 'Anticipo de Pago (Parcial)' : 'Liquidar Pago de Comisiones'}
                 </h3>
               </div>
               <button
@@ -1066,26 +1150,49 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
               <div className="p-3 rounded-xl bg-[#121215] border border-[#272730]">
                 <span className="text-[10px] text-neutral-400 block">Artista a Liquidar:</span>
                 <span className="font-bold text-white text-sm block">{settleArtist.name}</span>
-                <span className="text-[10px] text-[#FF3366] block">
-                  Período: {periodLabel} • Comisión habitual: {settleArtist.defaultCommissionRate}%
+                <span className="text-[10px] text-neutral-400 block">
+                  Comisión habitual: {settleArtist.defaultCommissionRate}%
                 </span>
+                <div className="mt-2 flex justify-between items-center">
+                  <span className="text-[11px] text-neutral-300">
+                    {settleBalance < 0 ? 'Anticipo ya entregado a descontar:' : 'Saldo pendiente actual:'}
+                  </span>
+                  <span className={`font-mono font-bold ${settleBalance < 0 ? 'text-amber-400' : 'text-[#FF3366]'}`}>
+                    {formatMoney(Math.abs(settleBalance))}
+                  </span>
+                </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-neutral-300 mb-1">
-                  Comisión Bruta a Liquidar ($ USD) *
+                  {settleType === 'anticipo' ? 'Monto del Anticipo ($ USD) *' : 'Comisión a Liquidar ($ USD) *'}
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   required
+                  min="0"
                   value={settleAmount}
-                  onChange={e => setSettleAmount(parseFloat(e.target.value) || 0)}
+                  onChange={e => {
+                    setSettleAmount(parseFloat(e.target.value) || 0);
+                    setSettleError(null);
+                  }}
                   onFocus={e => e.target.select()}
                   className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 transition-colors"
                 />
               </div>
 
+              {settleType === 'anticipo' && (
+                <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 rounded-xl p-2.5">
+                  El anticipo se descuenta del saldo pendiente del artista.
+                  {settleAmount > Math.max(0, settleBalance) && (
+                    <> Supera el saldo actual: la diferencia ({formatMoney(settleAmount - Math.max(0, settleBalance))}) se descontará de comisiones futuras.</>
+                  )}
+                </p>
+              )}
+
+              {settleType === 'liquidacion' && (
+              <>
               <div>
                 <label className="block font-semibold text-neutral-300 mb-1">
                   Propinas a Entregar ($ USD)
@@ -1093,8 +1200,12 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={settleTips}
-                  onChange={e => setSettleTips(parseFloat(e.target.value) || 0)}
+                  onChange={e => {
+                    setSettleTips(parseFloat(e.target.value) || 0);
+                    setSettleError(null);
+                  }}
                   onFocus={e => e.target.select()}
                   className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-emerald-400 font-mono focus:border-[#FF3366]/60 transition-colors"
                 />
@@ -1107,12 +1218,18 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                 <input
                   type="number"
                   step="0.01"
+                  min="0"
                   value={settleDeductions}
-                  onChange={e => setSettleDeductions(parseFloat(e.target.value) || 0)}
+                  onChange={e => {
+                    setSettleDeductions(parseFloat(e.target.value) || 0);
+                    setSettleError(null);
+                  }}
                   onFocus={e => e.target.select()}
                   className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-[#FF3366] font-mono focus:border-[#FF3366]/60 transition-colors"
                 />
               </div>
+              </>
+              )}
 
               <div>
                 <label className="block font-semibold text-neutral-300 mb-1">
@@ -1144,9 +1261,32 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
               <div className="p-3.5 rounded-2xl bg-[#121215] border border-emerald-500/40 flex justify-between items-center text-sm">
                 <span className="font-semibold text-neutral-300">Neto a Transferir / Pagar:</span>
                 <span className="font-mono font-bold text-emerald-400 text-lg">
-                  {formatMoney(Math.max(0, settleAmount + settleTips - settleDeductions))}
+                  {formatMoney(
+                    settleType === 'anticipo'
+                      ? Math.max(0, settleAmount)
+                      : Math.max(0, settleAmount + settleTips - settleDeductions)
+                  )}
                 </span>
               </div>
+
+              <div className="flex justify-between text-[11px] text-neutral-400 px-1">
+                <span>Saldo después del pago:</span>
+                {(() => {
+                  const after =
+                    settleBalance - (settleAmount + (settleType === 'anticipo' ? 0 : settleTips));
+                  return (
+                    <span className={`font-mono ${after < 0 ? 'text-amber-400' : 'text-neutral-200'}`}>
+                      {after < 0 ? `Anticipo a descontar ${formatMoney(-after)}` : formatMoney(after)}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {settleError && (
+                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/40 text-red-300 text-[11px]">
+                  {settleError}
+                </div>
+              )}
 
               <div className="pt-3 border-t border-[#25252E] flex justify-end gap-3">
                 <button
@@ -1160,7 +1300,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   type="submit"
                   className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-full shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all cursor-pointer"
                 >
-                  Confirmar Pago & Registrar
+                  Registrar e Imprimir Ticket
                 </button>
               </div>
             </form>
@@ -1265,6 +1405,17 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
               </div>
 
               <div>
+                <label className="block font-semibold text-neutral-300 mb-1">Cédula / Pasaporte</label>
+                <input
+                  type="text"
+                  placeholder="1712345678"
+                  value={dni}
+                  onChange={e => setDni(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:border-[#FF3366]/60 transition-colors"
+                />
+              </div>
+
+              <div>
                 <label className="block font-semibold text-neutral-300 mb-1">Email</label>
                 <input
                   type="email"
@@ -1294,6 +1445,17 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
           </div>
         </div>
       )}
+      {/* MODAL: COMPROBANTE DE PAGO PARA FIRMAS */}
+      <ArtistPaymentTicketModal
+        settlement={ticketSettlement}
+        artist={ticketArtist}
+        justCreated={ticketJustCreated}
+        onClose={() => {
+          setTicketSettlement(null);
+          setTicketArtist(null);
+          setTicketJustCreated(false);
+        }}
+      />
     </div>
   );
 };
