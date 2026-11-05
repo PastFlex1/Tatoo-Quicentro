@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Users,
   Search,
@@ -62,6 +63,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setActiveTab,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
@@ -277,6 +279,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
 
   // Handlers
   const handleOpenAddModal = () => {
+    if (!guardPermission('clients.create')) return;
     setEditingClient(null);
     setFormName('');
     setFormPhone('');
@@ -302,6 +305,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleOpenEditModal = (client: ClientProfile) => {
+    if (!guardPermission('clients.edit')) return;
     setEditingClient(client);
     setFormName(client.name);
     setFormPhone(client.phone || '');
@@ -327,6 +331,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleDeleteClient = (client: ClientProfile) => {
+    if (!guardPermission('clients.delete')) return;
     if (confirm(`¿Eliminar la ficha del cliente "${client.name}"? Los comprobantes y ventas previas se conservarán.`)) {
       deleteClient(client.id);
       if (viewHistoryClient?.id === client.id) {
@@ -395,6 +400,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
 
   const handleSaveClient = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(editingClient ? 'clients.edit' : 'clients.create')) return;
     if (!formName.trim()) return;
 
     const parsedTags = formTags
@@ -434,6 +440,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleCobrarEnPos = (client: ClientProfile) => {
+    if (!guardPermission('pos.charge')) return;
     if (onSelectClientForPos) {
       onSelectClientForPos(client);
     }
@@ -441,6 +448,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleExportClientDossier = (client: ClientProfile, clientSales: SaleRecord[]) => {
+    if (!guardPermission('clients.export')) return;
     const lines = [
       `"EXPEDIENTE CLÍNICO & HISTORIAL DE CLIENTE - ${client.name.toUpperCase()}"`,
       `"Generado: ${new Date().toLocaleString('es-EC')}"`,
@@ -607,6 +615,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleOpenConsentUploadForSale = (sale: SaleRecord, existingConsent?: ProcedureConsentRecord) => {
+    if (!guardPermission('clients.view_medical')) return;
     setConsentProcedureType('sale');
     setConsentProcedureRefId(sale.id);
     setConsentInvoiceOrRef(sale.invoiceNumber);
@@ -622,6 +631,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleOpenConsentUploadForAppointment = (apt: Appointment, existingConsent?: ProcedureConsentRecord) => {
+    if (!guardPermission('clients.view_medical')) return;
     setConsentProcedureType('appointment');
     setConsentProcedureRefId(apt.id);
     setConsentInvoiceOrRef(`CITA-${apt.date}`);
@@ -637,6 +647,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleOpenManualConsentUpload = () => {
+    if (!guardPermission('clients.view_medical')) return;
     setConsentProcedureType('manual');
     setConsentProcedureRefId('');
     setConsentInvoiceOrRef(`PROC-${new Date().toISOString().slice(0, 10)}`);
@@ -653,6 +664,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
 
   const handleSaveUploadedConsent = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('clients.view_medical')) return;
     if (!viewHistoryClient) return;
 
     const finalDataUrl =
@@ -754,6 +766,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   const handleDeleteProcedureConsent = (consentId: string, procedureType?: string, procedureRefId?: string) => {
+    if (!guardPermission('clients.view_medical')) return;
     if (!viewHistoryClient) return;
     if (!confirm('¿Deseas eliminar este documento de consentimiento firmado del procedimiento?')) return;
 

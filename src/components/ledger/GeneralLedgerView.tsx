@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   BookOpen,
   Scale,
@@ -42,6 +43,7 @@ export const GeneralLedgerView: React.FC = () => {
     deleteManualJournalEntry,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Active top tab: default to 'journal' (Libro Diario / Asientos Contables)
   const [activeTab, setActiveTab] = useState<'journal' | 'mayor' | 'trial_balance' | 'chart_of_accounts'>('journal');
   const [journalFilter, setJournalFilter] = useState<'all' | JournalSource>('all');
@@ -217,6 +219,7 @@ export const GeneralLedgerView: React.FC = () => {
   }, [trialBalanceRows]);
 
   const handleExportJournalCSV = () => {
+    if (!guardPermission('ledger.export')) return;
     const headers = [
       'N° Asiento',
       'Fecha',
@@ -258,6 +261,7 @@ export const GeneralLedgerView: React.FC = () => {
   };
 
   const handleOpenPrintManualEntry = (entry: UnifiedJournalEntry) => {
+    if (!guardPermission('ledger.export')) return;
     if (entry.manualRecord) {
       setSelectedEntryToPrint(entry.manualRecord);
     } else {
@@ -279,6 +283,7 @@ export const GeneralLedgerView: React.FC = () => {
   };
 
   const handleDeleteManual = (id: string, entryNum: string) => {
+    if (!guardPermission('ledger.delete_entry')) return;
     if (confirm(`¿Estás seguro de anular el asiento contable ${entryNum}? Se revertirán sus movimientos en el Libro Mayor.`)) {
       deleteManualJournalEntry(id);
     }

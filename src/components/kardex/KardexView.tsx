@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Boxes,
   PlusCircle,
@@ -25,6 +26,7 @@ export const KardexView: React.FC = () => {
     reconcileKardexInventory,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Filters state
   const [selectedItemFilter, setSelectedItemFilter] = useState<string>('all');
   const [kardexTypeFilter, setKardexTypeFilter] = useState<string>('all');
@@ -75,6 +77,7 @@ export const KardexView: React.FC = () => {
 
   const handleCreateKardexMovement = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('kardex.create_movement')) return;
     if (!kdxItemId || kdxQty <= 0) return;
 
     const item = inventory.find(i => i.id === kdxItemId);
@@ -108,6 +111,7 @@ export const KardexView: React.FC = () => {
   };
 
   const handleReconcile = () => {
+    if (!guardPermission('kardex.create_movement')) return;
     setIsSyncing(true);
     setTimeout(() => {
       const res = reconcileKardexInventory();

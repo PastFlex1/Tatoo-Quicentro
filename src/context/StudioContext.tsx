@@ -24,7 +24,18 @@ import {
   SystemUser,
   UserRole,
   CreditNoteRecord,
+  CashMovement,
+  CashMovementType,
+  CashShiftSummary,
+  SystemRole,
 } from '../types';
+import {
+  ADMIN_ROLE_ID,
+  ALL_PERMISSIONS,
+  DEFAULT_ROLES,
+  normalizePermissions,
+  PERMISSION_MODULES,
+} from '../data/permissions';
 import {
   INITIAL_ARTISTS,
   INITIAL_CASH_SHIFT,
@@ -47,6 +58,7 @@ import {
   getDefaultTabsForRole,
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
+import { computeShiftSummary, ShiftTransaction } from '../utils/cashShift';
 import { buildJournalEntries, buildPostings, LedgerPosting, UnifiedJournalEntry } from '../utils/accountingEngine';
 import {
   buildAccessKey,
@@ -203,6 +215,14 @@ interface StudioContextType {
   updateUser: (id: string, updated: Partial<SystemUser>) => void;
   deleteUser: (id: string) => void;
   canAccessTab: (tabId: string) => boolean;
+  /** Permiso granular `modulo.accion` del usuario conectado */
+  can: (permission: string) => boolean;
+  roles: SystemRole[];
+  currentRole: SystemRole | null;
+  getRole: (roleId: string) => SystemRole | undefined;
+  addRole: (data: Pick<SystemRole, 'name' | 'description' | 'color' | 'permissions'>) => SystemRole | null;
+  updateRole: (id: string, updates: Partial<Pick<SystemRole, 'name' | 'description' | 'color' | 'permissions'>>) => boolean;
+  deleteRole: (id: string) => { ok: boolean; error?: string };
 
   // Actions - General Ledger Manual Entries
   addManualJournalEntry: (entry: Omit<ManualJournalEntry, 'id' | 'entryNumber'> & { entryNumber?: string }) => void;
@@ -211,7 +231,17 @@ interface StudioContextType {
 
   // Actions - Cash Shift
   openCashShift: (openingCash: number, openedBy: string, notes?: string) => void;
-  closeCashShift: (actualCounted: number, closedBy: string, notes?: string) => void;
+  closeCashShift: (
+    actualCounted: number,
+    closedBy: string,
+    notes?: string,
+    denominations?: Record<string, number>
+  ) => CashShift | null;
+  addCashMovement: (type: CashMovementType, amount: number, concept: string) => void;
+  removeCashMovement: (id: string) => void;
+  /** Resumen y movimientos del turno en curso */
+  currentShiftSummary: CashShiftSummary;
+  currentShiftTransactions: ShiftTransaction[];
 
   // Settings & Utilities
   updateSettings: (newSettings: Partial<StudioSettings>) => void;
@@ -323,6 +353,7 @@ const STORAGE_KEYS = {
   PAST_SHIFTS: 'inkledger_past_shifts_v1',
   SETTINGS: 'inkledger_settings_v1',
   THEME: 'inkledger_theme_v1',
+  ROLES: 'inkledger_roles_v1',
 };
 
 if (typeof window !== 'undefined') {
@@ -405,6 +436,20 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [users, setUsers] = useState<SystemUser[]>(() =>
     safeLoadFromStorage(STORAGE_KEYS.USERS, INITIAL_USERS)
   );
+
+  // Roles y permisos granulares
+  const [roles, setRoles] = useState<SystemRole[]>(() => {
+    const saved = safeLoadFromStorage<SystemRole[]>(STORAGE_KEYS.ROLES, []);
+    const list = Array.isArray(saved) && saved.length > 0 ? saved : DEFAULT_ROLES;
+    // El Administrador siempre conserva TODOS los permisos (incluidos los nuevos del catálogo)
+    const admin = DEFAULT_ROLES.find(r => r.id === ADMIN_ROLE_ID)!;
+    const others = list.filter(r => r.id !== ADMIN_ROLE_ID).map(r => ({ ...r, permissions: normalizePermissions(r.permissions || []) }));
+    return [{ ...admin, permissions: ALL_PERMISSIONS }, ...others];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(roles));
+  }, [roles]);
 
   const [currentUser, setCurrentUser] = useState<SystemUser>(() => {
     const saved = safeLoadFromStorage<SystemUser | null>(STORAGE_KEYS.CURRENT_USER, null);
@@ -639,7 +684,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       kardexMovements: kardexMovements.filter(m => inRange(m.date)),
       manualJournalEntries: manualJournalEntries.filter(j => inRange(j.date)),
       purchaseOrders,
-      shifts: [...pastShifts, currentShift].filter(sh => sh && inRange(sh.openedAt)),
+      // El turno recién cerrado está en currentShift y en pastShifts: se deduplica por id
+      shifts: [currentShift, ...pastShifts.filter(p => p.id !== currentShift.id)].filter(sh => sh && inRange(sh.openedAt)),
     });
   }, [
     filteredSales,
@@ -666,62 +712,38 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return `${sign}${settings.currency}${formatted}`;
   };
 
-  // Recalculate Cash Shift live when sales or cash expenses occur today
+  // Resumen del turno de caja en curso (ventana apertura → cierre/ahora, no por fecha UTC)
+  const currentShiftComputed = useMemo(
+    () => computeShiftSummary(currentShift, sales, expenses, creditNotes),
+    [currentShift, sales, expenses, creditNotes]
+  );
+
+  // Mantener los totales del turno abierto sincronizados (los usa el menú lateral)
   useEffect(() => {
     if (currentShift.status !== 'open') return;
-    const shiftDate = currentShift.date;
-
-    const todaySales = sales.filter(s => s.date.startsWith(shiftDate));
-    const todayExpenses = expenses.filter(e => e.date.startsWith(shiftDate));
-
-    let cashIn = 0;
-    let cardIn = 0;
-    let transferIn = 0;
-
-    todaySales.forEach(s => {
-      if (s.status === 'cancelled') return;
-      if (s.paymentMethod === 'cash') {
-        cashIn += s.amountPaidNow;
-      } else if (s.paymentMethod === 'card') {
-        cardIn += s.amountPaidNow;
-      } else if (s.paymentMethod === 'transfer') {
-        transferIn += s.amountPaidNow;
-      } else if (s.paymentMethod === 'split') {
-        cashIn += s.cashPaid || 0;
-        cardIn += s.cardPaid || 0;
-        transferIn += s.transferPaid || 0;
-      }
-    });
-
-    let cashOut = 0;
-    todayExpenses.forEach(e => {
-      if (e.paymentMethod === 'cash') {
-        cashOut += e.amount;
-      }
-    });
-
-    const expected = currentShift.openingCash + cashIn - cashOut;
-
+    const sm = currentShiftComputed.summary;
+    const cashIn = Math.round((sm.cashSales + sm.cashTips) * 100) / 100;
+    const cashOut = Math.round((sm.cashExpenses + sm.cashArtistPayouts + sm.cashRefunds) * 100) / 100;
     setCurrentShift(prev => {
       if (
-        prev.expectedCash === expected &&
+        prev.expectedCash === sm.expectedCash &&
         prev.cashSalesTotal === cashIn &&
         prev.cashExpensesTotal === cashOut &&
-        prev.cardTotal === cardIn &&
-        prev.transferTotal === transferIn
+        prev.cardTotal === sm.cardSales &&
+        prev.transferTotal === sm.transferSales
       ) {
         return prev;
       }
       return {
         ...prev,
-        expectedCash: Math.round(expected * 100) / 100,
-        cashSalesTotal: Math.round(cashIn * 100) / 100,
-        cashExpensesTotal: Math.round(cashOut * 100) / 100,
-        cardTotal: Math.round(cardIn * 100) / 100,
-        transferTotal: Math.round(transferIn * 100) / 100,
+        expectedCash: sm.expectedCash,
+        cashSalesTotal: cashIn,
+        cashExpensesTotal: cashOut,
+        cardTotal: sm.cardSales,
+        transferTotal: sm.transferSales,
       };
     });
-  }, [sales, expenses, currentShift.date, currentShift.status, currentShift.openingCash]);
+  }, [currentShiftComputed, currentShift.status]);
 
   // Client Operations
   const addClient = (clientData: Omit<ClientProfile, 'id' | 'createdAt'>): ClientProfile => {
@@ -982,12 +1004,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setUsers(prev => prev.map(u => (u.id === userId ? updated : u)));
 
     // Redirect if current tab is not accessible
-    const allowed = targetUser.allowedTabs && targetUser.allowedTabs.length > 0
-      ? targetUser.allowedTabs
-      : getDefaultTabsForRole(targetUser.rol);
-
-    if (!allowed.includes(activeTab)) {
-      setActiveTab(allowed[0] || 'dashboard');
+    const targetPerms = new Set(roles.find(r => r.id === targetUser.rol)?.permissions || []);
+    if (targetUser.rol !== ADMIN_ROLE_ID && !targetPerms.has(`${activeTab}.view`)) {
+      setActiveTab(firstTabForRole(targetUser.rol));
     }
 
     return true;
@@ -1019,14 +1038,67 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  const canAccessTab = (tabId: string): boolean => {
-    if (!currentUser) return true;
-    if (currentUser.rol === 'ADMIN') return true;
-    if (currentUser.allowedTabs && currentUser.allowedTabs.length > 0) {
-      return currentUser.allowedTabs.includes(tabId);
-    }
-    const defaultTabs = getDefaultTabsForRole(currentUser.rol);
-    return defaultTabs.includes(tabId);
+  // ===================== ROLES & PERMISOS =====================
+  const currentRole = useMemo(() => roles.find(r => r.id === currentUser?.rol) || null, [roles, currentUser]);
+  const currentPermissions = useMemo(() => new Set(currentRole?.permissions || []), [currentRole]);
+
+  /** ¿El usuario conectado tiene el permiso `modulo.accion`? */
+  const can = (permission: string): boolean => {
+    if (!currentUser) return false;
+    if (currentUser.rol === ADMIN_ROLE_ID) return true;
+    return currentPermissions.has(permission);
+  };
+
+  const canAccessTab = (tabId: string): boolean => can(`${tabId}.view`);
+
+  const getRole = (roleId: string) => roles.find(r => r.id === roleId);
+
+  /** Primer módulo visible para un rol (para redirigir al cambiar de usuario). */
+  const firstTabForRole = (roleId: string): string => {
+    if (roleId === ADMIN_ROLE_ID) return 'dashboard';
+    const perms = new Set(roles.find(r => r.id === roleId)?.permissions || []);
+    return PERMISSION_MODULES.find(m => perms.has(`${m.id}.view`))?.id || 'dashboard';
+  };
+
+  const addRole = (data: Pick<SystemRole, 'name' | 'description' | 'color' | 'permissions'>): SystemRole | null => {
+    if (!can('users.manage_roles')) return null;
+    const role: SystemRole = {
+      id: `role-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: data.name.trim(),
+      description: data.description?.trim() || undefined,
+      color: data.color || '#64748B',
+      permissions: normalizePermissions(data.permissions),
+      createdAt: new Date().toISOString(),
+    };
+    setRoles(prev => [...prev, role]);
+    return role;
+  };
+
+  const updateRole = (id: string, updates: Partial<Pick<SystemRole, 'name' | 'description' | 'color' | 'permissions'>>): boolean => {
+    if (!can('users.manage_roles') || id === ADMIN_ROLE_ID) return false;
+    setRoles(prev =>
+      prev.map(r =>
+        r.id === id
+          ? {
+              ...r,
+              ...updates,
+              name: (updates.name ?? r.name).trim(),
+              permissions: updates.permissions ? normalizePermissions(updates.permissions) : r.permissions,
+              updatedAt: new Date().toISOString(),
+            }
+          : r
+      )
+    );
+    return true;
+  };
+
+  const deleteRole = (id: string): { ok: boolean; error?: string } => {
+    if (!can('users.manage_roles')) return { ok: false, error: 'No tiene permiso para administrar roles.' };
+    if (id === ADMIN_ROLE_ID) return { ok: false, error: 'El rol Administrador no se puede eliminar.' };
+    const assigned = users.filter(u => u.rol === id).length;
+    if (assigned > 0) return { ok: false, error: `El rol está asignado a ${assigned} usuario(s). Reasígnelos antes de eliminarlo.` };
+    setRoles(prev => prev.filter(r => r.id !== id));
+    return { ok: true };
   };
 
   // Appointment Operations
@@ -2232,14 +2304,23 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Cash Shift Operations
+  const nextShiftNumber = () => {
+    const max = [currentShift, ...pastShifts].reduce((m, sh) => {
+      const n = parseInt((sh?.shiftNumber || '').replace(/\D/g, ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    return `ARQ-${String(max + 1).padStart(6, '0')}`;
+  };
+
   const openCashShift = (openingCash: number, openedBy: string, notes?: string) => {
+    if (currentShift.status === 'open' && currentShift.shiftNumber) return;
     const now = new Date();
     const newShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: now.toISOString().split('T')[0],
       openedAt: now.toISOString(),
-      openedBy: openedBy || 'Encargado de Caja',
-      openingCash: Math.max(0, openingCash),
+      openedBy: openedBy || `${currentUser.nombres} ${currentUser.apellidos}`.trim() || 'Encargado de Caja',
+      openingCash: Math.max(0, Math.round(openingCash * 100) / 100),
       expectedCash: Math.max(0, openingCash),
       actualCashCounted: undefined,
       cardTotal: 0,
@@ -2247,27 +2328,64 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       cashSalesTotal: 0,
       cashExpensesTotal: 0,
       status: 'open',
-      notes: notes || 'Apertura de turno',
+      notes: notes || undefined,
+      shiftNumber: nextShiftNumber(),
+      movements: [],
     };
     setCurrentShift(newShift);
   };
 
-  const closeCashShift = (actualCounted: number, closedBy: string, notes?: string) => {
-    const now = new Date();
-    const discrepancy = Math.round((actualCounted - currentShift.expectedCash) * 100) / 100;
+  const addCashMovement = (type: CashMovementType, amount: number, concept: string) => {
+    if (currentShift.status !== 'open' || !(amount > 0)) return;
+    const movement: CashMovement = {
+      id: `mov-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      date: new Date().toISOString(),
+      type,
+      amount: Math.round(amount * 100) / 100,
+      concept: concept.trim() || (type === 'ingreso' ? 'Ingreso de efectivo' : type === 'retiro' ? 'Retiro de efectivo' : 'Depósito al banco'),
+      registeredBy: `${currentUser.nombres} ${currentUser.apellidos}`.trim(),
+    };
+    setCurrentShift(prev => ({ ...prev, movements: [...(prev.movements || []), movement] }));
+  };
+
+  const removeCashMovement = (id: string) => {
+    if (currentShift.status !== 'open') return;
+    setCurrentShift(prev => ({ ...prev, movements: (prev.movements || []).filter(m => m.id !== id) }));
+  };
+
+  const closeCashShift = (
+    actualCounted: number,
+    closedBy: string,
+    notes?: string,
+    denominations?: Record<string, number>
+  ): CashShift | null => {
+    if (currentShift.status !== 'open') return null;
+    const now = new Date().toISOString();
+    const shiftAtClose: CashShift = { ...currentShift, closedAt: now };
+    const { summary } = computeShiftSummary(shiftAtClose, sales, expenses, creditNotes);
+    const counted = Math.round(actualCounted * 100) / 100;
+    const discrepancy = Math.round((counted - summary.expectedCash) * 100) / 100;
 
     const closed: CashShift = {
-      ...currentShift,
-      closedAt: now.toISOString(),
-      closedBy: closedBy || 'Encargado de Caja',
-      actualCashCounted: actualCounted,
+      ...shiftAtClose,
+      shiftNumber: currentShift.shiftNumber || nextShiftNumber(),
+      closedBy: closedBy || `${currentUser.nombres} ${currentUser.apellidos}`.trim() || 'Encargado de Caja',
+      expectedCash: summary.expectedCash,
+      cashSalesTotal: Math.round((summary.cashSales + summary.cashTips) * 100) / 100,
+      cashExpensesTotal: Math.round((summary.cashExpenses + summary.cashArtistPayouts + summary.cashRefunds) * 100) / 100,
+      cardTotal: summary.cardSales,
+      transferTotal: summary.transferSales,
+      actualCashCounted: counted,
       discrepancy,
       status: 'closed',
       notes: notes || currentShift.notes,
+      closingDenominations: denominations,
+      closingSummary: summary,
     };
 
-    setPastShifts(prev => [closed, ...prev]);
+    setPastShifts(prev => [closed, ...prev.filter(p => p.id !== closed.id)]);
     setCurrentShift(closed);
+    return closed;
   };
 
   // Settings
@@ -2325,6 +2443,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       suppliers,
       purchaseOrders,
       users,
+      roles,
       currentUser,
       settlements,
       pastShifts,
@@ -2355,6 +2474,15 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.suppliers && Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
       if (parsed.purchaseOrders && Array.isArray(parsed.purchaseOrders)) setPurchaseOrders(parsed.purchaseOrders);
       if (parsed.users && Array.isArray(parsed.users)) setUsers(parsed.users);
+      if (parsed.roles && Array.isArray(parsed.roles) && parsed.roles.length > 0) {
+        const admin = DEFAULT_ROLES.find(r => r.id === ADMIN_ROLE_ID)!;
+        setRoles([
+          { ...admin, permissions: ALL_PERMISSIONS },
+          ...parsed.roles
+            .filter((r: SystemRole) => r && r.id && r.id !== ADMIN_ROLE_ID)
+            .map((r: SystemRole) => ({ ...r, permissions: normalizePermissions(r.permissions || []) })),
+        ]);
+      }
       if (parsed.currentUser && parsed.currentUser.id) setCurrentUser(parsed.currentUser);
       if (parsed.settlements && Array.isArray(parsed.settlements)) setSettlements(parsed.settlements);
       if (parsed.settings) setSettings(parsed.settings);
@@ -2442,11 +2570,22 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updateUser,
         deleteUser,
         canAccessTab,
+        can,
+        roles,
+        currentRole,
+        getRole,
+        addRole,
+        updateRole,
+        deleteRole,
         addManualJournalEntry,
         updateManualJournalEntry,
         deleteManualJournalEntry,
         openCashShift,
         closeCashShift,
+        addCashMovement,
+        removeCashMovement,
+        currentShiftSummary: currentShiftComputed.summary,
+        currentShiftTransactions: currentShiftComputed.transactions,
         updateSettings,
         formatMoney,
         clearAllData,
@@ -2540,11 +2679,22 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   updateUser: () => {},
   deleteUser: () => {},
   canAccessTab: () => true,
+  can: () => true,
+  roles: DEFAULT_ROLES,
+  currentRole: null,
+  getRole: () => undefined,
+  addRole: () => null,
+  updateRole: () => false,
+  deleteRole: () => ({ ok: false }),
   addManualJournalEntry: () => {},
   updateManualJournalEntry: () => {},
   deleteManualJournalEntry: () => {},
   openCashShift: () => {},
-  closeCashShift: () => {},
+  closeCashShift: () => null,
+  addCashMovement: () => {},
+  removeCashMovement: () => {},
+  currentShiftSummary: computeShiftSummary(INITIAL_CASH_SHIFT, [], [], []).summary,
+  currentShiftTransactions: [],
   updateSettings: () => {},
   formatMoney: (val) => `$${Number(val || 0).toFixed(2)}`,
   clearAllData: () => {},

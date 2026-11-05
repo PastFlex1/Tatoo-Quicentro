@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   X,
   FileCode,
@@ -30,6 +31,7 @@ export const SriXmlImportModal: React.FC<SriXmlImportModalProps> = ({
 }) => {
   const { addExpense, addKardexMovement, inventory, formatMoney } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedInvoices, setParsedInvoices] = useState<
     Array<{
@@ -117,6 +119,7 @@ export const SriXmlImportModal: React.FC<SriXmlImportModalProps> = ({
   };
 
   const handleExecuteImport = () => {
+    if (!guardPermission('expenses.import_xml')) return;
     const toImport = parsedInvoices.filter(p => p.selected);
     if (toImport.length === 0) {
       alert('Selecciona al menos una factura para importar.');

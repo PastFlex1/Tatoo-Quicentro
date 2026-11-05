@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import { DEFAULT_SRI_API_URL } from '../../services/sriElectronicService';
 import {
   Save,
@@ -37,6 +38,8 @@ import { ElectronicSignatureUploader } from './ElectronicSignatureUploader';
 export const SettingsView: React.FC = () => {
   const { settings, updateSettings } = useStudio();
 
+  const { guard: guardPermission, can } = usePermission();
+  const canEditSri = can('settings.edit_sri');
   // Tab State
   const [activeTab, setActiveTab] = useState<'sri_fiscal' | 'establishment' | 'signature' | 'pos_params' | 'validation_test'>('sri_fiscal');
   const [activeDocType, setActiveDocType] = useState<'factura' | 'nota_venta' | 'retencion'>('factura');
@@ -232,6 +235,7 @@ export const SettingsView: React.FC = () => {
 
   // Carga de archivo de firma electrónica (.p12 / .pfx)
   const handleFileSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!guardPermission('settings.signature')) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -252,6 +256,7 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleRemoveSignature = () => {
+    if (!guardPermission('settings.signature')) return;
     if (confirm('¿Deseas remover la firma electrónica actual? Para emitir facturas electrónicas válidas se requiere un certificado activo.')) {
       setFirmaElectronicaBase64(undefined);
       setFirmaElectronicaNombre(undefined);
@@ -261,6 +266,7 @@ export const SettingsView: React.FC = () => {
 
   // Carga y procesamiento del logotipo de la empresa
   const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!guardPermission('settings.edit_company')) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -284,17 +290,20 @@ export const SettingsView: React.FC = () => {
   };
 
   const handleRestoreDefaultLogo = () => {
+    if (!guardPermission('settings.edit_company')) return;
     const defaultSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 80" width="240" height="80"><rect width="240" height="80" rx="12" fill="%23111115"/><text x="120" y="38" font-family="Arial,sans-serif" font-weight="900" font-size="20" fill="%23FF3366" text-anchor="middle" letter-spacing="2">DEVOLUTION INK</text><text x="120" y="58" font-family="Arial,sans-serif" font-weight="700" font-size="9" fill="%23A3A3A3" text-anchor="middle" letter-spacing="4">TATTOO STUDIO · QUITO</text></svg>`;
     setLogoUrl(defaultSvg);
   };
 
   const handleRemoveLogo = () => {
+    if (!guardPermission('settings.edit_company')) return;
     setLogoUrl('');
   };
 
   // Guardar configuración completa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('settings.edit_company')) return;
 
     updateSettings({
       // Compatibilidad con campos previos de StudioSettings
@@ -550,6 +559,7 @@ export const SettingsView: React.FC = () => {
         {/* TAB 1: DATOS FISCALES SRI */}
         {/* ========================================================= */}
         {activeTab === 'sri_fiscal' && (
+          <fieldset disabled={!canEditSri} className="contents">
           <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#24242A] pb-3">
               <div>
@@ -832,12 +842,14 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           </div>
+          </fieldset>
         )}
 
         {/* ========================================================= */}
         {/* TAB 2: ESTABLECIMIENTO & PUNTOS DE EMISIÓN */}
         {/* ========================================================= */}
         {activeTab === 'establishment' && (
+          <fieldset disabled={!canEditSri} className="contents">
           <div className="space-y-6">
             {/* SECCIÓN 1: UBICACIÓN GEOGRÁFICA Y JURISDICCIÓN TERRITORIAL */}
             <div className="p-4 sm:p-6 rounded-2xl bg-[#18181D] border border-[#272730] space-y-4">
@@ -1177,6 +1189,7 @@ export const SettingsView: React.FC = () => {
               </div>
             </div>
           </div>
+          </fieldset>
         )}
 
         {/* ========================================================= */}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Truck,
   Search,
@@ -48,6 +49,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
     setActiveTab,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -172,6 +174,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
 
   // Open modal for Create
   const handleOpenCreateModal = () => {
+    if (!guardPermission('suppliers.create')) return;
     setEditingSupplier(null);
     setFormRuc('');
     setFormRazonSocial('');
@@ -197,6 +200,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
 
   // Open modal for Edit
   const handleOpenEditModal = (sup: Supplier) => {
+    if (!guardPermission('suppliers.edit')) return;
     setEditingSupplier(sup);
     setFormRuc(sup.ruc);
     setFormRazonSocial(sup.razonSocial);
@@ -262,6 +266,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
   // Save Supplier
   const handleSaveSupplier = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(editingSupplier ? 'suppliers.edit' : 'suppliers.create')) return;
 
     const cleanRuc = formRuc.trim().replace(/\D/g, '');
     if (cleanRuc.length !== 13) {
@@ -308,6 +313,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
 
   // Delete Supplier
   const handleDeleteSupplier = (sup: Supplier) => {
+    if (!guardPermission('suppliers.delete')) return;
     if (confirm(`¿Estás seguro de eliminar al proveedor "${sup.razonSocial}"? Esta acción no se puede deshacer.`)) {
       deleteSupplier(sup.id);
       if (viewingSupplier?.id === sup.id) {

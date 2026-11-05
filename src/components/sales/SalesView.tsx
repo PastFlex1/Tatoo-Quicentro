@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Search,
   PlusCircle,
@@ -41,6 +42,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
     emitCreditNoteToSri,
   } = useStudio();
 
+  const { guard: guardPermission, can } = usePermission();
+  // Acciones protegidas por permiso
+  const openReceipt = (sale: SaleRecord) => {
+    if (guardPermission('sales.print')) onOpenReceipt(sale);
+  };
+  const printSalesNote = (sale: SaleRecord) => {
+    if (guardPermission('sales.print')) printSalesNote(sale);
+  };
+  const printCreditNote = (cn: CreditNoteRecord) => {
+    if (guardPermission('sales.print')) printCreditNote(cn);
+  };
   // Active Billing Tab
   const [activeSubTab, setActiveSubTab] = useState<BillingTabType>('invoices');
   const [searchTerm, setSearchTerm] = useState('');
@@ -132,6 +144,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   const totalCreditNotesReverted = creditNotesList.reduce((acc, cn) => acc + cn.total, 0);
 
   const exportToCSV = () => {
+    if (!guardPermission('sales.export')) return;
     if (activeSubTab === 'credit_notes') {
       const headers = ['N° Nota Crédito', 'Fecha', 'Factura Afectada', 'Cliente', 'Cédula / RUC', 'Motivo', 'Subtotal', 'IVA', 'Total'];
       const rows = creditNotesList.map(cn => [
@@ -200,12 +213,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   };
 
   const handleOpenEmitCreditNote = (sale?: SaleRecord) => {
+    if (!guardPermission('sales.credit_note')) return;
     setCreditNoteToPreselect(sale || null);
     setIsNewCreditNoteOpen(true);
   };
 
   // XML del comprobante: el autorizado por el SRI si existe; si no, el XML generado (aún sin firma/autorización)
   const handleViewXmlForSale = (sale: SaleRecord) => {
+    if (!guardPermission('sales.view_xml')) return;
     const claveAcceso = sale.sriAccessKey || buildAccessKey(settings, '01', sale.invoiceNumber, new Date(sale.date));
     const authorized = sale.sriStatus === 'AUTORIZADO' && sale.sriAuthorizedXml;
     setXmlViewerDoc({
@@ -219,6 +234,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   };
 
   const handleViewXmlForCreditNote = (cn: CreditNoteRecord) => {
+    if (!guardPermission('sales.view_xml')) return;
     const claveAcceso = cn.sriAccessKey || buildAccessKey(settings, '04', cn.creditNoteNumber, new Date(cn.date));
     const authorized = cn.sriStatus === 'AUTORIZADO' && cn.sriAuthorizedXml;
     const sale = allSales.find(s => s.id === cn.affectedInvoiceId);
@@ -233,6 +249,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   };
 
   const handleDownloadXml = (docNumber: string, xmlContent: string) => {
+    if (!guardPermission('sales.view_xml')) return;
     const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -291,7 +308,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
             </button>
           ) : (
             <button
-              onClick={onOpenNewSale}
+              onClick={() => guardPermission('sales.create') && onOpenNewSale()}
               className="w-full py-2.5 px-3 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5" />
@@ -466,7 +483,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           <SriStatusBadge
                             status={sale.sriStatus}
                             messages={sale.sriMessages}
-                            onRetry={() => emitSaleToSri(sale.id)}
+                            onRetry={can('sales.send_sri') ? () => emitSaleToSri(sale.id) : undefined}
                           />
                         )}
                       </div>
@@ -523,7 +540,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           <span>XML</span>
                         </button>
                         <button
-                          onClick={() => onOpenReceipt(sale)}
+                          onClick={() => openReceipt(sale)}
                           className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
                           title="Ver Ticket Térmico 80mm"
                         >
@@ -617,7 +634,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                               center
                               status={sale.sriStatus}
                               messages={sale.sriMessages}
-                              onRetry={() => emitSaleToSri(sale.id)}
+                              onRetry={can('sales.send_sri') ? () => emitSaleToSri(sale.id) : undefined}
                             />
                           )}
                         </td>
@@ -654,7 +671,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                             </button>
 
                             <button
-                              onClick={() => onOpenReceipt(sale)}
+                              onClick={() => openReceipt(sale)}
                               className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
                               title="Ver Ticket Térmico POS 80mm"
                             >
@@ -751,7 +768,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <button
                           onClick={() => {
                             setSelectedSalesNoteFormat('A4');
-                            setSelectedSalesNoteToPrint(sale);
+                            printSalesNote(sale);
                           }}
                           className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                           title="Ver e imprimir RIDE A4 Nota de Venta"
@@ -762,7 +779,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         <button
                           onClick={() => {
                             setSelectedSalesNoteFormat('THERMAL');
-                            setSelectedSalesNoteToPrint(sale);
+                            printSalesNote(sale);
                           }}
                           className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
                           title="Ver Ticket Térmico 80mm"
@@ -843,7 +860,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                             <button
                               onClick={() => {
                                 setSelectedSalesNoteFormat('A4');
-                                setSelectedSalesNoteToPrint(sale);
+                                printSalesNote(sale);
                               }}
                               className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                               title="Ver e imprimir RIDE A4 Nota de Venta RIMPE"
@@ -854,7 +871,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                             <button
                               onClick={() => {
                                 setSelectedSalesNoteFormat('THERMAL');
-                                setSelectedSalesNoteToPrint(sale);
+                                printSalesNote(sale);
                               }}
                               className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
                               title="Ver Ticket Térmico 80mm"
@@ -903,7 +920,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                     <SriStatusBadge
                       status={cn.sriStatus}
                       messages={cn.sriMessages}
-                      onRetry={() => emitCreditNoteToSri(cn.id)}
+                      onRetry={can('sales.send_sri') ? () => emitCreditNoteToSri(cn.id) : undefined}
                     />
                   </div>
 
@@ -943,7 +960,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                       <button
                         onClick={() => {
                           setSelectedCreditNoteFormat('A4');
-                          setSelectedCreditNoteToPrint(cn);
+                          printCreditNote(cn);
                         }}
                         className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                         title="Ver e imprimir RIDE A4 Nota de Crédito"
@@ -962,7 +979,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                       <button
                         onClick={() => {
                           setSelectedCreditNoteFormat('THERMAL');
-                          setSelectedCreditNoteToPrint(cn);
+                          printCreditNote(cn);
                         }}
                         className="p-2 rounded-xl bg-[#24242C] text-neutral-300 hover:text-white cursor-pointer"
                         title="Ver Ticket 80mm Nota de Crédito"
@@ -1046,7 +1063,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           center
                           status={cn.sriStatus}
                           messages={cn.sriMessages}
-                          onRetry={() => emitCreditNoteToSri(cn.id)}
+                          onRetry={can('sales.send_sri') ? () => emitCreditNoteToSri(cn.id) : undefined}
                         />
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
@@ -1063,7 +1080,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           <button
                             onClick={() => {
                               setSelectedCreditNoteFormat('A4');
-                              setSelectedCreditNoteToPrint(cn);
+                              printCreditNote(cn);
                             }}
                             className="px-2.5 py-1 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                             title="Ver e imprimir RIDE A4 Nota de Crédito autorizada por el SRI"
@@ -1082,7 +1099,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           <button
                             onClick={() => {
                               setSelectedCreditNoteFormat('THERMAL');
-                              setSelectedCreditNoteToPrint(cn);
+                              printCreditNote(cn);
                             }}
                             className="p-1.5 rounded-xl bg-[#121215] hover:bg-[#282834] text-neutral-300 hover:text-white border border-[#272730] transition-colors cursor-pointer"
                             title="Ver Ticket Térmico 80mm"

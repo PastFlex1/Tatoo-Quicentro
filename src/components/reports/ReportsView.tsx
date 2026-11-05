@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   FileSpreadsheet,
   Download,
@@ -35,6 +36,7 @@ export const ReportsView: React.FC = () => {
     importBackup,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   const [activeReportTab, setActiveReportTab] = useState<ReportTab>('executive');
   const [selectedArtistFilter] = useState<string>('all');
   const [pieChartMode, setPieChartMode] = useState<'revenue' | 'expenses' | 'payments'>('revenue');
@@ -397,10 +399,12 @@ export const ReportsView: React.FC = () => {
   }, [dateFilter]);
 
   const handlePrintReport = () => {
+    if (!guardPermission('reports.export')) return;
     window.print();
   };
 
   const handleExportCSV = () => {
+    if (!guardPermission('reports.export')) return;
     const lines: string[] = [
       `"REPORTE FINANCIERO Y CONTABLE - ${settings.studioName.toUpperCase()}"`,
       `"Generado: ${new Date().toLocaleString('es-ES')}"`,
@@ -449,6 +453,7 @@ export const ReportsView: React.FC = () => {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!guardPermission('reports.restore')) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1310,7 +1315,7 @@ export const ReportsView: React.FC = () => {
           </button>
 
           <button
-            onClick={exportBackup}
+            onClick={() => guardPermission('reports.backup') && exportBackup()}
             className="p-2 rounded-full border border-[#272730] text-neutral-400 hover:text-white hover:bg-[#1C1C22]"
             title="Descargar Backup Completo en JSON"
           >

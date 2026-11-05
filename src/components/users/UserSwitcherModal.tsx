@@ -30,7 +30,7 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
   onClose,
   preselectedUser = null,
 }) => {
-  const { users, currentUser, switchUser, settings } = useStudio();
+  const { users, currentUser, switchUser, settings, roles } = useStudio();
   const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
@@ -46,44 +46,10 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
   if (!isOpen) return null;
 
   const getRoleBadge = (rol: UserRole) => {
-    switch (rol) {
-      case 'ADMIN':
-        return {
-          label: 'Administrador / Dueño',
-          icon: ShieldCheck,
-          className: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-        };
-      case 'CAJERO_RECEPCION':
-        return {
-          label: 'Cajero / Recepción',
-          icon: CreditCard,
-          className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-        };
-      case 'ARTISTA':
-        return {
-          label: 'Artista / Tatuador',
-          icon: Palette,
-          className: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-        };
-      case 'BODEGA':
-        return {
-          label: 'Encargado de Bodega',
-          icon: Package,
-          className: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-        };
-      case 'CONTADOR':
-        return {
-          label: 'Contador General',
-          icon: BookOpen,
-          className: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-        };
-      default:
-        return {
-          label: rol,
-          icon: Users,
-          className: 'bg-neutral-500/15 text-neutral-400 border-neutral-500/30',
-        };
-    }
+    const role = roles.find(r => r.id === rol);
+    const icon =
+      rol === 'ADMIN' ? ShieldCheck : rol === 'CAJERO_RECEPCION' ? CreditCard : rol === 'ARTISTA' ? Palette : rol === 'BODEGA' ? Package : rol === 'CONTADOR' ? BookOpen : Users;
+    return { label: role?.name || rol, icon, className: '', color: role?.color || '#64748B' };
   };
 
   const handleSelectUser = (user: SystemUser) => {
@@ -252,6 +218,7 @@ export const UserSwitcherModal: React.FC<UserSwitcherModalProps> = ({
                             <span className="text-neutral-600">•</span>
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${roleBadge.className}`}
+                              style={{ color: roleBadge.color, background: `${roleBadge.color}22`, borderColor: `${roleBadge.color}55` }}
                             >
                               <Icon className="w-3 h-3" />
                               {roleBadge.label}

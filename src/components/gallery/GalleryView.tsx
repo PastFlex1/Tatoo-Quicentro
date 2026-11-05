@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Camera,
   Image as ImageIcon,
@@ -40,6 +41,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
     setActiveTab,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Filters state
   const [selectedCategory, setSelectedCategory] = useState<GalleryCategory>('all');
   const [selectedArtistId, setSelectedArtistId] = useState<string>('all');
@@ -158,6 +160,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
   };
 
   const handleOpenUploadModal = (prefillCategory?: 'tattoo' | 'piercing' | 'healed' | 'flash' | 'coverup') => {
+    if (!guardPermission('gallery.upload')) return;
     setUploadTitle('');
     setUploadCategory(prefillCategory || (selectedCategory !== 'all' ? (selectedCategory as any) : 'tattoo'));
     setUploadArtistId(artists[0]?.id || '');
@@ -177,6 +180,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
 
   const handleSavePhoto = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('gallery.upload')) return;
 
     const finalImage = uploadImageFilePreview || uploadImageUrl.trim();
     if (!finalImage) {
@@ -215,6 +219,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
   };
 
   const handleDeletePhoto = (id: string, title: string) => {
+    if (!guardPermission('gallery.delete')) return;
     if (confirm(`¿Estás seguro de eliminar la foto "${title}" de la galería?`)) {
       deleteGalleryPhoto(id);
       if (lightboxPhoto?.id === id) {

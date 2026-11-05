@@ -21,7 +21,8 @@ export const ArtistPaymentTicketModal: React.FC<ArtistPaymentTicketModalProps> =
   onClose,
   justCreated = false,
 }) => {
-  const { settings, updateSettings, formatMoney } = useStudio();
+  const { settings, updateSettings, formatMoney, can } = useStudio();
+  const canPrint = can('artists.print');
   const [repName, setRepName] = useState(settings.representanteLegal || '');
   const [repDni, setRepDni] = useState(settings.representanteLegalCedula || '');
 
@@ -238,7 +239,9 @@ export const ArtistPaymentTicketModal: React.FC<ArtistPaymentTicketModalProps> =
           </button>
           <button
             onClick={handlePrint}
-            className="px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            disabled={!canPrint}
+            title={canPrint ? undefined : 'Sin permiso para imprimir comprobantes de pago'}
+            className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             Imprimir ticket para firmas

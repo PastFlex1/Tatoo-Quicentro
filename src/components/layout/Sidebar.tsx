@@ -43,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     canAccessTab,
     settings,
     formatMoney,
+    currentRole,
   } = useStudio();
 
   const [isSwitcherOpen, setIsSwitcherOpen] = React.useState(false);
@@ -235,7 +236,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
                   {currentUser?.nombres || 'Usuario'} {currentUser?.apellidos || ''}
                 </p>
                 <p className="text-[10px] text-neutral-400 truncate">
-                  Rol: {currentUser?.rol || 'ADMIN'}
+                  Rol: {currentRole?.name || currentUser?.rol || 'Sin rol'}
                 </p>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   X,
   FileText,
@@ -29,6 +30,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 }) => {
   const { artists, clients, settings, addProforma, convertProformaToAppointment } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Form State
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -146,6 +148,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('proformas.create')) return;
     if (!clientName.trim() || !serviceName.trim()) {
       alert('Por favor indica el nombre del cliente y el nombre del servicio o concepto.');
       return;

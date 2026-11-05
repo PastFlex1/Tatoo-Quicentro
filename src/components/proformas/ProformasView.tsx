@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   FileText,
   Plus,
@@ -43,6 +44,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
     setActiveTab,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -145,11 +147,13 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
   };
 
   const handleQuickConvert = (proforma: Proforma) => {
+    if (!guardPermission('proformas.convert')) return;
     convertProformaToAppointment(proforma.id, undefined, undefined, false);
     setActiveTab('appointments');
   };
 
   const handleOpenBillingModal = (prof: Proforma) => {
+    if (!guardPermission('proformas.convert')) return;
     setBillingProforma(prof);
     setBillingFinalPrice(prof.total);
     setBillingTipAmount(0);
@@ -158,6 +162,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
   };
 
   const handleProcessBilling = () => {
+    if (!guardPermission('proformas.convert')) return;
     if (!billingProforma) return;
     try {
       const sale = convertProformaToSale(
@@ -179,6 +184,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
   };
 
   const handleDeleteProforma = (proforma: Proforma) => {
+    if (!guardPermission('proformas.delete')) return;
     if (confirm(`¿Eliminar la cotización ${proforma.proformaNumber} del cliente "${proforma.clientName}"?`)) {
       deleteProforma(proforma.id);
     }

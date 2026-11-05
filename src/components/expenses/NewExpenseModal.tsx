@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import { X, FileCode, UploadCloud, CheckCircle2, AlertCircle, Building2, RefreshCw } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ExpenseCategory } from '../../types';
@@ -13,6 +14,7 @@ interface NewExpenseModalProps {
 export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClose }) => {
   const { addExpense, formatMoney, settings, suppliers, inventory, addKardexMovement } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   const [category, setCategory] = useState<ExpenseCategory>('supplies_tattoo');
   const [description, setDescription] = useState('');
   const [supplier, setSupplier] = useState('');
@@ -123,6 +125,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('expenses.create')) return;
     if (!description.trim() || amount <= 0) {
       alert('Por favor complete la descripción y un importe válido');
       return;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Sparkles,
   User,
@@ -52,6 +53,14 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setActiveTab,
   } = useStudio();
 
+  const { guard: guardPermission, can } = usePermission();
+  const canDiscount = can('pos.discount');
+  const canChangeCommission = can('pos.change_commission');
+  const canChangeTax = can('pos.change_tax');
+  const canChangePrice = can('pos.change_price');
+  // Solo los cambios hechos a mano por el usuario requieren permiso (no los automáticos por categoría/producto)
+  const [commissionEdited, setCommissionEdited] = useState(false);
+  const [taxEdited, setTaxEdited] = useState(false);
   // Form states
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('Tatuaje Personalizado (Media Sesión)');
@@ -273,6 +282,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   };
 
   const handleResetForm = () => {
+    setCommissionEdited(false);
+    setTaxEdited(false);
     setLinkedAppointmentId(null);
     setLinkedInventoryItemId(null);
     setConsumedSupplies([]);
@@ -298,6 +309,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('pos.charge')) return;
+    // Validación de permisos finos (aunque el campo se haya modificado por otra vía)
+    if (discount > 0 && !guardPermission('pos.discount')) return;
+    if (commissionEdited && !guardPermission('pos.change_commission')) return;
+    if (taxEdited && !guardPermission('pos.change_tax')) return;
     if (!clientName.trim()) {
       alert('Por favor ingresa el nombre del cliente para emitir el ticket.');
       return;
@@ -746,7 +762,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   min="0"
                   max="100"
                   value={customCommission}
-                  onChange={e => setCustomCommission(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                  disabled={!canChangeCommission}
+                  title={canChangeCommission ? undefined : 'Sin permiso para modificar la comisión'}
+                  onChange={e => {
+                    setCommissionEdited(true);
+                    setCustomCommission(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)));
+                  }}
                   className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 text-center"
                 />
               </div>
@@ -1056,6 +1077,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   step="0.01"
                   min="0"
                   value={subtotal}
+                  disabled={!canChangePrice && Boolean(linkedAppointmentId || linkedInventoryItemId)}
+                  title={!canChangePrice && (linkedAppointmentId || linkedInventoryItemId) ? 'Sin permiso para modificar el precio de la cita / producto' : undefined}
                   onChange={e => setSubtotal(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono text-sm font-bold focus:border-[#FF3366]/60"
                 />
@@ -1070,6 +1093,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   step="0.01"
                   min="0"
                   value={discount}
+                  disabled={!canDiscount}
+                  title={canDiscount ? undefined : 'Sin permiso para aplicar descuentos'}
                   onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono text-sm focus:border-[#FF3366]/60"
                 />
@@ -1083,9 +1108,13 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   type="number"
                   min="0"
                   max="100"
-                  disabled={documentType === 'nota_venta'}
+                  disabled={documentType === 'nota_venta' || !canChangeTax}
+                  title={canChangeTax ? undefined : 'Sin permiso para cambiar la tarifa de IVA'}
                   value={taxRate}
-                  onChange={e => setTaxRate(parseFloat(e.target.value) || 0)}
+                  onChange={e => {
+                    setTaxEdited(true);
+                    setTaxRate(parseFloat(e.target.value) || 0);
+                  }}
                   className={`w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono text-sm focus:border-[#FF3366]/60 ${
                     documentType === 'nota_venta' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}

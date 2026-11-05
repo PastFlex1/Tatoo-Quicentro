@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import { X, Sparkles, User, FileText, Minus, Plus, ShieldCheck } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { PaymentMethod, SaleRecord, ServiceCategory } from '../../types';
@@ -12,6 +13,7 @@ interface NewSaleModalProps {
 export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onSaleCreated }) => {
   const { artists, settings, addSale, formatMoney } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Form states
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
@@ -79,6 +81,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('sales.create')) return;
     if (!clientName.trim()) {
       alert('Por favor introduce el nombre del cliente');
       return;

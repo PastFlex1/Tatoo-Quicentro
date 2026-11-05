@@ -362,6 +362,49 @@ export interface CashShift {
   cashExpensesTotal: number;
   status: 'open' | 'closed';
   notes?: string;
+  /** Número correlativo del arqueo (ARQ-000001) */
+  shiftNumber?: string;
+  /** Movimientos manuales de efectivo durante el turno */
+  movements?: CashMovement[];
+  /** Conteo físico por denominación al cierre ({ '20': 3, '0.25': 4 }) */
+  closingDenominations?: Record<string, number>;
+  /** Resumen congelado al momento del cierre (para reimprimir el ticket igual) */
+  closingSummary?: CashShiftSummary;
+}
+
+export type CashMovementType = 'ingreso' | 'retiro' | 'deposito_banco';
+
+export interface CashMovement {
+  id: string;
+  date: string;
+  type: CashMovementType;
+  amount: number;
+  concept: string;
+  registeredBy: string;
+}
+
+/** Resumen calculado de un turno de caja */
+export interface CashShiftSummary {
+  openingCash: number;
+  // Ventas
+  salesCount: number;
+  invoicesCount: number;
+  salesNotesCount: number;
+  grossSales: number;
+  cashSales: number;
+  cardSales: number;
+  transferSales: number;
+  cashTips: number;
+  otherTips: number;
+  // Salidas de efectivo
+  cashExpenses: number;
+  cashArtistPayouts: number;
+  cashRefunds: number;
+  // Movimientos manuales
+  manualIn: number;
+  manualOut: number;
+  bankDeposits: number;
+  expectedCash: number;
 }
 
 export type SriRegimenTributario =
@@ -1111,7 +1154,21 @@ export type UserRole =
   | 'CAJERO_RECEPCION'  // Recepcionista, Cajero & Coordinador de Citas
   | 'ARTISTA'           // Tatuador / Piercer Residente o Invitado
   | 'BODEGA'            // Bodeguero / Administrador de Insumos y Kardex
-  | 'CONTADOR';         // Contador / Auditor Fiscal Externo
+  | 'CONTADOR'          // Contador / Auditor Fiscal Externo
+  | (string & {});      // Roles personalizados creados por el administrador
+
+/** Rol con su lista de permisos granulares (`modulo.accion`). */
+export interface SystemRole {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  permissions: string[];
+  /** Rol de sistema bloqueado (Administrador) */
+  isSystem?: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
 
 export interface SystemUser {
   id: string;

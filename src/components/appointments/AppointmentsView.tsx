@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   Calendar as CalendarIcon,
   PlusCircle,
@@ -25,7 +26,8 @@ type ViewMode = 'calendar' | 'timeline' | 'list';
 
 export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceipt }) => {
   const {
-    appointments,
+    appointments: allAppointments,
+    currentUser,
     artists,
     formatMoney,
     updateAppointmentStatus,
@@ -35,6 +37,20 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
     settings,
   } = useStudio();
 
+  const { guard: guardPermission, can } = usePermission();
+  // Sin "ver citas de todos", el usuario solo ve las de su artista vinculado
+  const appointments = useMemo(
+    () =>
+      can('appointments.view_all')
+        ? allAppointments
+        : allAppointments.filter(a => currentUser.artistId && a.artistId === currentUser.artistId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allAppointments, currentUser, can('appointments.view_all')]
+  );
+  const changeStatus = (id: string, status: AppointmentStatus) => {
+    if (!guardPermission(status === 'cancelled' || status === 'no_show' ? 'appointments.cancel' : 'appointments.edit')) return;
+    updateAppointmentStatus(id, status);
+  };
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -169,6 +185,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const [billingFinalPrice, setBillingFinalPrice] = useState<number>(0);
 
   const handleStartBilling = (apt: Appointment) => {
+    if (!guardPermission('pos.charge')) return;
     setSelectedAppointment(apt);
     setBillingFinalPrice(apt.estimatedPrice);
     setBillingTipAmount(0);
@@ -177,6 +194,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   };
 
   const handleConfirmBilling = () => {
+    if (!guardPermission('pos.charge')) return;
     if (!selectedAppointment) return;
     try {
       const sale = completeAndBillAppointment(
@@ -618,7 +636,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                             <select
                               value={apt.status}
                               onChange={e =>
-                                updateAppointmentStatus(apt.id, e.target.value as AppointmentStatus)
+                                changeStatus(apt.id, e.target.value as AppointmentStatus)
                               }
                               className="bg-[#191920] border border-[#2B2B36] rounded-full px-2 py-1 text-[10px] text-neutral-300 focus:outline-hidden"
                             >
@@ -632,6 +650,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
 
                             <button
                               onClick={() => {
+                                if (!guardPermission('appointments.cancel')) return;
                                 if (confirm(`¿Eliminar la cita de ${apt.clientName}?`)) {
                                   deleteAppointment(apt.id);
                                 }
@@ -899,7 +918,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                             <select
                               value={apt.status}
                               onChange={e =>
-                                updateAppointmentStatus(apt.id, e.target.value as AppointmentStatus)
+                                changeStatus(apt.id, e.target.value as AppointmentStatus)
                               }
                               className="bg-[#121215] border border-[#2A2A33] rounded-full px-2 py-1 text-[10px] text-neutral-300 focus:outline-hidden"
                             >
@@ -913,6 +932,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
 
                             <button
                               onClick={() => {
+                                if (!guardPermission('appointments.cancel')) return;
                                 if (confirm(`¿Eliminar la cita de ${apt.clientName}?`)) {
                                   deleteAppointment(apt.id);
                                 }

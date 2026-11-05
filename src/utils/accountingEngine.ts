@@ -451,6 +451,26 @@ export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry
     );
   }
   shifts.forEach(sh => {
+    (sh.movements || []).forEach(m => {
+      const b = new EntryBuilder(`mov-${m.id}`);
+      if (m.type === 'ingreso') b.debit('1101', m.amount, m.concept).credit('3101', m.amount, 'Ingreso de efectivo a caja');
+      else if (m.type === 'deposito_banco') b.debit('1102', m.amount, 'Depósito de efectivo en banco').credit('1101', m.amount, m.concept);
+      else b.debit('3101', m.amount, 'Retiro de efectivo (propietario)').credit('1101', m.amount, m.concept);
+      push(
+        finalize(
+          {
+            id: `mov-entry-${m.id}`,
+            entryNumber: sh.shiftNumber || `MOV-${m.id.slice(-5)}`,
+            date: m.date,
+            reference: sh.shiftNumber || 'CAJA',
+            concept: `${m.type === 'ingreso' ? 'Ingreso' : m.type === 'retiro' ? 'Retiro' : 'Depósito bancario'}: ${m.concept}`,
+            source: 'shift',
+            entryType: 'MOVIMIENTO CAJA',
+          },
+          b.lines
+        )
+      );
+    });
     const diff = r2(sh.discrepancy || 0);
     if (sh.status !== 'closed' || Math.abs(diff) < 0.01) return;
     const b = new EntryBuilder(`shift-diff-${sh.id}`);
@@ -460,9 +480,9 @@ export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry
       finalize(
         {
           id: `shift-diff-entry-${sh.id}`,
-          entryNumber: `ARQ-${sh.id.slice(-5)}`,
+          entryNumber: sh.shiftNumber || `ARQ-${sh.id.slice(-5)}`,
           date: sh.closedAt || sh.openedAt,
-          reference: `ARQ-${sh.id.slice(-5)}`,
+          reference: sh.shiftNumber || `ARQ-${sh.id.slice(-5)}`,
           concept: `${diff < 0 ? 'Faltante' : 'Sobrante'} en cierre de caja (${sh.closedBy || sh.openedBy})`,
           source: 'shift',
           entryType: 'ARQUEO CAJA',

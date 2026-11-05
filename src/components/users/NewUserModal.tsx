@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { SystemUser, UserRole } from '../../types';
-import { getDefaultTabsForRole } from '../../data/initialData';
+import { ADMIN_ROLE_ID, PERMISSION_MODULES } from '../../data/permissions';
 import { consultarIdentificacion } from '../../services/sriService';
 
 interface NewUserModalProps {
@@ -33,7 +33,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   onClose,
   userToEdit,
 }) => {
-  const { artists, addUser, updateUser } = useStudio();
+  const { artists, addUser, updateUser, roles, currentUser } = useStudio();
 
   // Form fields
   const [nombres, setNombres] = useState('');
@@ -133,7 +133,6 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       estado,
       pin: pin.trim() || undefined,
       artistId: rol === 'ARTISTA' ? artistId || undefined : undefined,
-      allowedTabs: getDefaultTabsForRole(rol),
     };
 
     if (userToEdit) {
@@ -145,7 +144,15 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
     onClose();
   };
 
-  const allowedTabsPreview = getDefaultTabsForRole(rol);
+  const selectedRole = roles.find(r => r.id === rol);
+  const allowedTabsPreview = PERMISSION_MODULES.filter(
+    m => rol === ADMIN_ROLE_ID || selectedRole?.permissions.includes(`${m.id}.view`)
+  ).map(m => m.label);
+  const rolePermCount = rol === ADMIN_ROLE_ID
+    ? PERMISSION_MODULES.reduce((acc, m) => acc + m.actions.length, 0)
+    : selectedRole?.permissions.length || 0;
+  // Solo un Administrador puede asignar el rol Administrador
+  const assignableRoles = roles.filter(r => r.id !== ADMIN_ROLE_ID || currentUser.rol === ADMIN_ROLE_ID || userToEdit?.rol === ADMIN_ROLE_ID);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
@@ -314,11 +321,12 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                   onChange={e => setRol(e.target.value as UserRole)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#FF3366]"
                 >
-                  <option value="ADMIN">ADMINISTRADOR (Acceso Total a todo el sistema y configuración)</option>
-                  <option value="CAJERO_RECEPCION">RECEPCIÓN / CAJERO (POS, Facturación, Citas, Clientes, Arqueo)</option>
-                  <option value="ARTISTA">ARTISTA / TATUADOR (Sus Citas, Portafolio, Clientes y Comisiones)</option>
-                  <option value="BODEGA">BODEGA / INSUMOS (Inventario, Kardex, Proveedores y Órdenes de Compra)</option>
-                  <option value="CONTADOR">CONTADOR (Ventas, Gastos, Libro Mayor y Reportes Fiscales)</option>
+                  {assignableRoles.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {r.name.toUpperCase()}
+                      {r.description ? ` — ${r.description}` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -397,7 +405,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
             {/* Permissions Preview Pills */}
             <div className="pt-2 border-t border-[#24242F]">
               <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider mb-2">
-                Módulos Habilitados para este Rol ({allowedTabsPreview.length}):
+                Módulos habilitados ({allowedTabsPreview.length}) · {rolePermCount} permisos. Se administran en "Roles y permisos":
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {allowedTabsPreview.map(tab => (

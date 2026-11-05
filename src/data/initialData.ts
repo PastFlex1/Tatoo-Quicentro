@@ -88,7 +88,9 @@ export const INITIAL_CASH_SHIFT: CashShift = {
   transferTotal: 0,
   cashSalesTotal: 0,
   cashExpensesTotal: 0,
-  status: 'open',
+  // La caja arranca cerrada: el primer turno se abre desde Arqueo de Caja con su fondo inicial
+  status: 'closed',
+  closedAt: new Date().toISOString(),
 };
 
 export const getDefaultTabsForRole = (role: UserRole): string[] => {

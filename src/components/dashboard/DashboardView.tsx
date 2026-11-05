@@ -24,7 +24,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     appointments,
     formatMoney,
     setActiveTab,
+    can,
   } = useStudio();
+  const canSeeFinancials = can('dashboard.view_financials');
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayApts = appointments
@@ -94,6 +96,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
+      {!canSeeFinancials && (
+        <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] text-xs text-neutral-400">
+          Su rol no tiene permiso para ver cifras financieras del estudio. Se muestra solo la agenda del día.
+        </div>
+      )}
+      {canSeeFinancials && (
+      <>
       {/* KPI Cards Row with circular progress widget */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Facturación Total */}
@@ -198,6 +207,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      </>
+      )}
+
       {/* Today's Appointments & Studio Schedule Strip */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#24242B] pb-3">
@@ -282,6 +294,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
+      {canSeeFinancials && (
+      <>
       {/* Grid: Lines Breakdown with linear pink progress bars & Artist ranking */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
         {/* Left 2 Cols: Revenue distribution */}
@@ -545,6 +559,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

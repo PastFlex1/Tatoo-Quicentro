@@ -26,7 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewExpense,
   onToggleSidebar,
 }) => {
-  const { activeTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser } = useStudio();
+  const { activeTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser, currentRole } = useStudio();
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
@@ -208,7 +208,7 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentUser?.nombres?.split(' ')[0] || 'Usuario'}
               </span>
               <span className="text-[9px] text-[#FF3366] font-mono leading-tight">
-                {currentUser?.rol || 'ADMIN'}
+                {currentRole?.name || currentUser?.rol || 'Sin rol'}
               </span>
             </div>
           </button>

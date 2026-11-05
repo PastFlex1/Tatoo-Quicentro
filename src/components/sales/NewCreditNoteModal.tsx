@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import { X, RefreshCw, AlertCircle, FileText, CheckCircle2, Boxes } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { SaleRecord, CreditNoteReason } from '../../types';
@@ -16,6 +17,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
 }) => {
   const { sales, addCreditNote, formatMoney, settings } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Selected Invoice
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
   const [reason, setReason] = useState<CreditNoteReason>('ANULACION_TOTAL');
@@ -87,6 +89,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('sales.credit_note')) return;
     if (!activeSale) {
       alert('Por favor selecciona la factura a la que se aplicará la Nota de Crédito.');
       return;

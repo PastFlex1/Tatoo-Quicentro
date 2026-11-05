@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   X,
   Calendar,
@@ -37,6 +38,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 }) => {
   const { artists, clients, addAppointment, formatMoney, settings } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [clientName, setClientName] = useState('');
@@ -130,6 +132,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('appointments.create')) return;
     if (!clientName.trim() || !serviceName.trim() || !artistId) {
       alert('Por favor complete los campos obligatorios: Cliente, Artista y Servicio.');
       return;

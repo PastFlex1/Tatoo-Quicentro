@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   ClipboardList,
   Search,
@@ -36,6 +37,7 @@ export const PurchaseOrdersView: React.FC = () => {
     formatMoney,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | PurchaseOrderStatus>('all');
@@ -82,11 +84,13 @@ export const PurchaseOrdersView: React.FC = () => {
   }, [purchaseOrders]);
 
   const handleOpenEdit = (order: PurchaseOrder) => {
+    if (!guardPermission('purchase-orders.edit')) return;
     setOrderToEdit(order);
     setIsNewModalOpen(true);
   };
 
   const handleOpenReceive = (order: PurchaseOrder) => {
+    if (!guardPermission('purchase-orders.receive')) return;
     setOrderToReceive(order);
     setReceivedBy('Alex Palma - Administrador');
     setInvoiceReference(order.invoiceReference || '');
@@ -95,6 +99,7 @@ export const PurchaseOrdersView: React.FC = () => {
   };
 
   const handleConfirmReceive = () => {
+    if (!guardPermission('purchase-orders.receive')) return;
     if (!orderToReceive) return;
     receivePurchaseOrder(orderToReceive.id, {
       receivedBy,
@@ -109,6 +114,7 @@ export const PurchaseOrdersView: React.FC = () => {
   };
 
   const handleDelete = (id: string, num: string) => {
+    if (!guardPermission('purchase-orders.cancel')) return;
     if (window.confirm(`¿Está seguro de eliminar la Orden de Compra ${num}?`)) {
       deletePurchaseOrder(id);
     }
@@ -352,7 +358,7 @@ export const PurchaseOrdersView: React.FC = () => {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setSelectedOrderForPrint(order)}
+                      onClick={() => guardPermission('purchase-orders.print') && setSelectedOrderForPrint(order)}
                       className="p-2 rounded-xl bg-[#24242F] text-neutral-300 hover:text-white cursor-pointer"
                       title="Ver / Imprimir Orden A4"
                     >
@@ -489,7 +495,7 @@ export const PurchaseOrdersView: React.FC = () => {
                         {/* Ver Documento / Imprimir A4 */}
                         <button
                           type="button"
-                          onClick={() => setSelectedOrderForPrint(order)}
+                          onClick={() => guardPermission('purchase-orders.print') && setSelectedOrderForPrint(order)}
                           className="p-1.5 rounded-lg bg-[#24242F] hover:bg-[#2F2F3D] text-neutral-300 hover:text-white transition-colors cursor-pointer"
                           title="Visualizar e Imprimir Orden Oficial A4"
                         >

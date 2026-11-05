@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   PlusCircle,
   DollarSign,
@@ -46,6 +47,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
     formatMoney,
   } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Period filter for settlements: Día, Semana, Mes, o Todo
   const [period, setPeriod] = useState<SettlementPeriod>('month');
   const [searchTerm, setSearchTerm] = useState('');
@@ -231,6 +233,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   // Handler: Abrir modal de Liquidación (pago total) o Anticipo (pago parcial)
   const handleOpenSettle = (art: Artist, type: 'liquidacion' | 'anticipo') => {
+    if (!guardPermission(type === 'anticipo' ? 'artists.advance' : 'artists.settle')) return;
     const { balance, pendingCommission, pendingTips } = computeArtistBalance(art.id, sales, settlements);
     setSettleArtist(art);
     setSettleType(type);
@@ -252,6 +255,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   // Handler: Confirmar pago, registrar y abrir el comprobante para firmas
   const handleConfirmSettlement = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(settleType === 'anticipo' ? 'artists.advance' : 'artists.settle')) return;
     if (!settleArtist) return;
 
     const isAdvance = settleType === 'anticipo';
@@ -298,6 +302,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   // Reimprimir el comprobante de un pago anterior
   const openTicketFor = (st: ArtistSettlement) => {
+    if (!guardPermission('artists.print')) return;
     setTicketArtist(artists.find(a => a.id === st.artistId) || null);
     setTicketJustCreated(false);
     setTicketSettlement(st);
@@ -305,6 +310,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   // Handler: Open Commission Adjustment Modal
   const handleOpenCommissionModal = (art: Artist) => {
+    if (!guardPermission('artists.change_commission')) return;
     setCommissionArtist(art);
     setNewCommissionRate(art.defaultCommissionRate || 80);
   };
@@ -312,6 +318,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
   // Handler: Save Commission Adjustment
   const handleSaveCommissionRate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('artists.change_commission')) return;
     if (!commissionArtist) return;
 
     updateArtist(commissionArtist.id, {
@@ -323,6 +330,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   // Handler: Open Add/Edit Artist Modal
   const handleOpenEditArtist = (art: Artist) => {
+    if (!guardPermission('artists.edit')) return;
     setEditingArtist(art);
     setName(art.name);
     setNickname(art.nickname || '');
@@ -337,6 +345,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
   const handleSaveArtist = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(editingArtist ? 'artists.edit' : 'artists.create')) return;
     if (!name.trim()) return;
 
     if (editingArtist) {
@@ -416,6 +425,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
           {/* Add Artist Button */}
           <button
             onClick={() => {
+              if (!guardPermission('artists.create')) return;
               setEditingArtist(null);
               setName('');
               setNickname('');
@@ -600,7 +610,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <button
-                                onClick={() => toggleArtistStatus(art.id)}
+                                onClick={() => guardPermission('artists.toggle_status') && toggleArtistStatus(art.id)}
                                 className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold cursor-pointer ${
                                   art.active
                                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'

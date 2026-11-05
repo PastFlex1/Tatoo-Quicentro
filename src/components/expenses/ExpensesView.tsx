@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import { Search, PlusCircle, Trash2, FileCode, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ExpenseCategory } from '../../types';
@@ -11,6 +12,7 @@ interface ExpensesViewProps {
 export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) => {
   const { filteredExpenses, deleteExpense, updateExpense, formatMoney } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [sriStatusFilter, setSriStatusFilter] = useState<'all' | 'AUTORIZADO' | 'PENDIENTE'>('all');
@@ -75,6 +77,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
   };
 
   const handleDelete = (id: string, desc: string) => {
+    if (!guardPermission('expenses.delete')) return;
     if (confirm(`¿Eliminar el registro de gasto "${desc}"?`)) {
       deleteExpense(id);
     }
@@ -282,7 +285,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                           <button
                             type="button"
                             onClick={() => {
-                              updateExpense(item.id, { sriStatus: 'AUTORIZADO' });
+                              if (guardPermission('expenses.edit')) updateExpense(item.id, { sriStatus: 'AUTORIZADO' });
                             }}
                             className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 cursor-pointer font-bold"
                             title="Marcar como comprobante autorizado por el SRI"
@@ -424,7 +427,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
                             <button
                               type="button"
                               onClick={() => {
-                                updateExpense(item.id, { sriStatus: 'AUTORIZADO' });
+                                if (guardPermission('expenses.edit')) updateExpense(item.id, { sriStatus: 'AUTORIZADO' });
                               }}
                               className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 cursor-pointer font-bold"
                               title="Marcar como comprobante autorizado por el SRI"

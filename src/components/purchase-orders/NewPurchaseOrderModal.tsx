@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   X,
   FileText,
@@ -36,6 +37,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 }) => {
   const { suppliers, inventory, purchaseOrders, addPurchaseOrder, updatePurchaseOrder, formatMoney } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Selected supplier
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [supplierName, setSupplierName] = useState('');
@@ -272,6 +274,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(orderToEdit ? 'purchase-orders.edit' : 'purchase-orders.create')) return;
     if (!supplierName.trim() || !supplierRuc.trim()) {
       setErrorMessage('Debe seleccionar un proveedor con RUC válido.');
       return;

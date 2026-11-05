@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   X,
   Plus,
@@ -36,6 +37,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
 }) => {
   const { manualJournalEntries, addManualJournalEntry, currentUser, formatMoney } = useStudio();
 
+  const { guard: guardPermission } = usePermission();
   // Top header fields
   const currentYear = new Date().getFullYear();
   const defaultEntryNumber = useMemo(() => {
@@ -204,6 +206,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission('ledger.create_entry')) return;
 
     if (!concept.trim()) {
       alert('Por favor ingrese el concepto o glosa general del asiento contable.');

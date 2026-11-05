@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { usePermission } from '../../hooks/usePermission';
 import {
   PlusCircle,
   AlertTriangle,
@@ -29,6 +30,11 @@ export const InventoryView: React.FC = () => {
     formatMoney,
   } = useStudio();
 
+  const { guard: guardPermission, can } = usePermission();
+  const canSeeCosts = can('inventory.view_costs');
+  const adjust = (id: string, delta: number) => {
+    if (guardPermission('inventory.adjust_stock')) adjustStock(id, delta);
+  };
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [onlyLowStock, setOnlyLowStock] = useState(false);
@@ -147,6 +153,7 @@ export const InventoryView: React.FC = () => {
   const lowStockCount = inventory.filter(i => i.currentStock <= i.minStockAlert).length;
 
   const handleOpenAdd = () => {
+    if (!guardPermission('inventory.create')) return;
     setEditingItem(null);
     setName('');
     setBrand('');
@@ -166,6 +173,7 @@ export const InventoryView: React.FC = () => {
   };
 
   const handleOpenEdit = (item: InventoryItem) => {
+    if (!guardPermission('inventory.edit')) return;
     setEditingItem(item);
     setName(item.name);
     setBrand(item.brand);
@@ -207,6 +215,7 @@ export const InventoryView: React.FC = () => {
 
   const handleSaveItem = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!guardPermission(editingItem ? 'inventory.edit' : 'inventory.create')) return;
     if (!name.trim()) return;
 
     // Parse safely avoiding 0 lock
@@ -259,6 +268,7 @@ export const InventoryView: React.FC = () => {
   };
 
   const handleDelete = (id: string, itemName: string) => {
+    if (!guardPermission('inventory.delete')) return;
     if (confirm(`¿Eliminar insumo "${itemName}" del inventario?`)) {
       deleteInventoryItem(id);
     }
@@ -288,7 +298,7 @@ export const InventoryView: React.FC = () => {
         <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730]">
           <span className="text-[10px] text-neutral-400 block mb-1">Valorización Total Stock</span>
           <span className="text-lg font-bold font-mono tabular-nums text-white">
-            {formatMoney(totalCostValuation)}
+            {canSeeCosts ? formatMoney(totalCostValuation) : '••••'}
           </span>
           <span className="text-[10px] text-neutral-500 block mt-1">Precio de costo</span>
         </div>
@@ -443,7 +453,7 @@ export const InventoryView: React.FC = () => {
                     )}
                     <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#1C1C22]">
                       <span className="text-neutral-400">Costo Unit.:</span>
-                      <span className="text-neutral-200 font-mono">{formatMoney(item.unitCost)}</span>
+                      <span className="text-neutral-200 font-mono">{canSeeCosts ? formatMoney(item.unitCost) : '••••'}</span>
                     </div>
                     {pvpConIva && (
                       <div className="flex items-center justify-between text-[11px]">
@@ -457,7 +467,7 @@ export const InventoryView: React.FC = () => {
                     {/* Stepper adjustment */}
                     <div className="flex items-center gap-2 bg-[#121215] px-2.5 py-1 rounded-xl border border-[#272730]">
                       <button
-                        onClick={() => adjustStock(item.id, -1)}
+                        onClick={() => adjust(item.id, -1)}
                         className="w-6 h-6 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white bg-[#1A1A22] active:scale-95 cursor-pointer"
                         title="Restar 1"
                       >
@@ -467,7 +477,7 @@ export const InventoryView: React.FC = () => {
                         {item.currentStock}
                       </span>
                       <button
-                        onClick={() => adjustStock(item.id, 1)}
+                        onClick={() => adjust(item.id, 1)}
                         className="w-6 h-6 rounded-lg flex items-center justify-center text-white bg-[#FF3366] active:scale-95 cursor-pointer"
                         title="Sumar 1"
                       >
@@ -601,7 +611,7 @@ export const InventoryView: React.FC = () => {
 
                       {/* Unit Cost */}
                       <td className="py-3 px-4 text-right font-mono text-neutral-300 whitespace-nowrap">
-                        {formatMoney(item.unitCost)}
+                        {canSeeCosts ? formatMoney(item.unitCost) : '••••'}
                       </td>
 
                       {/* PVP Venta con y sin IVA */}
@@ -632,14 +642,14 @@ export const InventoryView: React.FC = () => {
 
                       {/* Total Cost Valuation */}
                       <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
-                        {formatMoney(item.currentStock * item.unitCost)}
+                        {canSeeCosts ? formatMoney(item.currentStock * item.unitCost) : '••••'}
                       </td>
 
                       {/* Stepper adjustment */}
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         <div className="inline-flex items-center gap-1 bg-[#121215] px-2 py-1 rounded-xl border border-[#272730]">
                           <button
-                            onClick={() => adjustStock(item.id, -1)}
+                            onClick={() => adjust(item.id, -1)}
                             className="w-5 h-5 rounded-md flex items-center justify-center text-neutral-400 hover:text-white hover:bg-[#25252E] transition-colors cursor-pointer"
                             title="Restar 1 (registra salida en Kardex)"
                           >
@@ -649,7 +659,7 @@ export const InventoryView: React.FC = () => {
                             {item.currentStock}
                           </span>
                           <button
-                            onClick={() => adjustStock(item.id, 1)}
+                            onClick={() => adjust(item.id, 1)}
                             className="w-5 h-5 rounded-md flex items-center justify-center text-[#FF3366] hover:bg-[#25252E] transition-colors cursor-pointer"
                             title="Sumar 1 (registra entrada en Kardex)"
                           >

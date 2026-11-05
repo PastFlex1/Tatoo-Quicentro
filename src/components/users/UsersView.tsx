@@ -22,9 +22,11 @@ import {
   Eye,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { SystemUser, UserRole } from '../../types';
-import { getDefaultTabsForRole } from '../../data/initialData';
+import { SystemRole, SystemUser, UserRole } from '../../types';
+import { ADMIN_ROLE_ID, PERMISSION_MODULES } from '../../data/permissions';
 import { NewUserModal } from './NewUserModal';
+import { RoleEditorModal } from './RoleEditorModal';
+import { Copy } from 'lucide-react';
 import { UserSwitcherModal } from './UserSwitcherModal';
 
 export const UsersView: React.FC = () => {
@@ -34,7 +36,19 @@ export const UsersView: React.FC = () => {
     switchUser,
     deleteUser,
     updateUser,
+    roles,
+    getRole,
+    can,
+    addRole,
+    updateRole,
+    deleteRole,
   } = useStudio();
+
+  // Pestaña activa del módulo
+  const [view, setView] = useState<'users' | 'roles'>('users');
+  // Editor de roles: role = editar, template = duplicar, ambos null = nuevo
+  const [roleModal, setRoleModal] = useState<{ role: SystemRole | null; template: SystemRole | null } | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,45 +88,46 @@ export const UsersView: React.FC = () => {
   }, [users]);
 
   const getRoleBadge = (rol: UserRole) => {
-    switch (rol) {
-      case 'ADMIN':
-        return {
-          label: 'Administrador / Dueño',
-          icon: ShieldCheck,
-          className: 'bg-rose-500/15 text-rose-400 border border-rose-500/30',
-        };
-      case 'CAJERO_RECEPCION':
-        return {
-          label: 'Cajero / Recepción',
-          icon: CreditCard,
-          className: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30',
-        };
-      case 'ARTISTA':
-        return {
-          label: 'Artista / Tatuador',
-          icon: Palette,
-          className: 'bg-purple-500/15 text-purple-400 border border-purple-500/30',
-        };
-      case 'BODEGA':
-        return {
-          label: 'Encargado Bodega',
-          icon: Package,
-          className: 'bg-amber-500/15 text-amber-400 border border-amber-500/30',
-        };
-      case 'CONTADOR':
-        return {
-          label: 'Contador CPA',
-          icon: BookOpen,
-          className: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
-        };
-      default:
-        return {
-          label: rol,
-          icon: Users,
-          className: 'bg-neutral-500/15 text-neutral-400 border border-neutral-500/30',
-        };
+    const role = getRole(rol);
+    const icon =
+      rol === ADMIN_ROLE_ID
+        ? ShieldCheck
+        : rol === 'CAJERO_RECEPCION'
+        ? CreditCard
+        : rol === 'ARTISTA'
+        ? Palette
+        : rol === 'BODEGA'
+        ? Package
+        : rol === 'CONTADOR'
+        ? BookOpen
+        : Shield;
+    return {
+      label: role?.name || `${rol} (rol eliminado)`,
+      icon,
+      className: 'border',
+      color: role?.color || '#64748B',
+    };
+  };
+
+  const handleSaveRole = (data: { name: string; description: string; color: string; permissions: string[] }) => {
+    if (!roleModal) return;
+    if (roleModal.role) updateRole(roleModal.role.id, data);
+    else addRole(data);
+    setRoleModal(null);
+    setSuccessNotice(roleModal.role ? `Rol "${data.name}" actualizado.` : `Rol "${data.name}" creado.`);
+    setTimeout(() => setSuccessNotice(null), 4000);
+  };
+
+  const handleDeleteRole = (role: SystemRole) => {
+    if (!window.confirm(`¿Eliminar el rol "${role.name}"?`)) return;
+    const res = deleteRole(role.id);
+    if (!res.ok) {
+      setRoleError(res.error || 'No se pudo eliminar el rol.');
+      setTimeout(() => setRoleError(null), 5000);
     }
   };
+
+  const totalPermissions = PERMISSION_MODULES.reduce((acc, m) => acc + m.actions.length, 0);
 
   const handleQuickSwitch = (u: SystemUser) => {
     // Usuarios con PIN: abrir el modal para que se ingrese el PIN
@@ -195,17 +210,33 @@ export const UsersView: React.FC = () => {
             <span>Cambiar de Usuario</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setUserToEdit(null);
-              setIsNewModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF3366] text-white text-xs font-bold hover:bg-[#e02958] transition-all shadow-[0_0_20px_rgba(255,51,102,0.35)] active:scale-95 cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nuevo Usuario</span>
-          </button>
+          {can('users.manage_roles') && (
+            <button
+              type="button"
+              onClick={() => {
+                setView('roles');
+                setRoleModal({ role: null, template: null });
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#1C1C24] hover:bg-[#252530] text-white text-xs font-bold border border-[#FF3366]/50 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Shield className="w-4 h-4 text-[#FF3366]" />
+              <span>Nuevo Rol</span>
+            </button>
+          )}
+
+          {can('users.create') && (
+            <button
+              type="button"
+              onClick={() => {
+                setUserToEdit(null);
+                setIsNewModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF3366] text-white text-xs font-bold hover:bg-[#e02958] transition-all shadow-[0_0_20px_rgba(255,51,102,0.35)] active:scale-95 cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nuevo Usuario</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -268,6 +299,110 @@ export const UsersView: React.FC = () => {
         </div>
       </div>
 
+      {/* Pestañas: Usuarios | Roles y permisos */}
+      <div className="flex gap-1 bg-[#17171C] border border-[#24242F] p-1 rounded-2xl w-full sm:w-fit">
+        {[
+          { id: 'users', label: `Usuarios (${users.length})` },
+          { id: 'roles', label: `Roles y permisos (${roles.length})` },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setView(t.id as 'users' | 'roles')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
+              view === t.id ? 'bg-[#FF3366] text-white' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'roles' && (
+        <div className="space-y-3">
+          {roleError && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {roleError}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+            {roles.map(r => {
+              const isAdmin = r.id === ADMIN_ROLE_ID;
+              const permCount = isAdmin ? totalPermissions : r.permissions.length;
+              const modulesOn = PERMISSION_MODULES.filter(m => isAdmin || r.permissions.includes(`${m.id}.view`));
+              const assigned = users.filter(u => u.rol === r.id).length;
+              return (
+                <div key={r.id} className="bg-[#17171C] border border-[#24242F] rounded-2xl p-4 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ background: r.color || '#64748B' }} />
+                      <div className="min-w-0">
+                        <div className="font-bold text-white text-sm truncate flex items-center gap-1.5">
+                          {r.name}
+                          {isAdmin && <Lock className="w-3.5 h-3.5 text-amber-300" />}
+                        </div>
+                        <div className="text-[11px] text-neutral-400 line-clamp-2">{r.description || 'Sin descripción'}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full h-1.5 bg-[#252530] rounded-full overflow-hidden">
+                    <div className="h-full" style={{ width: `${(permCount / totalPermissions) * 100}%`, background: r.color || '#64748B' }} />
+                  </div>
+                  <div className="flex justify-between text-[11px] text-neutral-400">
+                    <span>
+                      {permCount}/{totalPermissions} permisos · {modulesOn.length} módulos
+                    </span>
+                    <span>{assigned} usuario(s)</span>
+                  </div>
+                  <div className="text-[10px] text-neutral-500 truncate" title={modulesOn.map(m => m.label).join(', ')}>
+                    {modulesOn.map(m => m.label).join(' · ') || 'Sin módulos'}
+                  </div>
+                  <div className="flex gap-1.5 mt-auto pt-1">
+                    <button
+                      onClick={() => setRoleModal({ role: r, template: null })}
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-[#24242F] hover:bg-[#2F2F3D] text-neutral-200 text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      {isAdmin || !can('users.manage_roles') ? <Eye className="w-3.5 h-3.5" /> : <Edit2 className="w-3.5 h-3.5" />}
+                      {isAdmin || !can('users.manage_roles') ? 'Ver permisos' : 'Editar'}
+                    </button>
+                    {can('users.manage_roles') && (
+                      <button
+                        onClick={() => setRoleModal({ role: null, template: r })}
+                        className="px-3 py-1.5 rounded-lg bg-[#24242F] hover:bg-[#2F2F3D] text-neutral-300 text-xs cursor-pointer"
+                        title="Duplicar como nuevo rol"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {can('users.manage_roles') && !isAdmin && (
+                      <button
+                        onClick={() => handleDeleteRole(r)}
+                        className="px-3 py-1.5 rounded-lg bg-[#24242F] hover:bg-rose-500/20 text-neutral-400 hover:text-rose-400 text-xs cursor-pointer"
+                        title="Eliminar rol"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {can('users.manage_roles') && (
+              <button
+                onClick={() => setRoleModal({ role: null, template: null })}
+                className="border-2 border-dashed border-[#2B2B38] hover:border-[#FF3366]/60 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 text-neutral-400 hover:text-white cursor-pointer min-h-[180px]"
+              >
+                <Plus className="w-6 h-6 text-[#FF3366]" />
+                <span className="text-xs font-bold">Crear nuevo rol</span>
+                <span className="text-[10px] text-neutral-500">Defina permisos por módulo y por acción</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'users' && (
+      <>
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#17171C] border border-[#24242F] p-3 rounded-2xl">
         <div className="relative flex-1">
@@ -282,16 +417,7 @@ export const UsersView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          {(
-            [
-              { id: 'all', label: 'Todos' },
-              { id: 'ADMIN', label: 'Administradores' },
-              { id: 'CAJERO_RECEPCION', label: 'Cajeros' },
-              { id: 'ARTISTA', label: 'Artistas' },
-              { id: 'BODEGA', label: 'Bodega' },
-              { id: 'CONTADOR', label: 'Contabilidad' },
-            ] as const
-          ).map(tab => (
+          {[{ id: 'all', label: 'Todos' }, ...roles.map(r => ({ id: r.id, label: r.name }))].map(tab => (
             <button
               key={tab.id}
               onClick={() => setRoleFilter(tab.id)}
@@ -338,7 +464,11 @@ export const UsersView: React.FC = () => {
                   const isCurrent = user.id === currentUser.id;
                   const roleBadge = getRoleBadge(user.rol);
                   const Icon = roleBadge.icon;
-                  const allowedTabs = user.allowedTabs || getDefaultTabsForRole(user.rol);
+                  const userRole = getRole(user.rol);
+                  const userPermCount = user.rol === ADMIN_ROLE_ID ? totalPermissions : userRole?.permissions.length || 0;
+                  const userModules = PERMISSION_MODULES.filter(
+                    m => user.rol === ADMIN_ROLE_ID || userRole?.permissions.includes(`${m.id}.view`)
+                  );
 
                   return (
                     <tr key={user.id} className="hover:bg-[#1C1C24]/70 transition-colors">
@@ -371,6 +501,7 @@ export const UsersView: React.FC = () => {
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full ${roleBadge.className}`}
+                          style={{ color: roleBadge.color, background: `${roleBadge.color}22`, borderColor: `${roleBadge.color}55` }}
                         >
                           <Icon className="w-3.5 h-3.5" />
                           {roleBadge.label}
@@ -386,10 +517,11 @@ export const UsersView: React.FC = () => {
                       {/* Permissions preview */}
                       <td className="py-3 px-4">
                         <div className="text-neutral-300 font-medium">
-                          {allowedTabs.length} módulos habilitados
+                          {userModules.length} módulos · {userPermCount} permisos
                         </div>
-                        <div className="text-[10px] text-neutral-500 truncate max-w-[200px]">
-                          {allowedTabs.slice(0, 4).join(', ')}...
+                        <div className="text-[10px] text-neutral-500 truncate max-w-[200px]" title={userModules.map(m => m.label).join(', ')}>
+                          {userModules.slice(0, 3).map(m => m.label).join(', ')}
+                          {userModules.length > 3 ? '…' : ''}
                         </div>
                       </td>
 
@@ -404,6 +536,7 @@ export const UsersView: React.FC = () => {
                       <td className="py-3 px-4 text-center">
                         <button
                           type="button"
+                          disabled={!can('users.toggle_status')}
                           onClick={() => handleToggleStatus(user)}
                           className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
                             user.estado === 'ACTIVO'
@@ -432,6 +565,7 @@ export const UsersView: React.FC = () => {
                           )}
 
                           {/* Edit */}
+                          {can('users.edit') && (
                           <button
                             type="button"
                             onClick={() => {
@@ -443,9 +577,10 @@ export const UsersView: React.FC = () => {
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
+                          )}
 
                           {/* Delete */}
-                          {!isCurrent && (
+                          {!isCurrent && can('users.delete') && (
                             <button
                               type="button"
                               onClick={() => handleDeleteUser(user)}
@@ -465,6 +600,22 @@ export const UsersView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      </>
+      )}
+
+      {roleModal && (
+        <RoleEditorModal
+          key={`${roleModal.role?.id || 'new'}-${roleModal.template?.id || ''}`}
+          isOpen
+          role={roleModal.role}
+          readOnly={!can('users.manage_roles')}
+          template={roleModal.template}
+          existingNames={roles.filter(r => r.id !== roleModal.role?.id).map(r => r.name)}
+          onClose={() => setRoleModal(null)}
+          onSave={handleSaveRole}
+        />
+      )}
 
       {/* Modal 1: Nuevo / Editar Usuario */}
       <NewUserModal

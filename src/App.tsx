@@ -29,7 +29,7 @@ import { SaleRecord } from './types';
 import { ShieldAlert } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
-  const { activeTab, setActiveTab, currentUser, canAccessTab } = useStudio();
+  const { activeTab, setActiveTab, currentUser, canAccessTab, currentRole } = useStudio();
 
   // Global modals & responsive sidebar state
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -61,7 +61,7 @@ const MainLayout: React.FC = () => {
           <div className="max-w-md space-y-1.5">
             <h3 className="text-lg font-bold text-white">Módulo de Acceso Restringido</h3>
             <p className="text-xs text-neutral-400">
-              El usuario conectado <strong>@{currentUser?.username}</strong> con rol <strong>{currentUser?.rol}</strong> no cuenta con los permisos necesarios para acceder al módulo <code className="text-[#FF3366] font-mono">{activeTab}</code>.
+              El usuario conectado <strong>@{currentUser?.username}</strong> con rol <strong>{currentRole?.name || currentUser?.rol}</strong> no cuenta con los permisos necesarios para acceder al módulo <code className="text-[#FF3366] font-mono">{activeTab}</code>.
             </p>
           </div>
           <button
