@@ -21,6 +21,25 @@ export const isWithinShift = (dateStr: string, shift: CashShift) => {
   return t >= start && t <= end;
 };
 
+/** Cómo se cobró una venta: efectivo / tarjeta / transferencia y si la propina entró en efectivo. */
+export function saleCashParts(s: SaleRecord) {
+  const paid = s.amountPaidNow ?? s.total;
+  const tip = s.tipAmount || 0;
+  let cash = 0,
+    card = 0,
+    transfer = 0;
+  if (s.paymentMethod === 'cash') cash = paid;
+  else if (s.paymentMethod === 'card') card = paid;
+  else if (s.paymentMethod === 'transfer') transfer = paid;
+  else {
+    cash = s.cashPaid || 0;
+    card = s.cardPaid || 0;
+    transfer = s.transferPaid || 0;
+  }
+  const tipInCash = s.paymentMethod === 'cash' || s.paymentMethod === 'split';
+  return { paid, tip, cash, card, transfer, tipInCash };
+}
+
 export interface ShiftTransaction {
   id: string;
   date: string;
@@ -55,23 +74,10 @@ export function computeShiftSummary(
 
   sales
     .filter(s => isWithinShift(s.date, shift))
-    // Las ventas anuladas por nota de crédito sí ingresaron dinero (la devolución se resta aparte)
-    .filter(s => s.status !== 'cancelled' || Boolean(s.creditNoteNumber))
+    // Las ventas anuladas (por nota de crédito o por anulación) sí ingresaron dinero: la devolución se resta aparte
+    .filter(s => s.status !== 'cancelled' || Boolean(s.creditNoteNumber) || Boolean(s.voidedAt))
     .forEach(s => {
-      const paid = s.amountPaidNow ?? s.total;
-      const tip = s.tipAmount || 0;
-      let cash = 0,
-        card = 0,
-        transfer = 0;
-      if (s.paymentMethod === 'cash') cash = paid;
-      else if (s.paymentMethod === 'card') card = paid;
-      else if (s.paymentMethod === 'transfer') transfer = paid;
-      else {
-        cash = s.cashPaid || 0;
-        card = s.cardPaid || 0;
-        transfer = s.transferPaid || 0;
-      }
-      const tipInCash = s.paymentMethod === 'cash' || s.paymentMethod === 'split';
+      const { paid, tip, cash, card, transfer, tipInCash } = saleCashParts(s);
       cashSales += cash;
       cardSales += card;
       transferSales += transfer;
@@ -137,6 +143,24 @@ export function computeShiftSummary(
         method: isCash ? 'Efectivo' : 'Banco',
         cashEffect: isCash ? -refund : 0,
         amount: refund,
+      });
+    });
+
+  // Anulaciones de comprobantes: se devuelve al cliente lo cobrado; el efectivo sale del cajón del turno en que se anula
+  sales
+    .filter(s => s.voidedAt && isWithinShift(s.voidedAt, shift))
+    .forEach(s => {
+      const { paid, tip, cash, tipInCash } = saleCashParts(s);
+      const refundCash = cash + (tipInCash ? tip : 0);
+      cashRefunds += refundCash;
+      tx.push({
+        id: `void-${s.id}`,
+        date: s.voidedAt as string,
+        kind: 'devolucion',
+        label: `Anulación ${s.invoiceNumber} (${s.clientName})`,
+        method: refundCash > 0 ? 'Efectivo' : 'Banco / tarjeta',
+        cashEffect: -refundCash,
+        amount: paid + tip,
       });
     });
 

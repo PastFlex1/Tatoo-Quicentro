@@ -30,6 +30,14 @@ import { Appointment, ClientProfile, InventoryItem, PaymentMethod, SaleLineItem,
 import { consultarIdentificacion } from '../../services/sriService';
 import { validateSriBusinessConfig } from '../../utils/sriBusinessConfig';
 import { lineBase, lineTax } from '../../utils/saleLines';
+import {
+  CONSUMIDOR_FINAL_ID as CONSUMIDOR_FINAL,
+  CONSUMIDOR_FINAL_LIMIT,
+  consumidorFinalLimitMessage,
+  exceedsConsumidorFinalLimit,
+  isConsumidorFinal as isCfId,
+} from '../../utils/consumidorFinal';
+import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
 import { flagLabel, riskFlagsOf } from '../../data/consentCatalog';
 
 interface PosViewProps {
@@ -37,9 +45,6 @@ interface PosViewProps {
 }
 
 const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
-const CONSUMIDOR_FINAL = '9999999999999';
-/** Límite SRI para facturar a consumidor final sin identificación */
-const CF_LIMIT = 50;
 
 /** Accesos rápidos de servicios del estudio */
 const QUICK_SERVICES: { label: string; category: ServiceCategory; description: string; price: number; hours?: number }[] = [
@@ -157,7 +162,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const splitTotal = r2((parseFloat(split.cash) || 0) + (parseFloat(split.card) || 0) + (parseFloat(split.transfer) || 0));
   const splitRemaining = r2(toCollect - splitTotal);
 
-  const isConsumidorFinal = !clientDni.trim() || clientDni.trim() === CONSUMIDOR_FINAL;
+  const isConsumidorFinal = isCfId(clientDni);
+  // Ley del SRI: a consumidor final solo se factura hasta $50 (facturas y notas de venta)
+  const cfBlocked = exceedsConsumidorFinalLimit(clientDni, computed.total + tipNum);
   const hasServices = lines.some(l => l.kind === 'service' && (l.category === 'tattoo' || l.category === 'piercing'));
 
   const matchedClient: ClientProfile | undefined = useMemo(() => {
@@ -384,8 +391,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     if (lines.some(l => l.unitPrice <= 0)) return 'Hay líneas con precio $0. Ingrese el precio.';
     if (!clientName.trim()) return 'Ingrese el cliente o use "Consumidor final".';
     if (!artistId) return 'Seleccione el artista.';
-    if (!isNotaVenta && isConsumidorFinal && computed.total > CF_LIMIT)
-      return `El SRI no permite facturar más de $${CF_LIMIT} a consumidor final. Ingrese la cédula o RUC del cliente.`;
+    if (cfBlocked) return consumidorFinalLimitMessage(computed.total + tipNum);
+    if (!isNotaVenta && !isConsumidorFinal) {
+      const idCheck = validarIdentificacionEcuador(clientDni.trim());
+      if (!idCheck.isValid) return `La identificación del cliente no es válida: ${(idCheck.errorMessage || 'revise la cédula, RUC o pasaporte').replace(/\.+$/, '')}.`;
+    }
     if (method === 'cash' && cashTendered && cashNum < toCollect) return 'El efectivo recibido es menor al total.';
     if (method === 'split' && Math.abs(splitRemaining) >= 0.01)
       return `Los montos del pago mixto deben sumar ${formatMoney(toCollect)} (falta ${formatMoney(splitRemaining)}).`;
@@ -1103,10 +1113,13 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             )}
             <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Nota interna (opcional)" className={inputCls} />
 
-            {!isNotaVenta && isConsumidorFinal && computed.total > CF_LIMIT && (
-              <div className="text-[11px] text-amber-300 flex gap-1.5">
+            {cfBlocked && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-[11px] text-amber-200 flex gap-1.5">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                Más de ${CF_LIMIT}: el SRI exige identificar al cliente.
+                <span>
+                  <strong>Identifique al comprador.</strong> Por ley, a consumidor final solo se factura hasta ${CONSUMIDOR_FINAL_LIMIT}. Ingrese
+                  cédula, RUC o pasaporte (o reduzca el valor).
+                </span>
               </div>
             )}
             {error && (
@@ -1119,11 +1132,11 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             <button
               type="button"
               onClick={handleCharge}
-              disabled={lines.length === 0 || charging}
+              disabled={lines.length === 0 || charging || cfBlocked}
               className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#FF4D7D] hover:to-[#FF3366] text-white font-black text-base flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,51,102,0.35)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ReceiptText className="w-5 h-5" />
-              {charging ? 'Emitiendo…' : <>Cobrar {formatMoney(toCollect)} · F9</>}
+              {charging ? 'Emitiendo…' : cfBlocked ? `Identifique al cliente (más de $${CONSUMIDOR_FINAL_LIMIT})` : <>Cobrar {formatMoney(toCollect)} · F9</>}
             </button>
             <p className="text-[10px] text-neutral-500 text-center">
               {isNotaVenta ? 'Se emitirá una nota de venta RIMPE.' : 'La factura se enviará automáticamente al SRI.'}

@@ -206,6 +206,11 @@ export const SalesNotePrintModal: React.FC<SalesNotePrintModalProps> = ({
               <span className="font-black text-xs uppercase tracking-wider block">
                 NOTA DE VENTA
               </span>
+              {sale.voidedAt && (
+                <span className="block mt-1 mx-3 py-0.5 border-2 border-red-600 text-red-600 font-black tracking-widest text-xs uppercase">
+                  ANULADA {new Date(sale.voidedAt).toLocaleDateString('es-EC')}
+                </span>
+              )}
               <span className="font-mono font-bold text-xs block text-black">
                 N° {sale.invoiceNumber}
               </span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isConsumidorFinal } from '../../utils/consumidorFinal';
 import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { X, RefreshCw, AlertCircle, FileText, CheckCircle2, Boxes } from 'lucide-react';
@@ -31,12 +32,13 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
   const [notes, setNotes] = useState<string>('');
 
   // Eligible invoices for credit notes (only facturas, not already cancelled)
-  const eligibleInvoices = sales.filter(
-    s => s.documentType !== 'nota_venta' && s.status !== 'cancelled'
-  );
+  // Solo facturas con comprador identificado: el SRI no admite notas de crédito a consumidor final
+  const issuedInvoices = sales.filter(s => s.documentType !== 'nota_venta' && s.status !== 'cancelled');
+  const eligibleInvoices = issuedInvoices.filter(s => !isConsumidorFinal(s.clientDni));
+  const excludedConsumerCount = issuedInvoices.length - eligibleInvoices.length;
 
   useEffect(() => {
-    if (preselectedSale) {
+    if (preselectedSale && !isConsumidorFinal(preselectedSale.clientDni)) {
       setSelectedInvoiceId(preselectedSale.id);
       setCreditSubtotal(preselectedSale.subtotal - (preselectedSale.discount || 0));
       setCreditTax(preselectedSale.taxAmount || 0);
@@ -181,6 +183,14 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
                 </option>
               ))}
             </UiSelect>
+            {excludedConsumerCount > 0 && (
+              <p className="mt-1.5 text-[10px] text-amber-300/90 leading-snug">
+                {excludedConsumerCount} factura(s) a <strong>consumidor final</strong> no aparecen: por ley no se pueden modificar ni anular con nota de crédito.
+              </p>
+            )}
+            {eligibleInvoices.length === 0 && (
+              <p className="mt-1.5 text-[11px] text-neutral-400">No hay facturas con comprador identificado para emitir una nota de crédito.</p>
+            )}
           </div>
 
           {/* Active Invoice Info Card */}

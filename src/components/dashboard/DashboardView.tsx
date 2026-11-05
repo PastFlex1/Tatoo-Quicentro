@@ -34,14 +34,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   // Metrics calculation
-  const totalIncome = filteredSales.reduce((acc, s) => acc + (s.status !== 'cancelled' ? s.total : 0), 0);
+  // Las ventas anuladas no cuentan en el tablero (ni en totales, ni en conteos, ni por método de pago)
+  const activeSales = filteredSales.filter(s => s.status !== 'cancelled');
+  const totalIncome = activeSales.reduce((acc, s) => acc + (s.status !== 'cancelled' ? s.total : 0), 0);
 
   // Studio share vs Artists share
-  const totalArtistCommissions = filteredSales.reduce(
+  const totalArtistCommissions = activeSales.reduce(
     (acc, s) => acc + (s.status !== 'cancelled' ? s.artistShare : 0),
     0
   );
-  const totalStudioGross = filteredSales.reduce(
+  const totalStudioGross = activeSales.reduce(
     (acc, s) => acc + (s.status !== 'cancelled' ? s.studioShare : 0),
     0
   );
@@ -55,23 +57,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Breakdown by service category
   const categoryBreakdown = {
-    tattoo: filteredSales
+    tattoo: activeSales
       .filter(s => s.serviceCategory === 'tattoo' && s.status !== 'cancelled')
       .reduce((acc, s) => acc + s.total, 0),
-    piercing: filteredSales
+    piercing: activeSales
       .filter(s => s.serviceCategory === 'piercing' && s.status !== 'cancelled')
       .reduce((acc, s) => acc + s.total, 0),
-    jewelry: filteredSales
+    jewelry: activeSales
       .filter(s => s.serviceCategory === 'jewelry' && s.status !== 'cancelled')
       .reduce((acc, s) => acc + s.total, 0),
-    aftercare: filteredSales
+    aftercare: activeSales
       .filter(s => s.serviceCategory === 'aftercare' && s.status !== 'cancelled')
       .reduce((acc, s) => acc + s.total, 0),
   };
 
   // Artist performance ranking
   const artistStats = artists.map(art => {
-    const artistSales = filteredSales.filter(
+    const artistSales = activeSales.filter(
       s => s.artistId === art.id && s.status !== 'cancelled'
     );
     const gross = artistSales.reduce((acc, s) => acc + s.total, 0);
@@ -86,7 +88,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }).sort((a, b) => b.gross - a.gross);
 
-  const recentSales = filteredSales.slice(0, 6);
+  const recentSales = activeSales.slice(0, 6);
   const criticalItems = inventory.filter(i => i.currentStock <= i.minStockAlert);
 
   // SVG circular gauge math
@@ -111,7 +113,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between text-neutral-400 text-xs mb-2 gap-2">
               <span>Facturación Total</span>
               <span className="text-[10px] font-mono text-[#FF3366] bg-[#FF3366]/10 px-2 py-0.5 rounded-full border border-[#FF3366]/20 shrink-0">
-                +{filteredSales.length} ventas
+                +{activeSales.length} ventas
               </span>
             </div>
             <div className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white truncate">
@@ -357,19 +359,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="p-3 rounded-xl bg-[#121215] border border-[#24242C]">
               <span className="text-[10px] text-neutral-400 block mb-1">Efectivo en Caja</span>
               <span className="font-mono font-bold text-white">
-                {formatMoney(filteredSales.reduce((acc, s) => acc + (s.cashPaid || (s.paymentMethod === 'cash' ? s.amountPaidNow : 0)), 0))}
+                {formatMoney(activeSales.reduce((acc, s) => acc + (s.cashPaid || (s.paymentMethod === 'cash' ? s.amountPaidNow : 0)), 0))}
               </span>
             </div>
             <div className="p-3 rounded-xl bg-[#121215] border border-[#24242C]">
               <span className="text-[10px] text-neutral-400 block mb-1">Tarjeta / Datáfono</span>
               <span className="font-mono font-bold text-white">
-                {formatMoney(filteredSales.reduce((acc, s) => acc + (s.cardPaid || (s.paymentMethod === 'card' ? s.amountPaidNow : 0)), 0))}
+                {formatMoney(activeSales.reduce((acc, s) => acc + (s.cardPaid || (s.paymentMethod === 'card' ? s.amountPaidNow : 0)), 0))}
               </span>
             </div>
             <div className="p-3 rounded-xl bg-[#121215] border border-[#24242C]">
               <span className="text-[10px] text-neutral-400 block mb-1">Transferencias / Zelle</span>
               <span className="font-mono font-bold text-white">
-                {formatMoney(filteredSales.reduce((acc, s) => acc + (s.transferPaid || (s.paymentMethod === 'transfer' ? s.amountPaidNow : 0)), 0))}
+                {formatMoney(activeSales.reduce((acc, s) => acc + (s.transferPaid || (s.paymentMethod === 'transfer' ? s.amountPaidNow : 0)), 0))}
               </span>
             </div>
           </div>

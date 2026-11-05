@@ -1,4 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import {
+  CONSUMIDOR_FINAL_LIMIT,
+  consumidorFinalLimitMessage,
+  exceedsConsumidorFinalLimit,
+} from '../../utils/consumidorFinal';
 import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
@@ -36,6 +41,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
     completeAndBillAppointment,
     getProformaByAppointmentId,
     settings,
+    clients,
   } = useStudio();
 
   const { guard: guardPermission, can } = usePermission();
@@ -184,10 +190,21 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const [billingPaymentMethod, setBillingPaymentMethod] = useState<PaymentMethod>('card');
   const [billingTipAmount, setBillingTipAmount] = useState<number>(0);
   const [billingFinalPrice, setBillingFinalPrice] = useState<number>(0);
+  const [billingBuyerDni, setBillingBuyerDni] = useState<string>('');
+  // Importe del comprobante (con IVA y propina): es lo que mira el SRI para el límite de consumidor final
+  const billingInvoiceTotal = Math.round(billingFinalPrice * (1 + (settings.defaultTaxRate || 0) / 100) * 100) / 100 + billingTipAmount;
+  const billingCfBlocked = exceedsConsumidorFinalLimit(billingBuyerDni, billingInvoiceTotal);
 
   const handleStartBilling = (apt: Appointment) => {
     if (!guardPermission('pos.charge')) return;
     setSelectedAppointment(apt);
+    // Se precarga la cédula de la ficha del cliente, si existe
+    const profile = clients.find(
+      c =>
+        c.name.toLowerCase().trim() === apt.clientName.toLowerCase().trim() ||
+        (c.phone && apt.clientPhone && c.phone.replace(/\D/g, '') === apt.clientPhone.replace(/\D/g, ''))
+    );
+    setBillingBuyerDni(profile?.dni || '');
     setBillingFinalPrice(apt.estimatedPrice);
     setBillingTipAmount(0);
     setBillingPaymentMethod(apt.depositPaymentMethod || 'card');
@@ -202,7 +219,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
         selectedAppointment.id,
         billingPaymentMethod,
         billingTipAmount,
-        billingFinalPrice
+        billingFinalPrice,
+        { dni: billingBuyerDni }
       );
       setIsBillingModalOpen(false);
       setSelectedAppointment(null);
@@ -1042,6 +1060,27 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 </div>
               </div>
 
+              {/* Identificación del comprador (obligatoria por ley si la factura supera $50) */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
+                  Cédula / RUC / Pasaporte del comprador
+                </label>
+                <input
+                  type="text"
+                  value={billingBuyerDni}
+                  onChange={e => setBillingBuyerDni(e.target.value.trim())}
+                  placeholder="Vacío = consumidor final (solo hasta $50)"
+                  className={`w-full bg-[#111114] border rounded-xl px-3 py-2 font-mono text-white focus:outline-hidden ${
+                    billingCfBlocked ? 'border-amber-500/60' : 'border-[#2A2A33]'
+                  }`}
+                />
+                {billingCfBlocked && (
+                  <p className="text-[11px] text-amber-300 leading-snug">
+                    Por ley, a consumidor final solo se factura hasta ${CONSUMIDOR_FINAL_LIMIT}. Este comprobante suma {formatMoney(billingInvoiceTotal)}: ingrese la identificación del comprador.
+                  </p>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">
                   Método de Pago para el Saldo
@@ -1089,7 +1128,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 <button
                   type="button"
                   onClick={handleConfirmBilling}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.4)] cursor-pointer"
+                  disabled={billingCfBlocked}
+                  title={billingCfBlocked ? 'Identifique al comprador: más de $' + CONSUMIDOR_FINAL_LIMIT + ' a consumidor final no está permitido' : undefined}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.4)] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Receipt className="w-4 h-4" />
                   <span>Generar Ticket & Completar</span>

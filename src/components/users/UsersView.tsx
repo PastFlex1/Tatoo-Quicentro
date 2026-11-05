@@ -200,7 +200,7 @@ export const UsersView: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
             onClick={() => setIsSwitcherModalOpen(true)}
@@ -241,7 +241,7 @@ export const UsersView: React.FC = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-[#17171C] border border-[#24242F] p-4 rounded-2xl flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
             <Users className="w-5 h-5" />

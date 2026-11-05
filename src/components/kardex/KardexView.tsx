@@ -478,7 +478,7 @@ export const KardexView: React.FC = () => {
 
       {/* Modal: Registrar Movimiento de Kardex */}
       {isKardexModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-[#141417] border border-[#272730] rounded-3xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#24242A] bg-[#16161B]">
               <div className="flex items-center gap-3">

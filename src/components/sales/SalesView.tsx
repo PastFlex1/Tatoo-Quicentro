@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE, isConsumidorFinal } from '../../utils/consumidorFinal';
+import { useAlertModal } from '../../context/AlertModalContext';
 import { usePermission } from '../../hooks/usePermission';
 import {
   Search,
@@ -23,6 +25,8 @@ import { SalesNotePrintModal } from './SalesNotePrintModal';
 import { ReceiptModal } from './ReceiptModal';
 import { buildAccessKey, buildFacturaXml, buildNotaCreditoXml } from '../../services/sriElectronicService';
 import { SriStatusBadge } from '../common/SriStatusBadge';
+import { VoidSaleModal } from './VoidSaleModal';
+import { Ban } from 'lucide-react';
 
 interface SalesViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -45,15 +49,21 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   } = useStudio();
 
   const { guard: guardPermission, can } = usePermission();
+  const { showAlert } = useAlertModal();
   // Acciones protegidas por permiso
   const openReceipt = (sale: SaleRecord) => {
     if (guardPermission('sales.print')) onOpenReceipt(sale);
   };
   const printSalesNote = (sale: SaleRecord) => {
-    if (guardPermission('sales.print')) printSalesNote(sale);
+    if (guardPermission('sales.print')) setSelectedSalesNoteToPrint(sale);
   };
   const printCreditNote = (cn: CreditNoteRecord) => {
-    if (guardPermission('sales.print')) printCreditNote(cn);
+    if (guardPermission('sales.print')) setSelectedCreditNoteToPrint(cn);
+  };
+  // Anulación de comprobantes que no admiten nota de crédito (factura a consumidor final / nota de venta)
+  const [saleToVoid, setSaleToVoid] = useState<SaleRecord | null>(null);
+  const openVoid = (sale: SaleRecord) => {
+    if (guardPermission('sales.void')) setSaleToVoid(sale);
   };
   // Active Billing Tab
   const [activeSubTab, setActiveSubTab] = useState<BillingTabType>(initialSubTab);
@@ -138,11 +148,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
   }, [filteredCreditNotes, searchTerm]);
 
   // Totals calculations
-  const totalInvoicesGross = invoicesList.reduce((acc, s) => acc + s.total, 0);
-  const totalInvoicesTax = invoicesList.reduce((acc, s) => acc + s.taxAmount, 0);
-  const totalInvoicesStudio = invoicesList.reduce((acc, s) => acc + s.studioShare, 0);
+  // Los comprobantes anulados no cuentan en los totales (las anuladas con nota de crédito se restan aparte)
+  const activeInvoices = invoicesList.filter(s => !s.voidedAt);
+  const totalInvoicesGross = activeInvoices.reduce((acc, s) => acc + s.total, 0);
+  const totalInvoicesTax = activeInvoices.reduce((acc, s) => acc + s.taxAmount, 0);
+  const totalInvoicesStudio = activeInvoices.reduce((acc, s) => acc + s.studioShare, 0);
 
-  const totalSalesNotesGross = salesNotesList.reduce((acc, s) => acc + s.total, 0);
+  const totalSalesNotesGross = salesNotesList.filter(s => !s.voidedAt).reduce((acc, s) => acc + s.total, 0);
   const totalCreditNotesReverted = creditNotesList.reduce((acc, cn) => acc + cn.total, 0);
 
   const exportToCSV = () => {
@@ -216,6 +228,10 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
 
   const handleOpenEmitCreditNote = (sale?: SaleRecord) => {
     if (!guardPermission('sales.credit_note')) return;
+    if (sale && isConsumidorFinal(sale.clientDni)) {
+      showAlert({ title: 'No se puede emitir nota de crédito', message: CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE, type: 'warning' });
+      return;
+    }
     setCreditNoteToPreselect(sale || null);
     setIsNewCreditNoteOpen(true);
   };
@@ -477,7 +493,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         </div>
                       </div>
                       <div>
-                        {isCancelled || hasCreditNote ? (
+                        {sale.voidedAt ? (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30"
+                            title={`Anulada el ${new Date(sale.voidedAt).toLocaleDateString('es-EC')}: ${sale.voidReason || ''}`}
+                          >
+                            ANULADA
+                          </span>
+                        ) : isCancelled || hasCreditNote ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                             ANULADA CON NC
                           </span>
@@ -548,13 +571,22 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
-                        {!hasCreditNote && !isCancelled && (
+                        {!hasCreditNote && !isCancelled && !isConsumidorFinal(sale.clientDni) && (
                           <button
                             onClick={() => handleOpenEmitCreditNote(sale)}
                             className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30 cursor-pointer"
                             title="Emitir Nota de Crédito (reverso tributario legal SRI)"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {!hasCreditNote && !isCancelled && isConsumidorFinal(sale.clientDni) && (
+                          <button
+                            onClick={() => openVoid(sale)}
+                            className="p-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 cursor-pointer"
+                            title="Anular factura a consumidor final (no admite nota de crédito)"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
                           </button>
                         )}
                       </div>
@@ -627,7 +659,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           {sale.artistName}
                         </td>
                         <td className="py-3 px-4 text-center whitespace-nowrap">
-                          {isCancelled || hasCreditNote ? (
+                          {sale.voidedAt ? (
+                            <span
+                              className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30"
+                              title={`Anulada el ${new Date(sale.voidedAt).toLocaleDateString('es-EC')}: ${sale.voidReason || ''}`}
+                            >
+                              ANULADA
+                            </span>
+                          ) : isCancelled || hasCreditNote ? (
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
                               ANULADA CON NC
                             </span>
@@ -680,7 +719,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                               <Eye className="w-3.5 h-3.5" />
                             </button>
 
-                            {!hasCreditNote && !isCancelled && (
+                            {!hasCreditNote && !isCancelled && isConsumidorFinal(sale.clientDni) && (
+                              <button
+                                onClick={() => openVoid(sale)}
+                                className="px-2 py-1 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Factura a consumidor final: no admite nota de crédito; se anula en el SRI y aquí"
+                              >
+                                <Ban className="w-3 h-3" />
+                                <span>Anular</span>
+                              </button>
+                            )}
+                            {!hasCreditNote && !isCancelled && !isConsumidorFinal(sale.clientDni) && (
                               <button
                                 onClick={() => handleOpenEmitCreditNote(sale)}
                                 className="px-2 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
@@ -742,9 +791,15 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           })}
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        RIMPE POPULAR
-                      </span>
+                      {sale.voidedAt ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30" title={sale.voidReason}>
+                          ANULADA
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          RIMPE POPULAR
+                        </span>
+                      )}
                     </div>
 
                     <div className="bg-[#121215] p-2.5 rounded-xl border border-[#23232A] space-y-1">
@@ -788,6 +843,15 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {!sale.voidedAt && (
+                          <button
+                            onClick={() => openVoid(sale)}
+                            className="p-2 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 cursor-pointer"
+                            title="Anular nota de venta"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -850,9 +914,15 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center whitespace-nowrap">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            RIMPE POPULAR
-                          </span>
+                          {sale.voidedAt ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30" title={sale.voidReason}>
+                              ANULADA
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              RIMPE POPULAR
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right font-mono font-bold text-white whitespace-nowrap">
                           {formatMoney(sale.total)}
@@ -880,6 +950,16 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
+                            {!sale.voidedAt && (
+                              <button
+                                onClick={() => openVoid(sale)}
+                                className="px-2 py-1 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Anular nota de venta"
+                              >
+                                <Ban className="w-3 h-3" />
+                                <span>Anular</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1234,6 +1314,18 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
           </div>
         </div>
       )}
+      <VoidSaleModal
+        sale={saleToVoid}
+        onClose={() => setSaleToVoid(null)}
+        onDone={voided => {
+          setSaleToVoid(null);
+          showAlert({
+            title: 'Comprobante anulado',
+            message: `${voided.invoiceNumber} quedó ANULADO. Recuerde devolver el dinero al cliente; la caja, la contabilidad y el inventario ya se actualizaron.`,
+            type: 'success',
+          });
+        }}
+      />
     </div>
   );
 };

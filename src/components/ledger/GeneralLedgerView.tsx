@@ -293,8 +293,8 @@ export const GeneralLedgerView: React.FC = () => {
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 xl:p-8 space-y-4 sm:space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#24242A] pb-4">
-        <div>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-[#24242A] pb-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2.5 mb-1">
             <span className="w-2.5 h-2.5 rounded-full bg-[#FF3366] shadow-[0_0_8px_#FF3366] shrink-0"></span>
             <h1 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -306,9 +306,9 @@ export const GeneralLedgerView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center flex-wrap gap-2">
+        <div className="flex items-center flex-wrap gap-2 min-w-0 max-w-full">
           {/* Sub-tabs Selector */}
-          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730] overflow-x-auto">
+          <div className="flex items-center gap-1 bg-[#121215] p-1 rounded-full border border-[#272730] overflow-x-auto max-w-full">
             <button
               onClick={() => setActiveTab('journal')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all whitespace-nowrap cursor-pointer ${

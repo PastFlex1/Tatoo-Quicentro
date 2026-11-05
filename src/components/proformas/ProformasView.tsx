@@ -1,4 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import {
+  CONSUMIDOR_FINAL_LIMIT,
+  consumidorFinalLimitMessage,
+  exceedsConsumidorFinalLimit,
+} from '../../utils/consumidorFinal';
 import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
@@ -62,6 +67,10 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
   const [billingPaymentMethod, setBillingPaymentMethod] = useState<PaymentMethod>('card');
   const [billingTipAmount, setBillingTipAmount] = useState<number>(0);
   const [billingFinalPrice, setBillingFinalPrice] = useState<number>(0);
+  const [billingBuyerDni, setBillingBuyerDni] = useState<string>('');
+  // El valor final de la proforma ya incluye IVA; con la propina forma el importe del comprobante
+  const billingInvoiceTotal = Math.round((billingFinalPrice + billingTipAmount) * 100) / 100;
+  const billingCfBlocked = exceedsConsumidorFinalLimit(billingBuyerDni, billingInvoiceTotal);
   const [billingSuccessNotice, setBillingSuccessNotice] = useState<string | null>(null);
 
   // Filtered List
@@ -156,6 +165,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
   const handleOpenBillingModal = (prof: Proforma) => {
     if (!guardPermission('proformas.convert')) return;
     setBillingProforma(prof);
+    setBillingBuyerDni(prof.clientDni || '');
     setBillingFinalPrice(prof.total);
     setBillingTipAmount(0);
     setBillingPaymentMethod('card');
@@ -170,7 +180,8 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
         billingProforma.id,
         billingPaymentMethod,
         billingTipAmount,
-        billingFinalPrice
+        billingFinalPrice,
+        { dni: billingBuyerDni }
       );
       setIsBillingModalOpen(false);
       setBillingSuccessNotice(`¡Factura ${sale.invoiceNumber} emitida exitosamente para ${sale.clientName}!`);
@@ -650,12 +661,23 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                   <span className="text-neutral-400">Artista Asignado:</span>
                   <span className="font-semibold text-emerald-400">{billingProforma.artistName}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-400">RUC / Cédula Cliente:</span>
-                  <span className="font-mono text-neutral-300 font-bold">
-                    {billingProforma.clientDni || '9999999999999 (Consumidor Final)'}
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-neutral-400 shrink-0">RUC / Cédula Cliente:</span>
+                  <input
+                    type="text"
+                    value={billingBuyerDni}
+                    onChange={e => setBillingBuyerDni(e.target.value.trim())}
+                    placeholder="Vacío = consumidor final"
+                    className={`w-48 bg-[#17171C] border rounded-lg px-2 py-1 text-right font-mono font-bold text-neutral-200 focus:outline-hidden ${
+                      billingCfBlocked ? 'border-amber-500/60' : 'border-[#2B2B36]'
+                    }`}
+                  />
                 </div>
+                {billingCfBlocked && (
+                  <p className="text-[11px] text-amber-300 leading-snug">
+                    Por ley, a consumidor final solo se factura hasta ${CONSUMIDOR_FINAL_LIMIT}. Esta factura suma {formatMoney(billingInvoiceTotal)}: ingrese la cédula, RUC o pasaporte del comprador.
+                  </p>
+                )}
                 {billingProforma.clientPhone && (
                   <div className="flex items-center justify-between">
                     <span className="text-neutral-400">Teléfono:</span>
@@ -790,7 +812,9 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
               <button
                 type="button"
                 onClick={handleProcessBilling}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 cursor-pointer"
+                disabled={billingCfBlocked}
+                title={billingCfBlocked ? 'Identifique al comprador: más de $' + CONSUMIDOR_FINAL_LIMIT + ' a consumidor final no está permitido' : undefined}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Receipt className="w-4 h-4" />
                 <span>Emitir Factura & Abrir Ticket</span>

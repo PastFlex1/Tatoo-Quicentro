@@ -50,7 +50,7 @@ export const AlertModalProvider: React.FC<{ children: ReactNode }> = ({ children
 
       {/* Alert Modal */}
       {alertState && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-[#18181D] border border-[#272730] rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-white space-y-4">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-xl shrink-0 mt-0.5">
@@ -97,7 +97,7 @@ export const AlertModalProvider: React.FC<{ children: ReactNode }> = ({ children
 
       {/* Confirm Modal */}
       {confirmState && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-[#18181D] border border-[#272730] rounded-2xl w-full max-w-md shadow-2xl p-5 sm:p-6 text-white space-y-4">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-xl shrink-0 mt-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20">

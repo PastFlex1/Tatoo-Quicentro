@@ -101,6 +101,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       a('sales', 'send_sri', 'Enviar / reintentar envío al SRI'),
       a('sales', 'view_xml', 'Ver y descargar XML'),
       a('sales', 'credit_note', 'Emitir notas de crédito (anular / devolver)', true),
+      a('sales', 'void', 'Anular facturas a consumidor final y notas de venta', true, 'Revierte venta, comisión, caja e inventario'),
       a('sales', 'export', 'Exportar ventas (CSV)'),
     ],
   },

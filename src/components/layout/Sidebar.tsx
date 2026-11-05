@@ -45,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
     settings,
     formatMoney,
     currentRole,
+    currentShiftSummary,
   } = useStudio();
 
   const [isSwitcherOpen, setIsSwitcherOpen] = React.useState(false);
@@ -205,9 +206,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
               {formatMoney(currentShift.expectedCash)}
             </div>
             <div className="text-[11px] text-neutral-400 mt-1.5 flex items-center justify-between pt-1.5 border-t border-[#202026]">
-              <span>En Efectivo:</span>
+              <span title="Ventas cobradas en efectivo menos devoluciones y anulaciones">Cobrado en efectivo (neto):</span>
               <span className="font-mono tabular-nums text-neutral-200">
-                {formatMoney(currentShift.cashSalesTotal)}
+                {formatMoney(currentShiftSummary.cashSales + currentShiftSummary.cashTips - currentShiftSummary.cashRefunds)}
               </span>
             </div>
           </div>

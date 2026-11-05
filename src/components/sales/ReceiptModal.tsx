@@ -54,6 +54,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
   // Clave de acceso real del comprobante (generada al emitir la factura)
   const claveAccesoCalculada = sale?.sriAccessKey || '';
   const isAuthorized = sale?.sriStatus === 'AUTORIZADO';
+  const isVoided = Boolean(sale?.voidedAt);
   const authDate = sale?.sriAuthorizationDate ? new Date(sale.sriAuthorizationDate) : null;
 
   if (!sale) return null;
@@ -200,13 +201,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border inline-flex items-center gap-1 ${
-                      isAuthorized
+                      isVoided
+                        ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                        : isAuthorized
                         ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                         : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                     }`}
                   >
                     <ShieldCheck className="w-3 h-3" />
-                    <span>{isAuthorized ? 'AUTORIZADO SRI' : `SRI: ${(sale.sriStatus || 'PENDIENTE').replace('_', ' ')}`}</span>
+                    <span>{isVoided ? 'ANULADA' : isAuthorized ? 'AUTORIZADO SRI' : `SRI: ${(sale.sriStatus || 'PENDIENTE').replace('_', ' ')}`}</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-neutral-400 mt-0.5">
@@ -367,6 +370,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                     <div className="text-[17px] font-bold text-black tracking-normal mt-1 uppercase">
                       FACTURA
                     </div>
+                    {isVoided && (
+                      <div className="my-1.5 py-1 border-2 border-red-600 text-red-600 text-center font-black tracking-widest text-xs uppercase">
+                  ANULADO {sale.voidedAt ? new Date(sale.voidedAt).toLocaleDateString('es-EC') : ''}
+                </div>
+                    )}
                     <div className="text-[12.5px] font-bold text-black mt-0.5 mb-2">
                       No. {fullInvoiceNumber}
                     </div>
@@ -653,6 +661,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
               {/* Document Identity */}
               <div className="py-2.5 border-b border-dashed border-slate-400 space-y-1">
                 <p className="font-bold text-center text-xs tracking-wider">*** FACTURA ELECTRÓNICA ***</p>
+                {isVoided && (
+                  <div className="my-1.5 py-1 border-2 border-red-600 text-red-600 text-center font-black tracking-widest text-xs uppercase">
+                  ANULADO {sale.voidedAt ? new Date(sale.voidedAt).toLocaleDateString('es-EC') : ''}
+                </div>
+                )}
                 <p className="font-extrabold text-center text-xs text-neutral-900">No. {fullInvoiceNumber}</p>
                 <div className="pt-1 space-y-0.5 text-[10px]">
                   <p>

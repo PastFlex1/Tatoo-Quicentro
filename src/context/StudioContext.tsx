@@ -28,6 +28,7 @@ import {
   CashMovementType,
   CashShiftSummary,
   SystemRole,
+  VoidSaleInput,
 } from '../types';
 import {
   ADMIN_ROLE_ID,
@@ -59,6 +60,13 @@ import {
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
 import { reserveDocumentNumber } from '../services/sequenceService';
+import {
+  CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE,
+  consumidorFinalLimitMessage,
+  exceedsConsumidorFinalLimit,
+  isConsumidorFinal,
+} from '../utils/consumidorFinal';
+import { validarIdentificacionEcuador } from '../utils/ecuadorIdValidator';
 import { SequenceType, padCode, parseDocumentSequential } from '../utils/documentNumber';
 import { computeShiftSummary, ShiftTransaction } from '../utils/cashShift';
 import { buildJournalEntries, buildPostings, LedgerPosting, UnifiedJournalEntry } from '../utils/accountingEngine';
@@ -109,7 +117,8 @@ interface StudioContextType {
     appointmentId: string,
     paymentMethod: PaymentMethod,
     tipAmount?: number,
-    finalTotal?: number
+    finalTotal?: number,
+    buyer?: { dni?: string; name?: string }
   ) => Promise<SaleRecord>;
 
   // Actions - Cotizaciones & Proformas
@@ -127,12 +136,15 @@ interface StudioContextType {
     proformaId: string,
     paymentMethod?: PaymentMethod,
     tipAmount?: number,
-    finalTotal?: number
+    finalTotal?: number,
+    buyer?: { dni?: string; name?: string }
   ) => Promise<SaleRecord>;
   getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
   // Actions - Sales
   addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>) => Promise<SaleRecord>;
+  /** Anula una factura a consumidor final o una nota de venta (no admiten nota de crédito) */
+  voidSale: (saleId: string, input: VoidSaleInput) => SaleRecord;
   updateSale: (id: string, updated: Partial<SaleRecord>) => void;
   deleteSale: (id: string) => void;
 
@@ -683,6 +695,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const inRange = (d: string) => isDateInFilter(d, dateFilter);
     return buildJournalEntries({
       sales: filteredSales,
+      voidedSales: sales.filter(x => x.voidedAt && inRange(x.voidedAt)),
       creditNotes: filteredCreditNotes,
       expenses: filteredExpenses,
       settlements: settlements.filter(st => inRange(st.date)),
@@ -693,6 +706,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       shifts: [currentShift, ...pastShifts.filter(p => p.id !== currentShift.id)].filter(sh => sh && inRange(sh.openedAt)),
     });
   }, [
+    sales,
     filteredSales,
     filteredCreditNotes,
     filteredExpenses,
@@ -1193,7 +1207,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     appointmentId: string,
     paymentMethod: PaymentMethod,
     tipAmount: number = 0,
-    finalTotal?: number
+    finalTotal?: number,
+    buyer?: { dni?: string; name?: string }
   ): Promise<SaleRecord> => {
     const apt = appointments.find(a => a.id === appointmentId);
     if (!apt) throw new Error('Cita no encontrada');
@@ -1212,9 +1227,18 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const artistShare = ((total - taxAmount) * commissionPercent) / 100;
     const studioShare = total - artistShare;
 
+    // Identificación del comprador: la ingresada al cobrar, o la de su ficha de cliente
+    const profile = clients.find(
+      c =>
+        c.name.toLowerCase().trim() === apt.clientName.toLowerCase().trim() ||
+        (c.phone && apt.clientPhone && c.phone.replace(/\D/g, '') === apt.clientPhone.replace(/\D/g, ''))
+    );
+    const buyerDni = (buyer?.dni || '').trim() || profile?.dni || undefined;
+
     const sale = await addSale({
       date: new Date().toISOString(),
-      clientName: apt.clientName,
+      clientName: (buyer?.name || '').trim() || apt.clientName,
+      clientDni: buyerDni,
       clientPhone: apt.clientPhone,
       clientEmail: apt.clientEmail,
       serviceCategory: apt.serviceCategory,
@@ -1404,7 +1428,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     proformaId: string,
     paymentMethod: PaymentMethod = 'card',
     tipAmount: number = 0,
-    finalTotal?: number
+    finalTotal?: number,
+    buyer?: { dni?: string; name?: string }
   ): Promise<SaleRecord> => {
     const prof = proformas.find(p => p.id === proformaId);
     if (!prof) throw new Error('Cotización / Proforma no encontrada');
@@ -1425,10 +1450,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const sale = await addSale({
       date: new Date().toISOString(),
-      clientName: prof.clientName,
+      clientName: (buyer?.name || '').trim() || prof.clientName,
       clientPhone: prof.clientPhone,
       clientEmail: prof.clientEmail,
-      clientDni: prof.clientDni,
+      clientDni: (buyer?.dni || '').trim() || prof.clientDni,
       serviceCategory: prof.serviceCategory,
       serviceName: prof.serviceName,
       artistId: prof.artistId,
@@ -1495,7 +1520,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   /** Firma, envía y consulta la autorización de una factura en el SRI. */
   const emitSaleToSri = async (saleId: string, saleSnapshot?: SaleRecord): Promise<SriEmissionResult | null> => {
     const sale = saleSnapshot || salesRef.current.find(s => s.id === saleId);
-    if (!sale || sale.documentType === 'nota_venta' || sale.sriStatus === 'AUTORIZADO') return null;
+    if (!sale || sale.documentType === 'nota_venta' || sale.sriStatus === 'AUTORIZADO' || sale.voidedAt) return null;
     if (sriInFlight.current.has(saleId)) return null;
     sriInFlight.current.add(saleId);
     try {
@@ -1505,7 +1530,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setSales(prev => prev.map(s => (s.id === saleId ? { ...s, sriAccessKey: claveAcceso, sriStatus: 'EN_PROCESO' } : s)));
       const xml = buildFacturaXml({ ...sale, sriAccessKey: claveAcceso }, cfg, claveAcceso);
       const result = await emitElectronicDocument(xml, claveAcceso, cfg, { alreadyReceived: wasInProcess });
-      setSales(prev => prev.map(s => (s.id === saleId ? { ...s, ...applySriResult(result) } : s)));
+      // Si mientras tanto se anuló la venta, el estado "ANULADO" prevalece sobre la respuesta del SRI
+      setSales(prev => prev.map(s => (s.id === saleId && !s.voidedAt ? { ...s, ...applySriResult(result) } : s)));
       return result;
     } finally {
       sriInFlight.current.delete(saleId);
@@ -1603,6 +1629,20 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Sale Operations
   const addSale = async (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): Promise<SaleRecord> => {
     const isNotaVenta = saleData.documentType === 'nota_venta';
+
+    // ---- Reglas del SRI (se validan ANTES de pedir el número, para no gastar un secuencial)
+    const importeTotal = (saleData.total || 0) + (saleData.tipAmount || 0);
+    if (exceedsConsumidorFinalLimit(saleData.clientDni, importeTotal)) {
+      throw new Error(consumidorFinalLimitMessage(importeTotal));
+    }
+    const buyerId = (saleData.clientDni || '').trim();
+    if (!isNotaVenta && !isConsumidorFinal(buyerId)) {
+      const check = validarIdentificacionEcuador(buyerId);
+      if (!check.isValid) {
+        throw new Error(`La identificación del comprador no es válida (${check.errorMessage || 'revise cédula, RUC o pasaporte'}). El SRI rechazaría la factura.`);
+      }
+    }
+
     // El servidor central entrega el número: atómico y consecutivo aunque varios trabajadores facturen a la vez
     const invoiceNumber = await nextDocumentNumber(isNotaVenta ? 'nota_venta' : 'factura');
 
@@ -1829,9 +1869,114 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Credit Note Operations / Notas de Crédito
+  /**
+   * Devuelve a bodega lo que una venta descontó (productos y consumibles de cabina) y lo registra en el Kardex.
+   * Lo usan las notas de crédito y la anulación de comprobantes.
+   */
+  const restockSaleInventory = (targetSale: SaleRecord, reference: string, concept: string) => {
+    const relatedKdx = kardexMovements.filter(m => m.reference === targetSale.invoiceNumber && m.quantityOut > 0);
+    if (relatedKdx.length === 0) return;
+    const nowIso = new Date().toISOString();
+    setInventory(prevInv => {
+      const updatedInv = [...prevInv];
+      const revMovements: KardexMovement[] = [];
+      relatedKdx.forEach(rm => {
+        const idx = updatedInv.findIndex(i => i.id === rm.itemId);
+        if (idx < 0) return;
+        const item = updatedInv[idx];
+        const newStock = item.currentStock + rm.quantityOut;
+        updatedInv[idx] = { ...item, currentStock: newStock };
+        revMovements.push({
+          id: `kdx-rev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: nowIso,
+          itemId: item.id,
+          itemName: item.name,
+          itemSku: item.sku,
+          unit: item.unit,
+          type: 'adjustment',
+          reference,
+          concept,
+          responsible: currentUser?.nombres || 'Administración',
+          quantityIn: rm.quantityOut,
+          unitCostIn: item.unitCost,
+          totalIn: Math.round(rm.quantityOut * item.unitCost * 100) / 100,
+          quantityOut: 0,
+          unitCostOut: 0,
+          totalOut: 0,
+          balanceQty: newStock,
+          balanceUnitCost: item.unitCost,
+          balanceTotal: Math.round(newStock * item.unitCost * 100) / 100,
+        });
+      });
+      if (revMovements.length > 0) setKardexMovements(prev => [...revMovements, ...prev]);
+      return updatedInv;
+    });
+  };
+
+  /**
+   * Anula un comprobante que NO admite nota de crédito:
+   *  - facturas a CONSUMIDOR FINAL (anuladas también en SRI en Línea)
+   *  - notas de venta
+   * La venta se conserva (nunca se borra) marcada como ANULADA; se revierten comisión, propina, caja,
+   * contabilidad e inventario, y la cita / proforma vinculadas quedan libres para volver a facturarse.
+   */
+  const voidSale = (saleId: string, input: VoidSaleInput): SaleRecord => {
+    if (!can('sales.void')) throw new Error('Su rol no tiene permiso para anular comprobantes.');
+    const sale = salesRef.current.find(x => x.id === saleId);
+    if (!sale) throw new Error('No se encontró el comprobante.');
+    if (sale.voidedAt || sale.status === 'cancelled') throw new Error('Este comprobante ya está anulado.');
+    if (sale.creditNoteNumber) throw new Error('Este comprobante ya fue anulado con una nota de crédito.');
+    const isNotaVenta = sale.documentType === 'nota_venta';
+    if (!isNotaVenta && !isConsumidorFinal(sale.clientDni)) {
+      throw new Error('Una factura con comprador identificado no se anula aquí: se modifica con una nota de crédito.');
+    }
+    const reason = (input.reason || '').trim();
+    if (reason.length < 10) throw new Error('Escriba el motivo de la anulación (mínimo 10 caracteres).');
+
+    const nowIso = new Date().toISOString();
+    const u = currentUserRef.current;
+    const voided: SaleRecord = {
+      ...sale,
+      status: 'cancelled',
+      voidedAt: nowIso,
+      voidReason: reason,
+      voidReference: (input.sriReference || '').trim() || undefined,
+      voidSriDate: input.sriVoidDate || undefined,
+      voidedBy: `${u?.nombres || ''} ${u?.apellidos || ''}`.trim() || u?.username,
+      voidRevertedInventory: input.revertInventory,
+      sriStatus: isNotaVenta ? sale.sriStatus : 'ANULADO',
+    };
+    setSales(prev => prev.map(x => (x.id === saleId ? voided : x)));
+    salesRef.current = salesRef.current.map(x => (x.id === saleId ? voided : x));
+
+    if (input.revertInventory) {
+      restockSaleInventory(
+        sale,
+        `ANU-${sale.invoiceNumber}`,
+        `Reingreso a bodega por anulación de ${isNotaVenta ? 'nota de venta' : 'factura'} ${sale.invoiceNumber}`
+      );
+    }
+
+    // La cita y la proforma ligadas a esta venta quedan disponibles para facturarse de nuevo
+    setAppointments(prev => prev.map(a => (a.saleId === saleId ? { ...a, status: 'in_progress', saleId: undefined } : a)));
+    setProformas(prev =>
+      prev.map(pf => (pf.saleId === saleId ? { ...pf, status: 'accepted', saleId: undefined, invoiceNumber: undefined } : pf))
+    );
+    return voided;
+  };
+
   const addCreditNote = async (
     cnData: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }
   ): Promise<CreditNoteRecord> => {
+    // El SRI no permite notas de crédito sobre facturas a consumidor final
+    const targetSale = salesRef.current.find(x => x.id === cnData.affectedInvoiceId);
+    if (targetSale && isConsumidorFinal(targetSale.clientDni)) {
+      throw new Error(CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE);
+    }
+    if (!targetSale && isConsumidorFinal(cnData.clientDni)) {
+      throw new Error(CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE);
+    }
+
     // Serie propia de notas de crédito (001-001-000000001), independiente de la de facturas
     const creditNoteNumber = await nextDocumentNumber('nota_credito');
 
@@ -1872,50 +2017,11 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (cnData.revertInventory && cnData.affectedInvoiceId) {
       const targetSale = sales.find(s => s.id === cnData.affectedInvoiceId);
       if (targetSale) {
-        const relatedKdx = kardexMovements.filter(m => m.reference === targetSale.invoiceNumber);
-        if (relatedKdx.length > 0) {
-          setInventory(prevInv => {
-            const updatedInv = [...prevInv];
-            const revMovements: KardexMovement[] = [];
-
-            relatedKdx.forEach(rm => {
-              const idx = updatedInv.findIndex(i => i.id === rm.itemId);
-              if (idx >= 0 && rm.quantityOut > 0) {
-                const item = updatedInv[idx];
-                const newStock = item.currentStock + rm.quantityOut;
-                updatedInv[idx] = { ...item, currentStock: newStock };
-
-                revMovements.push({
-                  id: `kdx-nc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  date: now.toISOString(),
-                  itemId: item.id,
-                  itemName: item.name,
-                  itemSku: item.sku,
-                  unit: item.unit,
-                  type: 'adjustment',
-                  reference: newCN.creditNoteNumber,
-                  concept: `Reingreso a bodega por Nota de Crédito ${newCN.creditNoteNumber} (Fac. ${targetSale.invoiceNumber})`,
-                  responsible: currentUser?.nombres || 'Administración',
-                  quantityIn: rm.quantityOut,
-                  unitCostIn: item.unitCost,
-                  totalIn: Math.round(rm.quantityOut * item.unitCost * 100) / 100,
-                  quantityOut: 0,
-                  unitCostOut: 0,
-                  totalOut: 0,
-                  balanceQty: newStock,
-                  balanceUnitCost: item.unitCost,
-                  balanceTotal: Math.round(newStock * item.unitCost * 100) / 100,
-                });
-              }
-            });
-
-            if (revMovements.length > 0) {
-              setKardexMovements(prev => [...revMovements, ...prev]);
-            }
-
-            return updatedInv;
-          });
-        }
+        restockSaleInventory(
+          targetSale,
+          newCN.creditNoteNumber,
+          `Reingreso a bodega por Nota de Crédito ${newCN.creditNoteNumber} (Fac. ${targetSale.invoiceNumber})`
+        );
       }
     }
 
@@ -2605,6 +2711,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         accountingPostings,
         emitSaleToSri,
         emitCreditNoteToSri,
+        voidSale,
       }}
     >
       {children}
@@ -2713,6 +2820,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   accountingEntries: [],
   accountingPostings: [],
   emitSaleToSri: async () => null,
+  voidSale: () => ({} as SaleRecord),
   emitCreditNoteToSri: async () => null,
 };
 

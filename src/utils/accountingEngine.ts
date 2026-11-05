@@ -54,6 +54,7 @@ export type JournalSource =
   | 'manual'
   | 'sale'
   | 'credit_note'
+  | 'void'
   | 'expense'
   | 'purchase'
   | 'kardex'
@@ -64,6 +65,7 @@ export const JOURNAL_SOURCE_LABELS: Record<JournalSource, string> = {
   manual: 'Manual',
   sale: 'Ventas',
   credit_note: 'Notas de Crédito',
+  void: 'Anulaciones',
   expense: 'Gastos',
   purchase: 'Compras / Inventario',
   kardex: 'Kardex (Consumo)',
@@ -100,6 +102,8 @@ export interface LedgerPosting {
 
 export interface AccountingInput {
   sales: SaleRecord[];
+  /** Comprobantes anulados cuya fecha de anulación cae en el período (generan el asiento de reverso) */
+  voidedSales: SaleRecord[];
   creditNotes: CreditNoteRecord[];
   expenses: ExpenseRecord[];
   settlements: ArtistSettlement[];
@@ -173,6 +177,37 @@ const cashPortionOfSale = (s: SaleRecord, collected: number): number => {
   return 0;
 };
 
+/** Líneas del asiento de una venta (cobro, ingresos por categoría, IVA, propina y comisión del artista). */
+function saleEntryLines(s: SaleRecord): JournalEntryLine[] {
+  const tip = r2(s.tipAmount || 0);
+  const tax = r2(s.taxAmount || 0);
+  const collected = r2((s.total || 0) + tip);
+  const revenue = r2(collected - tax - tip);
+  const cash = r2(cashPortionOfSale(s, collected));
+  const bank = r2(collected - cash);
+  const b = new EntryBuilder(`sale-${s.id}`)
+    .debit('1101', cash, `Cobro en efectivo: ${s.serviceName}`)
+    .debit('1102', bank, `Cobro ${s.paymentMethod === 'card' ? 'con tarjeta' : s.paymentMethod === 'split' ? 'mixto (POS/banco)' : 'por transferencia'}`);
+  // Ingreso por cuenta según la categoría de cada línea (tatuaje, piercing, joyería…)
+  const lines = saleLines(s);
+  const byAccount = new Map<string, number>();
+  lines.forEach(l => byAccount.set(revenueAccountFor(l.category), (byAccount.get(revenueAccountFor(l.category)) || 0) + l.base));
+  const linesTotal = [...byAccount.values()].reduce((a, v) => a + v, 0);
+  let assigned = 0;
+  const accounts = [...byAccount.entries()];
+  accounts.forEach(([acc, v], i) => {
+    // La última cuenta absorbe la diferencia de redondeo para que el asiento cuadre
+    const amount = i === accounts.length - 1 ? r2(revenue - assigned) : r2(linesTotal > 0 ? (v / linesTotal) * revenue : 0);
+    assigned += amount;
+    b.credit(acc, amount, lines.length > 1 ? `Venta (${acc === '4101' ? 'tatuaje' : acc === '4102' ? 'piercing' : 'productos'})` : `Venta: ${s.serviceName}`);
+  });
+  b.credit('2102', tax, `IVA en ventas (${s.taxRate || 0}%)`)
+    .credit('2101', tip, `Propina para ${s.artistName}`)
+    .debit('5101', s.artistShare || 0, `Comisión ${s.artistName} (${s.artistCommissionPercent || 0}%)`)
+    .credit('2101', s.artistShare || 0, `Comisión por pagar a ${s.artistName}`);
+  return b.lines;
+}
+
 export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry[] {
   const list: UnifiedJournalEntry[] = [];
   const push = (e: UnifiedJournalEntry | null) => {
@@ -214,35 +249,9 @@ export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry
   // ---------------------------------------------------------------- 2. VENTAS (FACTURAS / NOTAS DE VENTA)
   // Las ventas anuladas por nota de crédito se mantienen: la reversa la hace la nota de crédito.
   input.sales
-    .filter(s => s.status !== 'cancelled' || Boolean(s.creditNoteNumber))
+    // Las ventas anuladas (por nota de crédito o por anulación) se conservan: el reverso es un asiento aparte
+    .filter(s => s.status !== 'cancelled' || Boolean(s.creditNoteNumber) || Boolean(s.voidedAt))
     .forEach(s => {
-      const tip = r2(s.tipAmount || 0);
-      const tax = r2(s.taxAmount || 0);
-      const collected = r2((s.total || 0) + tip);
-      const revenue = r2(collected - tax - tip);
-      const cash = r2(cashPortionOfSale(s, collected));
-      const bank = r2(collected - cash);
-      const b = new EntryBuilder(`sale-${s.id}`)
-        .debit('1101', cash, `Cobro en efectivo: ${s.serviceName}`)
-        .debit('1102', bank, `Cobro ${s.paymentMethod === 'card' ? 'con tarjeta' : s.paymentMethod === 'split' ? 'mixto (POS/banco)' : 'por transferencia'}`);
-      // Ingreso por cuenta según la categoría de cada línea (tatuaje, piercing, joyería…)
-      const lines = saleLines(s);
-      const byAccount = new Map<string, number>();
-      lines.forEach(l => byAccount.set(revenueAccountFor(l.category), (byAccount.get(revenueAccountFor(l.category)) || 0) + l.base));
-      const linesTotal = [...byAccount.values()].reduce((a, v) => a + v, 0);
-      let assigned = 0;
-      const accounts = [...byAccount.entries()];
-      accounts.forEach(([acc, v], i) => {
-        // La última cuenta absorbe la diferencia de redondeo para que el asiento cuadre
-        const amount = i === accounts.length - 1 ? r2(revenue - assigned) : r2(linesTotal > 0 ? (v / linesTotal) * revenue : 0);
-        assigned += amount;
-        b.credit(acc, amount, lines.length > 1 ? `Venta (${acc === '4101' ? 'tatuaje' : acc === '4102' ? 'piercing' : 'productos'})` : `Venta: ${s.serviceName}`);
-      });
-      b
-        .credit('2102', tax, `IVA en ventas (${s.taxRate || 0}%)`)
-        .credit('2101', tip, `Propina para ${s.artistName}`)
-        .debit('5101', s.artistShare || 0, `Comisión ${s.artistName} (${s.artistCommissionPercent || 0}%)`)
-        .credit('2101', s.artistShare || 0, `Comisión por pagar a ${s.artistName}`);
       push(
         finalize(
           {
@@ -254,10 +263,37 @@ export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry
             source: 'sale',
             entryType: s.documentType === 'nota_venta' ? 'NOTA DE VENTA' : 'FACTURA',
           },
-          b.lines
+          saleEntryLines(s)
         )
       );
     });
+
+  // ---------------------------------------------------------------- 2b. ANULACIÓN DE COMPROBANTES (factura a consumidor final / nota de venta)
+  // El asiento de reverso es exactamente el de la venta con Debe y Haber intercambiados.
+  input.voidedSales.forEach(s => {
+    if (!s.voidedAt) return;
+    const reversed = saleEntryLines(s).map((l, i) => ({
+      ...l,
+      id: `void-${s.id}-${i}`,
+      debit: l.credit,
+      credit: l.debit,
+      concept: `Reverso: ${l.concept || ''}`.trim(),
+    }));
+    push(
+      finalize(
+        {
+          id: `void-entry-${s.id}`,
+          entryNumber: `ANU-${s.invoiceNumber}`,
+          date: s.voidedAt,
+          reference: s.invoiceNumber,
+          concept: `Anulación de ${s.documentType === 'nota_venta' ? 'nota de venta' : 'factura'} ${s.invoiceNumber}: ${s.voidReason || ''}`.trim(),
+          source: 'void',
+          entryType: 'ANULACIÓN DE COMPROBANTE',
+        },
+        reversed
+      )
+    );
+  });
 
   // ---------------------------------------------------------------- 3. NOTAS DE CRÉDITO (reverso de ventas)
   input.creditNotes.forEach(cn => {

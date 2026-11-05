@@ -684,7 +684,7 @@ export const SettingsView: React.FC = () => {
                     value={logoUrl}
                     onChange={e => setLogoUrl(e.target.value)}
                     placeholder="https://ejemplo.com/logo-estudio.png"
-                    className="flex-1 bg-[#101014] border border-[#26262F] focus:border-[#FF3366] rounded-lg px-2.5 py-1 text-[11px] text-white font-mono placeholder-neutral-600 outline-none"
+                    className="flex-1 min-w-0 bg-[#101014] border border-[#26262F] focus:border-[#FF3366] rounded-lg px-2.5 py-1 text-[11px] text-white font-mono placeholder-neutral-600 outline-none"
                   />
                 </div>
               </div>

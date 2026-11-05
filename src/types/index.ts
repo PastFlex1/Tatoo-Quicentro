@@ -9,6 +9,16 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'split';
 
 export type SaleStatus = 'completed' | 'deposit_only' | 'pending_balance' | 'cancelled';
 
+/** Datos que se registran al anular un comprobante */
+export interface VoidSaleInput {
+  reason: string;
+  /** N° / referencia de la solicitud de anulación en SRI en Línea */
+  sriReference?: string;
+  /** Fecha de la anulación en el SRI (YYYY-MM-DD) */
+  sriVoidDate?: string;
+  revertInventory: boolean;
+}
+
 /** Línea de detalle de una venta (servicio o producto). Precios sin IVA. */
 export interface SaleLineItem {
   id: string;
@@ -60,6 +70,13 @@ export interface SaleRecord {
   materialCostDeducted?: number; // Insumos cobrados al artista si aplica
   inventoryItemId?: string; // ID del producto de inventario vendido directamente
   consumedSupplies?: { itemId: string; name: string; quantity: number }[]; // Consumibles descargados en cabina
+  // ---- Anulación del comprobante (facturas a consumidor final y notas de venta)
+  voidedAt?: string;
+  voidReason?: string;
+  voidReference?: string;
+  voidSriDate?: string;
+  voidedBy?: string;
+  voidRevertedInventory?: boolean;
   /** Líneas de la factura (POS con varios ítems). Si no existe, la venta es de una sola línea. */
   items?: SaleLineItem[];
   status: SaleStatus;

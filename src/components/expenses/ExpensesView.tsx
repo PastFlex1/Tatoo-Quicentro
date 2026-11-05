@@ -474,7 +474,7 @@ export const ExpensesView: React.FC<ExpensesViewProps> = ({ onOpenNewExpense }) 
 
       {/* Modal Detalle Clave de Acceso SRI */}
       {selectedSriKey && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
           <div className="bg-[#17171C] border border-[#2B2B36] rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#24242B] pb-3">
               <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
