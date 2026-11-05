@@ -6,14 +6,16 @@ import { SaleRecord } from '../../types';
 interface SalesNotePrintModalProps {
   sale: SaleRecord | null;
   onClose: () => void;
+  initialFormat?: 'THERMAL' | 'A4';
 }
 
 export const SalesNotePrintModal: React.FC<SalesNotePrintModalProps> = ({
   sale,
   onClose,
+  initialFormat = 'THERMAL',
 }) => {
   const { settings, formatMoney } = useStudio();
-  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>('THERMAL');
+  const [ticketFormat, setTicketFormat] = useState<'THERMAL' | 'A4'>(initialFormat);
 
   if (!sale) return null;
 

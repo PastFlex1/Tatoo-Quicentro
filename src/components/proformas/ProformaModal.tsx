@@ -57,7 +57,13 @@ export const ProformaModal: React.FC<ProformaModalProps> = ({
     window.open(url, '_blank');
   };
 
-  const getStatusBadge = (status: Proforma['status']) => {
+  const getStatusBadge = (status: Proforma['status'], invoiceNumber?: string) => {
+    if (invoiceNumber || status === 'invoiced') {
+      return {
+        label: `Facturada (${invoiceNumber ? 'N° ' + invoiceNumber : 'Emitida'})`,
+        className: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+      };
+    }
     switch (status) {
       case 'accepted':
         return {
@@ -88,7 +94,7 @@ export const ProformaModal: React.FC<ProformaModalProps> = ({
     }
   };
 
-  const statusBadge = getStatusBadge(proforma.status);
+  const statusBadge = getStatusBadge(proforma.status, proforma.invoiceNumber);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">

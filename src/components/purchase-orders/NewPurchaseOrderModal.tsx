@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   FileText,
@@ -14,8 +14,11 @@ import {
   Layers,
   AlertCircle,
   Clock,
+  Search,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
-import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus } from '../../types';
+import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, Supplier, InventoryItem } from '../../types';
 import { useStudio } from '../../context/StudioContext';
 
 interface NewPurchaseOrderModalProps {
@@ -41,6 +44,11 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   const [supplierPhone, setSupplierPhone] = useState('');
   const [supplierAddress, setSupplierAddress] = useState('');
 
+  // Searchable Supplier Combobox state
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
+  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
+  const supplierDropdownRef = useRef<HTMLDivElement>(null);
+
   // Order Details
   const [orderNumber, setOrderNumber] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -63,7 +71,53 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
   const [itemUnitCost, setItemUnitCost] = useState<number>(0);
   const [itemTaxRate, setItemTaxRate] = useState<number>(15);
 
+  // Searchable Inventory Combobox state
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+  const [isInventoryDropdownOpen, setIsInventoryDropdownOpen] = useState(false);
+  const inventoryDropdownRef = useRef<HTMLDivElement>(null);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (supplierDropdownRef.current && !supplierDropdownRef.current.contains(e.target as Node)) {
+        setIsSupplierDropdownOpen(false);
+      }
+      if (inventoryDropdownRef.current && !inventoryDropdownRef.current.contains(e.target as Node)) {
+        setIsInventoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Filtered Suppliers for searchable dropdown
+  const filteredSuppliers = useMemo(() => {
+    const q = supplierSearchQuery.trim().toLowerCase();
+    if (!q) return suppliers;
+    return suppliers.filter(
+      sup =>
+        sup.razonSocial.toLowerCase().includes(q) ||
+        (sup.nombreComercial && sup.nombreComercial.toLowerCase().includes(q)) ||
+        sup.ruc.toLowerCase().includes(q) ||
+        (sup.contactoNombre && sup.contactoNombre.toLowerCase().includes(q)) ||
+        (sup.ciudad && sup.ciudad.toLowerCase().includes(q))
+    );
+  }, [suppliers, supplierSearchQuery]);
+
+  // Filtered Inventory Items for searchable dropdown
+  const filteredInventory = useMemo(() => {
+    const q = inventorySearchQuery.trim().toLowerCase();
+    if (!q) return inventory;
+    return inventory.filter(
+      inv =>
+        inv.name.toLowerCase().includes(q) ||
+        (inv.sku && inv.sku.toLowerCase().includes(q)) ||
+        (inv.category && inv.category.toLowerCase().includes(q)) ||
+        (inv.supplier && inv.supplier.toLowerCase().includes(q))
+    );
+  }, [inventory, inventorySearchQuery]);
 
   // Auto-generate next Order Number
   const generateNextOrderNumber = () => {
@@ -80,6 +134,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
       setSupplierEmail(orderToEdit.supplierEmail || '');
       setSupplierPhone(orderToEdit.supplierPhone || '');
       setSupplierAddress(orderToEdit.supplierAddress || '');
+      setSupplierSearchQuery(`${orderToEdit.supplierName} (${orderToEdit.supplierRuc})`);
       setOrderNumber(orderToEdit.orderNumber);
       setDate(orderToEdit.date);
       setExpectedDate(orderToEdit.expectedDate || '');
@@ -88,6 +143,9 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
       setStatus(orderToEdit.status);
       setNotes(orderToEdit.notes || '');
       setItems(orderToEdit.items || []);
+      setInventorySearchQuery('');
+      setIsSupplierDropdownOpen(false);
+      setIsInventoryDropdownOpen(false);
     } else {
       // New Order defaults
       const nextNum = generateNextOrderNumber();
@@ -100,9 +158,14 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
       setNotes('');
       setItems([]);
       setErrorMessage(null);
+      setInventorySearchQuery('');
+      setIsSupplierDropdownOpen(false);
+      setIsInventoryDropdownOpen(false);
 
       if (suppliers.length > 0) {
         handleSupplierChange(suppliers[0].id);
+      } else {
+        setSupplierSearchQuery('');
       }
     }
   }, [orderToEdit, isOpen]);
@@ -111,22 +174,28 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
     setSelectedSupplierId(supId);
     const sup = suppliers.find(s => s.id === supId);
     if (sup) {
-      setSupplierName(sup.razonSocial || sup.nombreComercial || '');
+      const displayName = sup.razonSocial || sup.nombreComercial || '';
+      setSupplierName(displayName);
       setSupplierRuc(sup.ruc);
       setSupplierEmail(sup.email || '');
       setSupplierPhone(sup.telefono || '');
       setSupplierAddress(sup.direccion || '');
+      setSupplierSearchQuery(`${displayName} (${sup.ruc})`);
       if (sup.diasCredito && sup.diasCredito > 0) {
         setPaymentTerms(`Crédito ${sup.diasCredito} días`);
       } else {
         setPaymentTerms('Contado');
       }
     }
+    setIsSupplierDropdownOpen(false);
   };
 
   const handleSelectInventoryItem = (invId: string) => {
     setSelectedInventoryId(invId);
-    if (!invId) return;
+    if (!invId) {
+      setInventorySearchQuery('');
+      return;
+    }
 
     const inv = inventory.find(i => i.id === invId);
     if (inv) {
@@ -136,7 +205,9 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
       setItemUnit(inv.unit || 'unidad');
       setItemUnitCost(inv.unitCost || 0);
       setItemTaxRate(typeof inv.taxRate === 'number' ? inv.taxRate : 15);
+      setInventorySearchQuery(`${inv.name}${inv.sku ? ` [${inv.sku}]` : ''}`);
     }
+    setIsInventoryDropdownOpen(false);
   };
 
   const handleAddItem = () => {
@@ -176,6 +247,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
 
     // Reset single item form
     setSelectedInventoryId('');
+    setInventorySearchQuery('');
     setItemName('');
     setItemCode('');
     setItemQuantity(1);
@@ -294,23 +366,135 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Select Supplier */}
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                  Proveedor Registrado *
-                </label>
-                <select
-                  value={selectedSupplierId}
-                  onChange={e => handleSupplierChange(e.target.value)}
-                  className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366] transition-colors"
-                >
-                  <option value="">-- Seleccionar Proveedor --</option>
-                  {suppliers.map(sup => (
-                    <option key={sup.id} value={sup.id}>
-                      {sup.razonSocial || sup.nombreComercial} ({sup.ruc})
-                    </option>
-                  ))}
-                </select>
+              {/* Searchable Select Supplier (Escribir o desplegar lista) */}
+              <div className="sm:col-span-2 relative" ref={supplierDropdownRef}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-neutral-300">
+                    Proveedor Registrado (Escribe o selecciona) *
+                  </label>
+                  {selectedSupplierId && (
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                      ✓ Proveedor seleccionado
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={supplierSearchQuery}
+                    onFocus={() => setIsSupplierDropdownOpen(true)}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setSupplierSearchQuery(val);
+                      setIsSupplierDropdownOpen(true);
+                      if (!val.trim()) {
+                        setSelectedSupplierId('');
+                        setSupplierName('');
+                        setSupplierRuc('');
+                      } else {
+                        setSupplierName(val);
+                      }
+                    }}
+                    placeholder="Buscar por nombre comercial, razón social o RUC..."
+                    className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl pl-9 pr-14 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#FF3366] transition-colors"
+                  />
+
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {supplierSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSupplierSearchQuery('');
+                          setSelectedSupplierId('');
+                          setSupplierName('');
+                          setSupplierRuc('');
+                          setIsSupplierDropdownOpen(true);
+                        }}
+                        className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-[#24242F] transition-colors cursor-pointer"
+                        title="Limpiar búsqueda de proveedor"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsSupplierDropdownOpen(prev => !prev)}
+                      className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-[#24242F] transition-colors cursor-pointer"
+                      title="Desplegar lista de proveedores"
+                    >
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform ${
+                          isSupplierDropdownOpen ? 'rotate-180 text-[#FF3366]' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dropdown List of Suppliers */}
+                {isSupplierDropdownOpen && (
+                  <div className="absolute z-40 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-[#141419] border border-[#2F2F3D] rounded-2xl shadow-2xl divide-y divide-[#22222C] custom-scrollbar">
+                    {filteredSuppliers.length === 0 ? (
+                      <div className="p-3.5 text-center text-xs text-neutral-400">
+                        <p className="font-semibold text-white">No se encontraron proveedores que coincidan</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                          Puedes usar el nombre escrito manualmente e ingresar su RUC abajo.
+                        </p>
+                      </div>
+                    ) : (
+                      filteredSuppliers.map(sup => {
+                        const isSelected = sup.id === selectedSupplierId;
+                        return (
+                          <button
+                            key={sup.id}
+                            type="button"
+                            onClick={() => handleSupplierChange(sup.id)}
+                            className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#FF3366]/15 text-white'
+                                : 'hover:bg-[#1E1E26] text-neutral-200'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-white truncate">
+                                  {sup.razonSocial}
+                                </span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-[#FF3366] shrink-0" />}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-neutral-400 mt-0.5">
+                                <span className="font-mono text-neutral-300">RUC: {sup.ruc}</span>
+                                {sup.nombreComercial && (
+                                  <span className="text-[#FF3366] font-medium">• {sup.nombreComercial}</span>
+                                )}
+                                {sup.ciudad && <span>• {sup.ciudad}</span>}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-md font-mono text-[10px] font-bold border ${
+                                  (sup.diasCredito ?? 0) > 0
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                                    : 'bg-neutral-800 text-neutral-300 border-neutral-700'
+                                }`}
+                              >
+                                {(sup.diasCredito ?? 0) === 0 ? 'Contado' : `${sup.diasCredito} días`}
+                              </span>
+                              {(sup.diasCredito ?? 0) > 0 && (sup.cupoCredito ?? 0) > 0 && (
+                                <span className="block text-[9.5px] font-mono text-neutral-400 mt-0.5">
+                                  Cupo: {formatMoney(sup.cupoCredito)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Order Number */}
@@ -434,25 +618,134 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
               </span>
             </div>
 
-            {/* Quick selector from Inventory */}
+            {/* Quick selector from Inventory (Searchable Combobox + Manual fields) */}
             <div className="bg-[#141419] p-3.5 rounded-xl border border-[#282833] space-y-3">
-              <div className="text-xs font-semibold text-neutral-400">
-                Seleccionar desde catálogo de inventario (o escribir manual):
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-neutral-300">
+                  Buscar insumo / producto en inventario (escribe para filtrar o despliega la lista):
+                </div>
+                {selectedInventoryId && (
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/25">
+                    ✓ Vinculado a Bodega / Kardex
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                <div className="sm:col-span-5">
-                  <select
-                    value={selectedInventoryId}
-                    onChange={e => handleSelectInventoryItem(e.target.value)}
-                    className="w-full bg-[#1A1A22] border border-[#30303D] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
-                  >
-                    <option value="">-- Buscar en Inventario Existente --</option>
-                    {inventory.map(inv => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.name} (Stock: {inv.currentStock} {inv.unit} | Costo: {formatMoney(inv.unitCost)})
-                      </option>
-                    ))}
-                  </select>
+                {/* Searchable Inventory Combobox */}
+                <div className="sm:col-span-5 relative" ref={inventoryDropdownRef}>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={inventorySearchQuery}
+                      onFocus={() => setIsInventoryDropdownOpen(true)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setInventorySearchQuery(val);
+                        setIsInventoryDropdownOpen(true);
+                        if (!val.trim()) {
+                          setSelectedInventoryId('');
+                        } else if (!selectedInventoryId) {
+                          // Si escribe directamente en el buscador, también autocompleta la descripción
+                          setItemName(val);
+                        }
+                      }}
+                      placeholder="Escribe nombre, SKU o despliega..."
+                      className="w-full bg-[#1A1A22] border border-[#30303D] rounded-xl pl-9 pr-14 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#FF3366] transition-colors"
+                    />
+
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {inventorySearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInventorySearchQuery('');
+                            setSelectedInventoryId('');
+                            setIsInventoryDropdownOpen(true);
+                          }}
+                          className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
+                          title="Limpiar búsqueda de insumo"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsInventoryDropdownOpen(prev => !prev)}
+                        className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-[#282834] transition-colors cursor-pointer"
+                        title="Desplegar lista de insumos"
+                      >
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform ${
+                            isInventoryDropdownOpen ? 'rotate-180 text-[#FF3366]' : ''
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown List of Inventory Items */}
+                  {isInventoryDropdownOpen && (
+                    <div className="absolute z-40 left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-[#16161D] border border-[#323242] rounded-2xl shadow-2xl divide-y divide-[#23232F] custom-scrollbar">
+                      {filteredInventory.length === 0 ? (
+                        <div className="p-3.5 text-center text-xs text-neutral-400">
+                          <p className="font-semibold text-white">No hay insumos que coincidan con "{inventorySearchQuery}"</p>
+                          <p className="text-[10.5px] text-neutral-500 mt-0.5">
+                            Puedes agregarlo como ítem manual completando la descripción y el costo.
+                          </p>
+                        </div>
+                      ) : (
+                        filteredInventory.map(inv => {
+                          const isSelected = inv.id === selectedInventoryId;
+                          const isLowStock = inv.currentStock <= (inv.minStockAlert || 5);
+                          return (
+                            <button
+                              key={inv.id}
+                              type="button"
+                              onClick={() => handleSelectInventoryItem(inv.id)}
+                              className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#FF3366]/15 text-white'
+                                  : 'hover:bg-[#20202A] text-neutral-200'
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-xs text-white truncate">
+                                    {inv.name}
+                                  </span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-[#FF3366] shrink-0" />}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-[10px] text-neutral-400 mt-0.5">
+                                  {inv.sku && (
+                                    <span className="font-mono text-neutral-300 bg-[#121217] px-1.5 py-0.2 rounded border border-[#272733]">
+                                      {inv.sku}
+                                    </span>
+                                  )}
+                                  <span
+                                    className={`font-mono font-semibold ${
+                                      isLowStock ? 'text-amber-400' : 'text-emerald-400'
+                                    }`}
+                                  >
+                                    Stock: {inv.currentStock} {inv.unit}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0 font-mono">
+                                <span className="text-xs font-bold text-white block">
+                                  {formatMoney(inv.unitCost)}
+                                </span>
+                                <span className="text-[9.5px] text-neutral-500 block">
+                                  Costo unit.
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-4">

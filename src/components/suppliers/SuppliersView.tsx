@@ -69,6 +69,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
   const [formDireccion, setFormDireccion] = useState('');
   const [formCiudad, setFormCiudad] = useState('QUITO');
   const [formDiasCredito, setFormDiasCredito] = useState<number>(15);
+  const [formCupoCredito, setFormCupoCredito] = useState<number>(1500);
   const [formBancoNombre, setFormBancoNombre] = useState('Banco Pichincha');
   const [formBancoTipoCuenta, setFormBancoTipoCuenta] = useState<'CORRIENTE' | 'AHORROS'>('CORRIENTE');
   const [formBancoNumeroCuenta, setFormBancoNumeroCuenta] = useState('');
@@ -182,6 +183,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
     setFormDireccion('');
     setFormCiudad('QUITO');
     setFormDiasCredito(15);
+    setFormCupoCredito(1500);
     setFormBancoNombre('Banco Pichincha');
     setFormBancoTipoCuenta('CORRIENTE');
     setFormBancoNumeroCuenta('');
@@ -206,6 +208,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
     setFormDireccion(sup.direccion || '');
     setFormCiudad(sup.ciudad || 'QUITO');
     setFormDiasCredito(sup.diasCredito ?? 15);
+    setFormCupoCredito(sup.cupoCredito ?? ((sup.diasCredito ?? 0) > 0 ? 1500 : 0));
     setFormBancoNombre(sup.bancoNombre || 'Banco Pichincha');
     setFormBancoTipoCuenta(sup.bancoTipoCuenta || 'CORRIENTE');
     setFormBancoNumeroCuenta(sup.bancoNumeroCuenta || '');
@@ -282,6 +285,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
       direccion: formDireccion.trim() || undefined,
       ciudad: formCiudad.trim().toUpperCase() || 'QUITO',
       diasCredito: formDiasCredito,
+      cupoCredito: formDiasCredito > 0 ? Math.max(0, formCupoCredito) : 0,
       bancoNombre: formBancoNombre.trim() || undefined,
       bancoTipoCuenta: formBancoTipoCuenta,
       bancoNumeroCuenta: formBancoNumeroCuenta.trim() || undefined,
@@ -540,6 +544,14 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                         </span>
                       </div>
                     )}
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#23232C]">
+                      <span className="text-neutral-400">Condición Crédito:</span>
+                      <span className="font-mono font-bold text-emerald-400 text-[10.5px]">
+                        {(sup.diasCredito ?? 0) === 0
+                          ? 'Contado ($0.00)'
+                          : `${sup.diasCredito} días · Cupo: ${formatMoney(sup.cupoCredito ?? 0)}`}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
@@ -698,9 +710,20 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
 
                       {/* Crédito */}
                       <td className="py-3 px-4 whitespace-nowrap text-center">
-                        <span className="font-mono font-bold text-xs text-neutral-200">
-                          {sup.diasCredito === 0 ? 'Contado' : `${sup.diasCredito} días`}
-                        </span>
+                        {(sup.diasCredito ?? 0) === 0 ? (
+                          <span className="inline-block px-2 py-0.5 rounded-md bg-neutral-800/80 border border-neutral-700 font-mono font-bold text-[10.5px] text-neutral-300">
+                            Contado
+                          </span>
+                        ) : (
+                          <div>
+                            <span className="font-mono font-bold text-xs text-emerald-400 block">
+                              {formatMoney(sup.cupoCredito ?? 0)}
+                            </span>
+                            <span className="inline-block text-[10px] font-mono font-semibold text-neutral-200 bg-[#1F1F27] px-1.5 py-0.2 rounded border border-[#2D2D3A] mt-0.5">
+                              Plazo: {sup.diasCredito} días
+                            </span>
+                          </div>
+                        )}
                         <span className="block text-[9.5px] text-neutral-500 mt-0.5">
                           Ret. IVA: {sup.retencionIvaPorcentaje ?? 30}%
                         </span>
@@ -980,7 +1003,132 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                 </div>
               </div>
 
-              {/* Sección 3: Datos Bancarios & Condiciones de Pago */}
+              {/* Sección 3: Condiciones de Crédito Comercial & Cupo Asignado */}
+              <div className="p-3.5 bg-[#121215] border border-[#272730] rounded-2xl space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#222228] pb-2">
+                  <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Condiciones de Crédito Comercial (Días y Cantidad de Crédito)</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                    {formDiasCredito === 0
+                      ? 'Modalidad: Pago de Contado'
+                      : `Crédito: ${formDiasCredito} días · Cupo: ${formatMoney(formCupoCredito)}`}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Días de Crédito */}
+                  <div className="p-3 bg-[#17171C] border border-[#2B2B36] rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-semibold text-neutral-200 text-xs">
+                        Días de Crédito (Plazo de Pago)
+                      </label>
+                      <span className="text-[10px] text-neutral-400 font-mono">0 = Contado</span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="180"
+                        value={formDiasCredito}
+                        onChange={e => {
+                          const days = Math.max(0, parseInt(e.target.value, 10) || 0);
+                          setFormDiasCredito(days);
+                          if (days === 0) {
+                            setFormCupoCredito(0);
+                          } else if (formCupoCredito === 0) {
+                            setFormCupoCredito(1500);
+                          }
+                        }}
+                        placeholder="Ej: 15, 30, 60"
+                        className="w-full px-3 py-2 pr-14 bg-[#121215] border border-[#2B2B36] rounded-xl text-white font-mono font-bold text-sm focus:border-[#FF3366] outline-none"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-neutral-400 pointer-events-none">
+                        días
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {[
+                        { label: 'Contado (0d)', value: 0 },
+                        { label: '15 días', value: 15 },
+                        { label: '30 días', value: 30 },
+                        { label: '45 días', value: 45 },
+                        { label: '60 días', value: 60 },
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setFormDiasCredito(opt.value);
+                            if (opt.value === 0) {
+                              setFormCupoCredito(0);
+                            } else if (formCupoCredito === 0) {
+                              setFormCupoCredito(1500);
+                            }
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                            formDiasCredito === opt.value
+                              ? 'bg-[#FF3366]/20 text-[#FF3366] border-[#FF3366]/40'
+                              : 'bg-[#121215] text-neutral-400 border-[#25252E] hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cantidad / Cupo de Crédito ($ USD) */}
+                  <div className="p-3 bg-[#17171C] border border-[#2B2B36] rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-semibold text-neutral-200 text-xs">
+                        Cantidad / Cupo de Crédito ($ USD)
+                      </label>
+                      <span className="text-[10px] text-emerald-400 font-mono">Monto máximo</span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-emerald-400 pointer-events-none">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="50"
+                        disabled={formDiasCredito === 0}
+                        value={formDiasCredito === 0 ? 0 : formCupoCredito}
+                        onChange={e => setFormCupoCredito(Math.max(0, parseFloat(e.target.value) || 0))}
+                        placeholder="Ej: 1500.00"
+                        className="w-full pl-7 pr-14 py-2 bg-[#121215] border border-[#2B2B36] rounded-xl text-emerald-400 font-mono font-bold text-sm focus:border-emerald-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-semibold text-neutral-400 pointer-events-none">
+                        USD
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {[500, 1500, 2500, 3500, 5000].map(amount => (
+                        <button
+                          key={amount}
+                          type="button"
+                          onClick={() => {
+                            if (formDiasCredito === 0) setFormDiasCredito(15);
+                            setFormCupoCredito(amount);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer border ${
+                            formDiasCredito > 0 && formCupoCredito === amount
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-[#121215] text-neutral-400 border-[#25252E] hover:text-white'
+                          }`}
+                        >
+                          ${amount.toLocaleString('en-US')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 4: Datos Bancarios & Retenciones SRI */}
               <div className="p-3.5 bg-[#121215] border border-[#272730] rounded-2xl space-y-3">
                 <span className="font-bold text-white text-xs flex items-center gap-1.5 border-b border-[#222228] pb-2">
                   <CreditCard className="w-3.5 h-3.5 text-[#FF3366]" />
@@ -1035,21 +1183,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     />
                   </div>
 
-                  <div>
-                    <label className="block font-semibold text-neutral-300 mb-1">
-                      Días de Crédito (0 = Contado)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="120"
-                      value={formDiasCredito}
-                      onChange={e => setFormDiasCredito(parseInt(e.target.value, 10) || 0)}
-                      className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white font-mono focus:border-[#FF3366] outline-none"
-                    />
-                  </div>
-
-                  <div>
+                  <div className="sm:col-span-1">
                     <label className="block font-semibold text-neutral-300 mb-1">
                       % Retención IVA Sugerida
                     </label>
@@ -1065,7 +1199,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     </select>
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block font-semibold text-neutral-300 mb-1">
                       % Retención Renta Sugerida
                     </label>
@@ -1160,11 +1294,20 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
             {/* Dossier Content */}
             <div className="p-5 sm:p-6 space-y-5 overflow-y-auto text-xs">
               {/* Resumen Comercial */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div className="p-3 bg-[#121215] rounded-xl border border-[#272730]">
-                  <span className="text-[10px] text-neutral-400 block font-semibold">Condición de Crédito</span>
+                  <span className="text-[10px] text-neutral-400 block font-semibold">Días de Crédito</span>
                   <span className="text-sm font-bold text-white block mt-0.5 font-mono">
-                    {viewingSupplier.diasCredito === 0 ? 'Pago de Contado' : `${viewingSupplier.diasCredito} días de plazo`}
+                    {(viewingSupplier.diasCredito ?? 0) === 0 ? 'Pago de Contado' : `${viewingSupplier.diasCredito} días de plazo`}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-[#121215] rounded-xl border border-[#272730]">
+                  <span className="text-[10px] text-neutral-400 block font-semibold">Cupo de Crédito ($)</span>
+                  <span className="text-sm font-bold text-emerald-400 block mt-0.5 font-mono">
+                    {(viewingSupplier.diasCredito ?? 0) === 0
+                      ? '$0.00 (Contado)'
+                      : formatMoney(viewingSupplier.cupoCredito ?? 0)}
                   </span>
                 </div>
 

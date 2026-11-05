@@ -35,7 +35,7 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { ClientProfile, SaleRecord } from '../../types';
+import { Appointment, ClientProfile, ProcedureConsentRecord, SaleRecord, ServiceCategory } from '../../types';
 import { consultarIdentificacion } from '../../services/sriService';
 import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
 
@@ -51,11 +51,14 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     appointments,
     galleryPhotos,
     artists,
+    settings,
     addGalleryPhoto,
     formatMoney,
     addClient,
     updateClient,
     deleteClient,
+    updateSale,
+    updateAppointment,
     setActiveTab,
   } = useStudio();
 
@@ -77,6 +80,24 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const [clientPhotoImagePreview, setClientPhotoImagePreview] = useState('');
   const [clientPhotoUrl, setClientPhotoUrl] = useState('');
   const clientPhotoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados para Consentimientos Firmados por Procedimiento (Subir y Visualizar)
+  const [isConsentUploadModalOpen, setIsConsentUploadModalOpen] = useState(false);
+  const [consentProcedureType, setConsentProcedureType] = useState<'sale' | 'appointment' | 'manual'>('sale');
+  const [consentProcedureRefId, setConsentProcedureRefId] = useState<string>('');
+  const [consentInvoiceOrRef, setConsentInvoiceOrRef] = useState<string>('');
+  const [consentServiceName, setConsentServiceName] = useState<string>('');
+  const [consentServiceCategory, setConsentServiceCategory] = useState<ServiceCategory>('tattoo');
+  const [consentArtistName, setConsentArtistName] = useState<string>('');
+  const [consentDate, setConsentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [consentBodyPlacement, setConsentBodyPlacement] = useState<string>('');
+  const [consentNotes, setConsentNotes] = useState<string>('');
+  const [consentFileDataUrl, setConsentFileDataUrl] = useState<string>('');
+  const [consentFileName, setConsentFileName] = useState<string>('');
+  const consentFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Modal de Visualización / Impresión de Consentimiento Firmado
+  const [viewingProcedureConsent, setViewingProcedureConsent] = useState<ProcedureConsentRecord | null>(null);
 
   // Modal 2: Crear / Editar Cliente
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -455,6 +476,319 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     const message = encodeURIComponent(`Hola ${client.name}! Te saludamos de Devolution Ink Tattoo Studio.`);
     const url = cleanPhone ? `https://wa.me/${cleanPhone}?text=${message}` : `https://wa.me/?text=${message}`;
     window.open(url, '_blank');
+  };
+
+  // =========================================================================
+  // HANDLERS DE CONSENTIMIENTO FIRMADO POR PROCEDIMIENTO
+  // =========================================================================
+  const generateOfficialSignedConsentSvg = (params: {
+    clientName: string;
+    clientDni?: string;
+    clientPhone?: string;
+    serviceName: string;
+    artistName: string;
+    date: string;
+    bodyPlacement?: string;
+    invoiceOrRef?: string;
+    allergies?: string;
+    notes?: string;
+  }) => {
+    const studioTitle = (settings.studioName || 'DEVOLUTION INK TATTOO STUDIO').replace(/&/g, '&amp;');
+    const cName = params.clientName.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const sName = params.serviceName.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const aName = params.artistName.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const zone = (params.bodyPlacement || 'Zona acordada en cabina').replace(/&/g, '&amp;');
+    const ref = (params.invoiceOrRef || 'PROC-' + Date.now().toString().slice(-5)).replace(/&/g, '&amp;');
+    const allergyTxt = (params.allergies || 'Ninguna alergia declarada').replace(/&/g, '&amp;');
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1020" viewBox="0 0 800 1020">
+      <rect width="800" height="1020" fill="#ffffff"/>
+      <rect x="24" y="24" width="752" height="972" rx="14" fill="#ffffff" stroke="#18181D" stroke-width="2.5"/>
+      <rect x="24" y="24" width="752" height="105" rx="14" fill="#141418"/>
+      <text x="55" y="68" fill="#FF3366" font-family="Arial, sans-serif" font-size="22" font-weight="bold">${studioTitle}</text>
+      <text x="55" y="94" fill="#E4E4E7" font-family="Arial, sans-serif" font-size="13" font-weight="bold">CONSENTIMIENTO INFORMADO &amp; FICHA DE BIOSEGURIDAD POR PROCEDIMIENTO</text>
+      <text x="55" y="114" fill="#A1A1AA" font-family="Arial, sans-serif" font-size="11">Normativa Sanitaria ARCSA / MSP Ecuador • Ref: ${ref}</text>
+
+      <rect x="55" y="152" width="690" height="135" rx="8" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.2"/>
+      <text x="72" y="178" fill="#0F172A" font-family="Arial, sans-serif" font-size="13" font-weight="bold">1. DATOS DEL PACIENTE / CLIENTE</text>
+      <text x="72" y="204" fill="#334155" font-family="Arial, sans-serif" font-size="12">Nombre Completo: <tspan font-weight="bold" fill="#0F172A">${cName}</tspan></text>
+      <text x="450" y="204" fill="#334155" font-family="Arial, sans-serif" font-size="12">Cédula / RUC / ID: <tspan font-weight="bold" fill="#0F172A">${params.clientDni || 'Registrado'}</tspan></text>
+      <text x="72" y="232" fill="#334155" font-family="Arial, sans-serif" font-size="12">Teléfono: <tspan font-weight="bold" fill="#0F172A">${params.clientPhone || 'Registrado'}</tspan></text>
+      <text x="450" y="232" fill="#334155" font-family="Arial, sans-serif" font-size="12">Fecha Procedimiento: <tspan font-weight="bold" fill="#0F172A">${params.date}</tspan></text>
+      <text x="72" y="260" fill="#334155" font-family="Arial, sans-serif" font-size="12">Alergias / Condición Médica: <tspan font-weight="bold" fill="#B45309">${allergyTxt}</tspan></text>
+
+      <rect x="55" y="305" width="690" height="120" rx="8" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1.2"/>
+      <text x="72" y="331" fill="#881337" font-family="Arial, sans-serif" font-size="13" font-weight="bold">2. DETALLE ESPECÍFICO DEL PROCEDIMIENTO AUTORIZADO</text>
+      <text x="72" y="358" fill="#1E293B" font-family="Arial, sans-serif" font-size="12">Procedimiento / Trabajo: <tspan font-weight="bold" fill="#0F172A">${sName}</tspan></text>
+      <text x="72" y="384" fill="#1E293B" font-family="Arial, sans-serif" font-size="12">Artista / Especialista Asignado: <tspan font-weight="bold" fill="#0F172A">${aName}</tspan></text>
+      <text x="450" y="384" fill="#1E293B" font-family="Arial, sans-serif" font-size="12">Zona Corporal: <tspan font-weight="bold" fill="#0F172A">${zone}</tspan></text>
+      <text x="72" y="408" fill="#475569" font-family="Arial, sans-serif" font-size="11">Materiales: Agujas/cartuchos estériles de uso único abiertos en presencia del cliente y pigmentos/joyería grado implante.</text>
+
+      <text x="55" y="458" fill="#0F172A" font-family="Arial, sans-serif" font-size="13" font-weight="bold">3. DECLARACIÓN Y AUTORIZACIÓN DEL CLIENTE</text>
+      <text x="55" y="484" fill="#334155" font-family="Arial, sans-serif" font-size="11.5">• Declaro ser mayor de edad y acudir libre y voluntariamente para la realización del procedimiento descrito.</text>
+      <text x="55" y="508" fill="#334155" font-family="Arial, sans-serif" font-size="11.5">• Confirmo que he verificado el sellado estéril de agujas, cartuchos, joyería e insumos descartables en cabina.</text>
+      <text x="55" y="532" fill="#334155" font-family="Arial, sans-serif" font-size="11.5">• He sido informado(a) de los cuidados posteriores (Aftercare) y asumo la responsabilidad de la higiene durante la curación.</text>
+      <text x="55" y="556" fill="#334155" font-family="Arial, sans-serif" font-size="11.5">• Autorizo el diseño, ubicación anatómica, tamaño y ortografía revisada previamente en el esténcil / marcaje.</text>
+      <text x="55" y="580" fill="#334155" font-family="Arial, sans-serif" font-size="11.5">• Eximo al estudio y al profesional de complicaciones derivadas del incumplimiento de las instrucciones post-operatorias.</text>
+
+      <rect x="55" y="615" width="690" height="75" rx="8" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+      <text x="72" y="638" fill="#475569" font-family="Arial, sans-serif" font-size="11" font-weight="bold">Observaciones Clínicas / Lote de Bioseguridad:</text>
+      <text x="72" y="662" fill="#0F172A" font-family="Arial, sans-serif" font-size="11.5">${(params.notes || 'Esténcil aprobado por el cliente. Agujas estériles verificadas en cabina. Sin novedades médicas.').replace(/&/g, '&amp;')}</text>
+
+      <rect x="55" y="725" width="320" height="160" rx="10" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1.5"/>
+      <text x="215" y="752" text-anchor="middle" fill="#166534" font-family="Arial, sans-serif" font-size="11" font-weight="bold">FIRMA DEL CLIENTE (CONFORME)</text>
+      <path d="M 115 815 Q 155 770 190 815 T 265 795 Q 295 785 320 820" fill="none" stroke="#0F172A" stroke-width="2.8" stroke-linecap="round"/>
+      <line x1="85" y1="840" x2="345" y2="840" stroke="#64748B" stroke-width="1"/>
+      <text x="215" y="860" text-anchor="middle" fill="#0F172A" font-family="Arial, sans-serif" font-size="11" font-weight="bold">${cName}</text>
+      <text x="215" y="876" text-anchor="middle" fill="#15803D" font-family="Arial, sans-serif" font-size="9.5" font-weight="bold">✓ CONSENTIMIENTO FIRMADO Y VALIDADO</text>
+
+      <rect x="425" y="725" width="320" height="160" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+      <text x="585" y="752" text-anchor="middle" fill="#334155" font-family="Arial, sans-serif" font-size="11" font-weight="bold">PROFESIONAL / ESTUDIO RESPONSABLE</text>
+      <path d="M 510 815 C 540 780, 580 830, 620 795 L 660 815" fill="none" stroke="#334155" stroke-width="2.2" stroke-linecap="round"/>
+      <line x1="455" y1="840" x2="715" y2="840" stroke="#64748B" stroke-width="1"/>
+      <text x="585" y="860" text-anchor="middle" fill="#0F172A" font-family="Arial, sans-serif" font-size="11" font-weight="bold">${aName}</text>
+      <text x="585" y="876" text-anchor="middle" fill="#64748B" font-family="Arial, sans-serif" font-size="9.5">Registro de Cabina • ${studioTitle}</text>
+
+      <text x="400" y="945" text-anchor="middle" fill="#64748B" font-family="Arial, sans-serif" font-size="10">Documento digitalizado y archivado en el Expediente Clínico 360° del Cliente • Fecha de archivo: ${new Date().toLocaleString('es-EC')}</text>
+    </svg>`;
+
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+
+  const getProcedureConsentForSale = (client: ClientProfile, sale: SaleRecord): ProcedureConsentRecord | undefined => {
+    const list = client.procedureConsents || [];
+    const found = list.find(
+      c =>
+        (c.procedureType === 'sale' && c.procedureRefId === sale.id) ||
+        (c.invoiceOrRefNumber && c.invoiceOrRefNumber === sale.invoiceNumber)
+    );
+    if (found) return found;
+    if (sale.consentDocumentUrl) {
+      return {
+        id: `consent-sale-${sale.id}`,
+        procedureType: 'sale',
+        procedureRefId: sale.id,
+        invoiceOrRefNumber: sale.invoiceNumber,
+        serviceName: sale.serviceName,
+        serviceCategory: sale.serviceCategory,
+        artistName: sale.artistName,
+        date: sale.date.split('T')[0],
+        fileDataUrl: sale.consentDocumentUrl,
+        fileName: sale.consentFileName || `Consentimiento_${sale.invoiceNumber}.png`,
+        notes: sale.notes,
+        uploadedAt: sale.consentSignedAt || sale.date,
+      };
+    }
+    return undefined;
+  };
+
+  const getProcedureConsentForAppointment = (client: ClientProfile, apt: Appointment): ProcedureConsentRecord | undefined => {
+    const list = client.procedureConsents || [];
+    const found = list.find(c => c.procedureType === 'appointment' && c.procedureRefId === apt.id);
+    if (found) return found;
+    if (apt.consentDocumentUrl) {
+      return {
+        id: `consent-apt-${apt.id}`,
+        procedureType: 'appointment',
+        procedureRefId: apt.id,
+        invoiceOrRefNumber: `CITA-${apt.date}`,
+        serviceName: apt.serviceName,
+        serviceCategory: apt.serviceCategory,
+        artistName: apt.artistName,
+        date: apt.date,
+        bodyPlacement: apt.bodyPlacement,
+        fileDataUrl: apt.consentDocumentUrl,
+        fileName: apt.consentFileName || `Consentimiento_Cita_${apt.date}.png`,
+        notes: apt.notes,
+        uploadedAt: apt.consentSignedAt || apt.createdAt,
+      };
+    }
+    return undefined;
+  };
+
+  const handleOpenConsentUploadForSale = (sale: SaleRecord, existingConsent?: ProcedureConsentRecord) => {
+    setConsentProcedureType('sale');
+    setConsentProcedureRefId(sale.id);
+    setConsentInvoiceOrRef(sale.invoiceNumber);
+    setConsentServiceName(sale.serviceName);
+    setConsentServiceCategory(sale.serviceCategory);
+    setConsentArtistName(sale.artistName);
+    setConsentDate(sale.date.split('T')[0]);
+    setConsentBodyPlacement(existingConsent?.bodyPlacement || '');
+    setConsentNotes(existingConsent?.notes || sale.notes || '');
+    setConsentFileDataUrl(existingConsent?.fileDataUrl || '');
+    setConsentFileName(existingConsent?.fileName || '');
+    setIsConsentUploadModalOpen(true);
+  };
+
+  const handleOpenConsentUploadForAppointment = (apt: Appointment, existingConsent?: ProcedureConsentRecord) => {
+    setConsentProcedureType('appointment');
+    setConsentProcedureRefId(apt.id);
+    setConsentInvoiceOrRef(`CITA-${apt.date}`);
+    setConsentServiceName(apt.serviceName);
+    setConsentServiceCategory(apt.serviceCategory);
+    setConsentArtistName(apt.artistName);
+    setConsentDate(apt.date);
+    setConsentBodyPlacement(existingConsent?.bodyPlacement || apt.bodyPlacement || '');
+    setConsentNotes(existingConsent?.notes || apt.notes || '');
+    setConsentFileDataUrl(existingConsent?.fileDataUrl || '');
+    setConsentFileName(existingConsent?.fileName || '');
+    setIsConsentUploadModalOpen(true);
+  };
+
+  const handleOpenManualConsentUpload = () => {
+    setConsentProcedureType('manual');
+    setConsentProcedureRefId('');
+    setConsentInvoiceOrRef(`PROC-${new Date().toISOString().slice(0, 10)}`);
+    setConsentServiceName('Tatuaje / Procedimiento en Cabina');
+    setConsentServiceCategory('tattoo');
+    setConsentArtistName(artists[0]?.name || 'Artista del Estudio');
+    setConsentDate(new Date().toISOString().split('T')[0]);
+    setConsentBodyPlacement('');
+    setConsentNotes('');
+    setConsentFileDataUrl('');
+    setConsentFileName('');
+    setIsConsentUploadModalOpen(true);
+  };
+
+  const handleSaveUploadedConsent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewHistoryClient) return;
+
+    const finalDataUrl =
+      consentFileDataUrl ||
+      generateOfficialSignedConsentSvg({
+        clientName: viewHistoryClient.name,
+        clientDni: viewHistoryClient.dni,
+        clientPhone: viewHistoryClient.phone,
+        serviceName: consentServiceName.trim() || 'Procedimiento de Estudio',
+        artistName: consentArtistName.trim() || 'Artista del Estudio',
+        date: consentDate,
+        bodyPlacement: consentBodyPlacement.trim() || undefined,
+        invoiceOrRef: consentInvoiceOrRef.trim() || undefined,
+        allergies: viewHistoryClient.allergies,
+        notes: consentNotes.trim() || undefined,
+      });
+
+    const finalFileName =
+      consentFileName ||
+      `Consentimiento_Firmado_${viewHistoryClient.name.replace(/\s+/g, '_')}_${consentDate}.svg`;
+
+    const nowIso = new Date().toISOString();
+
+    const newConsentRecord: ProcedureConsentRecord = {
+      id: `pcons-${Date.now()}`,
+      procedureType: consentProcedureType,
+      procedureRefId: consentProcedureRefId || undefined,
+      invoiceOrRefNumber: consentInvoiceOrRef.trim() || undefined,
+      serviceName: consentServiceName.trim() || 'Procedimiento de Estudio',
+      serviceCategory: consentServiceCategory,
+      artistName: consentArtistName.trim() || 'Artista del Estudio',
+      date: consentDate,
+      bodyPlacement: consentBodyPlacement.trim() || undefined,
+      fileDataUrl: finalDataUrl,
+      fileName: finalFileName,
+      notes: consentNotes.trim() || undefined,
+      uploadedAt: nowIso,
+    };
+
+    const existingList = viewHistoryClient.procedureConsents || [];
+    // Si ya había un consentimiento para el mismo procedureRefId, lo reemplazamos; si no, lo agregamos al inicio
+    const filteredPrev = consentProcedureRefId
+      ? existingList.filter(
+          c => !(c.procedureType === consentProcedureType && c.procedureRefId === consentProcedureRefId)
+        )
+      : existingList;
+
+    const updatedConsents = [newConsentRecord, ...filteredPrev];
+
+    // Si es un cliente dinámico (cli-dyn-...), primero lo persistimos o actualizamos en la base de clientes
+    const existingRegistered = clients.find(
+      c =>
+        c.id === viewHistoryClient.id ||
+        c.name.trim().toLowerCase() === viewHistoryClient.name.trim().toLowerCase()
+    );
+
+    if (existingRegistered) {
+      updateClient(existingRegistered.id, {
+        consentSigned: true,
+        procedureConsents: updatedConsents,
+      });
+      setViewHistoryClient({
+        ...existingRegistered,
+        consentSigned: true,
+        procedureConsents: updatedConsents,
+      });
+    } else {
+      const created = addClient({
+        name: viewHistoryClient.name,
+        phone: viewHistoryClient.phone,
+        email: viewHistoryClient.email,
+        dni: viewHistoryClient.dni,
+        instagram: viewHistoryClient.instagram,
+        consentSigned: true,
+        procedureConsents: updatedConsents,
+        tags: viewHistoryClient.tags || ['Frecuente'],
+      });
+      setViewHistoryClient(created);
+    }
+
+    // Si está vinculado a una Factura/Venta o a una Cita, sincronizamos también ese registro
+    if (consentProcedureType === 'sale' && consentProcedureRefId) {
+      updateSale(consentProcedureRefId, {
+        consentFormSigned: true,
+        consentDocumentUrl: finalDataUrl,
+        consentFileName: finalFileName,
+        consentSignedAt: nowIso,
+      });
+    } else if (consentProcedureType === 'appointment' && consentProcedureRefId) {
+      updateAppointment(consentProcedureRefId, {
+        consentSigned: true,
+        consentDocumentUrl: finalDataUrl,
+        consentFileName: finalFileName,
+        consentSignedAt: nowIso,
+      });
+    }
+
+    setIsConsentUploadModalOpen(false);
+  };
+
+  const handleDeleteProcedureConsent = (consentId: string, procedureType?: string, procedureRefId?: string) => {
+    if (!viewHistoryClient) return;
+    if (!confirm('¿Deseas eliminar este documento de consentimiento firmado del procedimiento?')) return;
+
+    const updatedConsents = (viewHistoryClient.procedureConsents || []).filter(c => c.id !== consentId);
+    const existingRegistered = clients.find(
+      c =>
+        c.id === viewHistoryClient.id ||
+        c.name.trim().toLowerCase() === viewHistoryClient.name.trim().toLowerCase()
+    );
+
+    if (existingRegistered) {
+      updateClient(existingRegistered.id, {
+        procedureConsents: updatedConsents,
+      });
+    }
+
+    if (procedureType === 'sale' && procedureRefId) {
+      updateSale(procedureRefId, {
+        consentDocumentUrl: undefined,
+        consentFileName: undefined,
+      });
+    } else if (procedureType === 'appointment' && procedureRefId) {
+      updateAppointment(procedureRefId, {
+        consentDocumentUrl: undefined,
+        consentFileName: undefined,
+      });
+    }
+
+    setViewHistoryClient({
+      ...viewHistoryClient,
+      procedureConsents: updatedConsents,
+    });
+    if (viewingProcedureConsent?.id === consentId) {
+      setViewingProcedureConsent(null);
+    }
   };
 
   return (
@@ -997,7 +1331,16 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenManualConsentUpload}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Subir o generar consentimiento firmado por procedimiento para este cliente"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>+ Subir Consentimiento Firmado</span>
+                </button>
                 <button
                   onClick={() => {
                     const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
@@ -1097,7 +1440,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                 }`}
               >
                 <HeartPulse className="w-3.5 h-3.5" />
-                <span>Ficha Médica & Bioseguridad</span>
+                <span>Ficha Médica & Consentimientos ({(viewHistoryClient.procedureConsents || []).length})</span>
               </button>
 
               {/* Tab 4: Galería de Fotos del Cliente */}
@@ -1144,46 +1487,79 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                           <tr className="border-b border-[#24242B] text-neutral-400 font-medium bg-[#121215]">
                             <th className="py-2.5 px-3 whitespace-nowrap">N° Factura</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">Fecha</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">Servicio / Trabajo</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Procedimiento / Trabajo</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
                             <th className="py-2.5 px-3 text-right whitespace-nowrap">Total Pagado</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">Forma de Pago</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Consentimiento Firmado</th>
                             <th className="py-2.5 px-3 text-center whitespace-nowrap">Comprobante</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#222228]">
-                          {sList.map(sale => (
-                            <tr key={sale.id} className="hover:bg-[#1A1A22] transition-colors">
-                              <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">
-                                {sale.invoiceNumber}
-                              </td>
-                              <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap text-[11px]">
-                                {new Date(sale.date).toLocaleDateString('es-EC')}
-                              </td>
-                              <td className="py-2.5 px-3 text-neutral-200">
-                                {sale.serviceName}
-                              </td>
-                              <td className="py-2.5 px-3 font-medium text-neutral-300 whitespace-nowrap">
-                                {sale.artistName}
-                              </td>
-                              <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
-                                {formatMoney(sale.total)}
-                              </td>
-                              <td className="py-2.5 px-3 whitespace-nowrap uppercase text-[10px] font-mono text-neutral-400">
-                                {sale.paymentMethod}
-                              </td>
-                              <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                <button
-                                  onClick={() => onOpenReceipt(sale)}
-                                  className="px-2.5 py-1 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                                  title="Ver ticket térmico o factura A4"
-                                >
-                                  <FileCheck className="w-3 h-3" />
-                                  <span>Ticket</span>
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {sList.map(sale => {
+                            const procConsent = getProcedureConsentForSale(viewHistoryClient, sale);
+                            return (
+                              <tr key={sale.id} className="hover:bg-[#1A1A22] transition-colors">
+                                <td className="py-2.5 px-3 font-mono font-bold text-white whitespace-nowrap">
+                                  {sale.invoiceNumber}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap text-[11px]">
+                                  {new Date(sale.date).toLocaleDateString('es-EC')}
+                                </td>
+                                <td className="py-2.5 px-3 text-neutral-200">
+                                  {sale.serviceName}
+                                </td>
+                                <td className="py-2.5 px-3 font-medium text-neutral-300 whitespace-nowrap">
+                                  {sale.artistName}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-400 whitespace-nowrap">
+                                  {formatMoney(sale.total)}
+                                </td>
+                                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                  {procConsent ? (
+                                    <div className="inline-flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingProcedureConsent(procConsent)}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                        title="Ver o imprimir el consentimiento firmado subido para este procedimiento"
+                                      >
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Ver Firmado</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenConsentUploadForSale(sale, procConsent)}
+                                        className="p-1 rounded-lg bg-[#252530] hover:bg-[#323242] text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                                        title="Reemplazar o actualizar archivo de consentimiento firmado"
+                                      >
+                                        <UploadCloud className="w-3.5 h-3.5 text-[#FF3366]" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenConsentUploadForSale(sale)}
+                                      className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                      title="Subir consentimiento ya firmado por el cliente para este procedimiento"
+                                    >
+                                      <UploadCloud className="w-3.5 h-3.5" />
+                                      <span>Subir Consentimiento</span>
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                  <button
+                                    onClick={() => onOpenReceipt(sale)}
+                                    className="px-2.5 py-1 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                    title="Ver ticket térmico o factura A4"
+                                  >
+                                    <FileCheck className="w-3 h-3" />
+                                    <span>Ticket</span>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     );
@@ -1210,32 +1586,69 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                         <thead>
                           <tr className="border-b border-[#24242B] text-neutral-400 font-medium bg-[#121215]">
                             <th className="py-2.5 px-3 whitespace-nowrap">Fecha / Horario</th>
-                            <th className="py-2.5 px-3 whitespace-nowrap">Servicio</th>
+                            <th className="py-2.5 px-3 whitespace-nowrap">Procedimiento / Servicio</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">Artista</th>
                             <th className="py-2.5 px-3 whitespace-nowrap">Zona Corporal</th>
                             <th className="py-2.5 px-3 text-right whitespace-nowrap">Seña / Anticipo</th>
+                            <th className="py-2.5 px-3 text-center whitespace-nowrap">Consentimiento Firmado</th>
                             <th className="py-2.5 px-3 text-center whitespace-nowrap">Estado</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#222228]">
-                          {aList.map(apt => (
-                            <tr key={apt.id} className="hover:bg-[#1A1A22] transition-colors">
-                              <td className="py-2.5 px-3 font-mono text-neutral-300 whitespace-nowrap">
-                                {apt.date} ({apt.startTime} - {apt.endTime})
-                              </td>
-                              <td className="py-2.5 px-3 font-medium text-white">{apt.serviceName}</td>
-                              <td className="py-2.5 px-3 text-neutral-300">{apt.artistName}</td>
-                              <td className="py-2.5 px-3 text-neutral-400">{apt.bodyPlacement || '—'}</td>
-                              <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-semibold">
-                                {formatMoney(apt.depositAmount)}
-                              </td>
-                              <td className="py-2.5 px-3 text-center">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#252530] text-neutral-300">
-                                  {apt.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {aList.map(apt => {
+                            const procConsent = getProcedureConsentForAppointment(viewHistoryClient, apt);
+                            return (
+                              <tr key={apt.id} className="hover:bg-[#1A1A22] transition-colors">
+                                <td className="py-2.5 px-3 font-mono text-neutral-300 whitespace-nowrap">
+                                  {apt.date} ({apt.startTime} - {apt.endTime})
+                                </td>
+                                <td className="py-2.5 px-3 font-medium text-white">{apt.serviceName}</td>
+                                <td className="py-2.5 px-3 text-neutral-300">{apt.artistName}</td>
+                                <td className="py-2.5 px-3 text-neutral-400">{apt.bodyPlacement || '—'}</td>
+                                <td className="py-2.5 px-3 text-right font-mono text-emerald-400 font-semibold">
+                                  {formatMoney(apt.depositAmount)}
+                                </td>
+                                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                  {procConsent ? (
+                                    <div className="inline-flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingProcedureConsent(procConsent)}
+                                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                        title="Ver o imprimir el consentimiento firmado subido para esta cita"
+                                      >
+                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Ver Firmado</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenConsentUploadForAppointment(apt, procConsent)}
+                                        className="p-1 rounded-lg bg-[#252530] hover:bg-[#323242] text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                                        title="Reemplazar o actualizar archivo de consentimiento firmado"
+                                      >
+                                        <UploadCloud className="w-3.5 h-3.5 text-[#FF3366]" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenConsentUploadForAppointment(apt)}
+                                      className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                      title="Subir consentimiento ya firmado por el cliente para este procedimiento"
+                                    >
+                                      <UploadCloud className="w-3.5 h-3.5" />
+                                      <span>Subir Consentimiento</span>
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#252530] text-neutral-300">
+                                    {apt.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     );
@@ -1300,6 +1713,110 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                       <p className="text-neutral-300 italic">{viewHistoryClient.notes}</p>
                     </div>
                   )}
+
+                  {/* SECCIÓN: HISTORIAL DE CONSENTIMIENTOS FIRMADOS POR CADA PROCEDIMIENTO */}
+                  <div className="pt-3 border-t border-[#24242B] space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-white text-xs uppercase flex items-center gap-1.5">
+                          <FileCheck className="w-4 h-4 text-emerald-400" />
+                          <span>
+                            Consentimientos Firmados por Procedimiento ({(viewHistoryClient.procedureConsents || []).length})
+                          </span>
+                        </span>
+                        <p className="text-[11px] text-neutral-400 mt-0.5">
+                          Archivo digital de hojas de consentimiento informado subidas y firmadas por el cliente en cada sesión.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleOpenManualConsentUpload}
+                        className="self-start sm:self-auto px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>+ Subir Consentimiento Firmado</span>
+                      </button>
+                    </div>
+
+                    {(viewHistoryClient.procedureConsents || []).length === 0 ? (
+                      <div className="p-6 text-center rounded-xl bg-[#17171C] border border-[#25252E] space-y-2">
+                        <FileText className="w-7 h-7 text-neutral-500 mx-auto" />
+                        <p className="text-xs font-semibold text-neutral-300">
+                          Aún no se han subido hojas de consentimiento firmadas por procedimiento
+                        </p>
+                        <p className="text-[11px] text-neutral-500 max-w-md mx-auto">
+                          Puedes subir el consentimiento firmado desde la pestaña de Facturas, Citas o usando el botón superior para registrar el documento firmado de cada sesión.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleOpenManualConsentUpload}
+                          className="mt-1 px-3.5 py-1.5 rounded-xl bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>Subir Primer Consentimiento Firmado</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {(viewHistoryClient.procedureConsents || []).map(cons => (
+                          <div
+                            key={cons.id}
+                            className="p-3 rounded-xl bg-[#17171C] border border-emerald-500/30 hover:border-emerald-500/60 transition-all flex items-start justify-between gap-3"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  <span>FIRMADO</span>
+                                </span>
+                                {cons.invoiceOrRefNumber && (
+                                  <span className="font-mono text-[10px] text-[#FF3366] font-bold">
+                                    {cons.invoiceOrRefNumber}
+                                  </span>
+                                )}
+                                <span className="font-mono text-[10px] text-neutral-400">
+                                  {cons.date}
+                                </span>
+                              </div>
+                              <p className="font-bold text-white text-xs truncate">
+                                {cons.serviceName}
+                              </p>
+                              <p className="text-[11px] text-neutral-400 truncate">
+                                Artista: <strong className="text-neutral-200">{cons.artistName}</strong>
+                                {cons.bodyPlacement ? ` • Zona: ${cons.bodyPlacement}` : ''}
+                              </p>
+                              <p className="text-[10px] text-neutral-500 font-mono truncate">
+                                Archivo: {cons.fileName}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setViewingProcedureConsent(cons)}
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/35 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                                title="Visualizar e imprimir consentimiento firmado"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Ver</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteProcedureConsent(cons.id, cons.procedureType, cons.procedureRefId)
+                                }
+                                className="p-1.5 rounded-lg bg-[#121215] hover:bg-red-500/20 text-neutral-400 hover:text-red-400 border border-[#272730] transition-colors cursor-pointer"
+                                title="Eliminar documento"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1806,6 +2323,414 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 3: SUBIR / REGISTRAR CONSENTIMIENTO FIRMADO POR PROCEDIMIENTO
+          ========================================================================= */}
+      {isConsentUploadModalOpen && viewHistoryClient && (
+        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-xl w-full shadow-2xl p-5 sm:p-6 space-y-4 my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#25252E] pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide">
+                    Subir Consentimiento Firmado por Procedimiento
+                  </h3>
+                  <p className="text-[11px] text-neutral-400">
+                    Cliente: <strong className="text-white">{viewHistoryClient.name}</strong>
+                    {consentInvoiceOrRef ? ` • Ref: ${consentInvoiceOrRef}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsConsentUploadModalOpen(false)}
+                className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveUploadedConsent} className="space-y-3.5 text-xs">
+              {/* Selector de Procedimiento (si existen facturas o citas del cliente) */}
+              {(() => {
+                const matched = clientsWithMetrics.find(c => c.client.id === viewHistoryClient.id);
+                const clientSalesList = matched ? matched.clientSales : [];
+                const clientAptsList = matched ? matched.clientAppointments : [];
+
+                if (clientSalesList.length === 0 && clientAptsList.length === 0) return null;
+
+                return (
+                  <div>
+                    <label className="block font-semibold text-neutral-300 mb-1">
+                      Vincular a Procedimiento del Cliente
+                    </label>
+                    <select
+                      value={
+                        consentProcedureRefId
+                          ? `${consentProcedureType}:${consentProcedureRefId}`
+                          : 'manual:'
+                      }
+                      onChange={e => {
+                        const [type, refId] = e.target.value.split(':');
+                        if (type === 'sale') {
+                          const s = clientSalesList.find(x => x.id === refId);
+                          if (s) {
+                            setConsentProcedureType('sale');
+                            setConsentProcedureRefId(s.id);
+                            setConsentInvoiceOrRef(s.invoiceNumber);
+                            setConsentServiceName(s.serviceName);
+                            setConsentServiceCategory(s.serviceCategory);
+                            setConsentArtistName(s.artistName);
+                            setConsentDate(s.date.split('T')[0]);
+                          }
+                        } else if (type === 'appointment') {
+                          const a = clientAptsList.find(x => x.id === refId);
+                          if (a) {
+                            setConsentProcedureType('appointment');
+                            setConsentProcedureRefId(a.id);
+                            setConsentInvoiceOrRef(`CITA-${a.date}`);
+                            setConsentServiceName(a.serviceName);
+                            setConsentServiceCategory(a.serviceCategory);
+                            setConsentArtistName(a.artistName);
+                            setConsentDate(a.date);
+                            setConsentBodyPlacement(a.bodyPlacement || '');
+                          }
+                        } else {
+                          setConsentProcedureType('manual');
+                          setConsentProcedureRefId('');
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
+                    >
+                      <option value="manual:">-- Procedimiento Manual / Otro --</option>
+                      {clientSalesList.length > 0 && (
+                        <optgroup label="Facturas & Comprobantes realizados">
+                          {clientSalesList.map(s => (
+                            <option key={s.id} value={`sale:${s.id}`}>
+                              {s.invoiceNumber} • {new Date(s.date).toLocaleDateString('es-EC')} • {s.serviceName} ({s.artistName})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {clientAptsList.length > 0 && (
+                        <optgroup label="Citas Agendadas">
+                          {clientAptsList.map(a => (
+                            <option key={a.id} value={`appointment:${a.id}`}>
+                              Cita {a.date} ({a.startTime}) • {a.serviceName} ({a.artistName})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                );
+              })()}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    Nombre del Procedimiento / Trabajo Realizado *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={consentServiceName}
+                    onChange={e => setConsentServiceName(e.target.value)}
+                    placeholder="Ej. Tatuaje Realismo Sombras, Piercing Nostril Titanio..."
+                    className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    Artista / Profesional Responsable *
+                  </label>
+                  <select
+                    value={consentArtistName}
+                    onChange={e => setConsentArtistName(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
+                  >
+                    {artists.map(art => (
+                      <option key={art.id} value={art.name}>
+                        {art.name} ({art.role})
+                      </option>
+                    ))}
+                    {!artists.some(a => a.name === consentArtistName) && consentArtistName && (
+                      <option value={consentArtistName}>{consentArtistName}</option>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    Fecha del Procedimiento *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={consentDate}
+                    onChange={e => setConsentDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono outline-none focus:border-[#FF3366]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    Zona Corporal / Anatómica
+                  </label>
+                  <input
+                    type="text"
+                    value={consentBodyPlacement}
+                    onChange={e => setConsentBodyPlacement(e.target.value)}
+                    placeholder="Ej. Antebrazo exterior, Costillas, Oreja..."
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-neutral-300 mb-1">
+                    N° Factura o Referencia
+                  </label>
+                  <input
+                    type="text"
+                    value={consentInvoiceOrRef}
+                    onChange={e => setConsentInvoiceOrRef(e.target.value)}
+                    placeholder="Ej. FAC-00124"
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono outline-none focus:border-[#FF3366]"
+                  />
+                </div>
+              </div>
+
+              {/* Zona de Carga de Archivo Firmado (Imagen Escaneada / Foto / PDF o Generación Digital) */}
+              <div className="p-3.5 rounded-2xl bg-[#121215] border border-[#272730] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-white flex items-center gap-1.5">
+                    <UploadCloud className="w-4 h-4 text-[#FF3366]" />
+                    <span>Archivo de Consentimiento Ya Firmado por el Cliente</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const autoSvg = generateOfficialSignedConsentSvg({
+                        clientName: viewHistoryClient.name,
+                        clientDni: viewHistoryClient.dni,
+                        clientPhone: viewHistoryClient.phone,
+                        serviceName: consentServiceName || 'Procedimiento en Cabina',
+                        artistName: consentArtistName || artists[0]?.name || 'Artista',
+                        date: consentDate,
+                        bodyPlacement: consentBodyPlacement || undefined,
+                        invoiceOrRef: consentInvoiceOrRef || undefined,
+                        allergies: viewHistoryClient.allergies,
+                        notes: consentNotes || undefined,
+                      });
+                      setConsentFileDataUrl(autoSvg);
+                      setConsentFileName(
+                        `Acta_Consentimiento_Firmado_${viewHistoryClient.name.replace(/\s+/g, '_')}_${consentDate}.svg`
+                      );
+                    }}
+                    className="text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    + Generar Acta Firmada Digitalmente
+                  </button>
+                </div>
+
+                <input
+                  type="file"
+                  ref={consentFileInputRef}
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      setConsentFileDataUrl(reader.result as string);
+                      setConsentFileName(f.name);
+                    };
+                    reader.readAsDataURL(f);
+                  }}
+                />
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => consentFileInputRef.current?.click()}
+                    className="px-4 py-2.5 rounded-xl bg-[#202028] hover:bg-[#2B2B36] border border-[#323240] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <UploadCloud className="w-4 h-4 text-[#FF3366]" />
+                    <span>Seleccionar Foto / Escaneo / PDF Firmado</span>
+                  </button>
+                  {consentFileName ? (
+                    <div className="flex-1 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-[11px] truncate flex items-center justify-between gap-2">
+                      <span className="truncate">✓ {consentFileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConsentFileDataUrl('');
+                          setConsentFileName('');
+                        }}
+                        className="text-neutral-400 hover:text-white shrink-0"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-neutral-400">
+                      Sube la foto/escaneo de la hoja firmada o genera el acta digital con 1 clic.
+                    </span>
+                  )}
+                </div>
+
+                {consentFileDataUrl && !consentFileDataUrl.startsWith('data:application/pdf') && (
+                  <div className="mt-2 rounded-xl overflow-hidden border border-[#2B2B36] bg-white max-h-56 overflow-y-auto p-2">
+                    <img
+                      src={consentFileDataUrl}
+                      alt="Vista previa consentimiento firmado"
+                      className="w-full h-auto object-contain mx-auto max-h-52"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-semibold text-neutral-300 mb-1">
+                  Observaciones de Bioseguridad / Lote de Agujas y Pigmentos
+                </label>
+                <input
+                  type="text"
+                  value={consentNotes}
+                  onChange={e => setConsentNotes(e.target.value)}
+                  placeholder="Ej. Agujas Kwadron estériles verificadas por el cliente, sin reacciones adversas..."
+                  className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366]"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#25252E] flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsConsentUploadModalOpen(false)}
+                  className="px-4 py-2 text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Guardar Consentimiento Firmado</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 4: VISUALIZAR E IMPRIMIR CONSENTIMIENTO FIRMADO DEL PROCEDIMIENTO
+          ========================================================================= */}
+      {viewingProcedureConsent && viewHistoryClient && (
+        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-3xl w-full shadow-2xl flex flex-col overflow-hidden max-h-[92vh]">
+            <div className="px-5 py-3.5 bg-[#121215] border-b border-[#25252E] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-bold text-white">
+                      Consentimiento Firmado por Procedimiento
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      ✓ FIRMADO POR EL CLIENTE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    {viewHistoryClient.name} • {viewingProcedureConsent.serviceName} ({viewingProcedureConsent.date})
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={viewingProcedureConsent.fileDataUrl}
+                  download={viewingProcedureConsent.fileName || `Consentimiento_${viewHistoryClient.name}.svg`}
+                  className="px-3 py-1.5 rounded-xl bg-[#20202A] hover:bg-[#2B2B38] text-neutral-200 hover:text-white border border-[#2E2E3A] text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#FF3366]" />
+                  <span>Descargar</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimir</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingProcedureConsent(null)}
+                  className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-neutral-900/70 space-y-4">
+              {/* Resumen de Metadatos del Procedimiento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-[#121215] p-3 rounded-2xl border border-[#272730]">
+                <div>
+                  <span className="text-[10px] text-neutral-400 block">Procedimiento</span>
+                  <span className="font-bold text-white">{viewingProcedureConsent.serviceName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-400 block">Artista Responsable</span>
+                  <span className="font-bold text-neutral-200">{viewingProcedureConsent.artistName}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-400 block">Fecha / Ref</span>
+                  <span className="font-mono font-bold text-[#FF3366]">
+                    {viewingProcedureConsent.date}{' '}
+                    {viewingProcedureConsent.invoiceOrRefNumber
+                      ? `(${viewingProcedureConsent.invoiceOrRefNumber})`
+                      : ''}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-neutral-400 block">Zona Anatómica</span>
+                  <span className="font-semibold text-emerald-400">
+                    {viewingProcedureConsent.bodyPlacement || 'Registrada en cabina'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Documento Visual */}
+              <div className="bg-white rounded-2xl p-3 sm:p-4 shadow-xl border border-neutral-300 flex items-center justify-center">
+                {viewingProcedureConsent.fileDataUrl.startsWith('data:application/pdf') ? (
+                  <iframe
+                    src={viewingProcedureConsent.fileDataUrl}
+                    title={viewingProcedureConsent.fileName}
+                    className="w-full h-[550px] rounded-lg"
+                  />
+                ) : (
+                  <img
+                    src={viewingProcedureConsent.fileDataUrl}
+                    alt={viewingProcedureConsent.fileName}
+                    className="max-w-full h-auto rounded-lg object-contain"
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

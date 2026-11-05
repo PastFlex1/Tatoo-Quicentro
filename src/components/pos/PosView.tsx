@@ -46,6 +46,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     addClient,
     addKardexMovement,
     updateAppointment,
+    proformas,
+    updateProforma,
     formatMoney,
     setActiveTab,
   } = useStudio();
@@ -354,12 +356,20 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       notes: notes.trim() || undefined,
     });
 
-    // If linked to an appointment, mark appointment as completed
+    // If linked to an appointment, mark appointment as completed and any linked proforma as invoiced
     if (linkedAppointmentId) {
       updateAppointment(linkedAppointmentId, {
         status: 'completed',
         saleId: saleRecord.id,
       });
+      const linkedProf = proformas.find(p => p.appointmentId === linkedAppointmentId);
+      if (linkedProf) {
+        updateProforma(linkedProf.id, {
+          status: 'invoiced',
+          saleId: saleRecord.id,
+          invoiceNumber: saleRecord.invoiceNumber,
+        });
+      }
     }
 
     setLastCreatedSale(saleRecord);

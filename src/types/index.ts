@@ -44,6 +44,9 @@ export interface SaleRecord {
   consumedSupplies?: { itemId: string; name: string; quantity: number }[]; // Consumibles descargados en cabina
   status: SaleStatus;
   consentFormSigned: boolean; // Consentimiento informado de salud
+  consentDocumentUrl?: string; // URL o Base64 del consentimiento firmado subido para este procedimiento
+  consentFileName?: string; // Nombre del archivo del consentimiento firmado
+  consentSignedAt?: string; // Fecha/hora de subida del consentimiento firmado
   documentType?: 'factura' | 'nota_venta'; // Factura (Tipo 01) o Nota de Venta RIMPE (Tipo 02)
   sriStatus?: 'AUTORIZADO' | 'PENDIENTE' | 'ANULADO';
   sriAccessKey?: string;
@@ -139,7 +142,8 @@ export interface Supplier {
   email?: string;
   direccion?: string;
   ciudad?: string;
-  diasCredito?: number; // 0 = Contado, 15, 30 días
+  diasCredito?: number; // 0 = Contado, 15, 30, 45, 60 días
+  cupoCredito?: number; // Cantidad / cupo máximo de crédito asignado en USD ($)
   bancoNombre?: string;
   bancoTipoCuenta?: 'CORRIENTE' | 'AHORROS';
   bancoNumeroCuenta?: string;
@@ -472,10 +476,29 @@ export interface Appointment {
   sizeApprox?: string; // Ej: "15x10 cm", "Flash pequeño"
   status: AppointmentStatus;
   consentSigned: boolean;
+  consentDocumentUrl?: string; // URL o Base64 del consentimiento firmado subido para esta cita/procedimiento
+  consentFileName?: string;
+  consentSignedAt?: string;
   notes?: string;
   designNotes?: string;
   saleId?: string; // ID de la venta si ya fue facturada en POS
   createdAt: string;
+}
+
+export interface ProcedureConsentRecord {
+  id: string;
+  procedureType: 'sale' | 'appointment' | 'manual';
+  procedureRefId?: string; // sale.id o appointment.id
+  invoiceOrRefNumber?: string; // N° de factura o referencia de cita
+  serviceName: string;
+  serviceCategory?: ServiceCategory;
+  artistName: string;
+  date: string; // Fecha del procedimiento
+  bodyPlacement?: string; // Zona anatómica del tatuaje o piercing
+  fileDataUrl: string; // Base64 imagen/PDF o enlace del documento firmado por el cliente
+  fileName: string;
+  notes?: string;
+  uploadedAt: string;
 }
 
 export interface ClientProfile {
@@ -492,6 +515,7 @@ export interface ClientProfile {
   skinNotes?: string; // Piel sensible, buena cicatrización, prefiere film
   tags?: string[]; // VIP, Frecuente, Coleccionista, Piel Sensible
   consentSigned: boolean;
+  procedureConsents?: ProcedureConsentRecord[]; // Historial de consentimientos firmados subidos por cada procedimiento
   emergencyContact?: string;
   notes?: string;
   createdAt: string;

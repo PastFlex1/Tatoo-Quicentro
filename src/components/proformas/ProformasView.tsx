@@ -70,10 +70,14 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
         p.clientName.toLowerCase().includes(q) ||
         p.serviceName.toLowerCase().includes(q) ||
         p.artistName.toLowerCase().includes(q) ||
+        (p.invoiceNumber && p.invoiceNumber.toLowerCase().includes(q)) ||
         (p.clientPhone && p.clientPhone.includes(q)) ||
         (p.clientDni && p.clientDni.includes(q));
 
-      const matchStatus = filterStatus === 'all' || p.status === filterStatus;
+      const isFacturada = Boolean(p.invoiceNumber) || p.status === 'invoiced';
+      const matchStatus =
+        filterStatus === 'all' ||
+        (filterStatus === 'invoiced' ? isFacturada : p.status === filterStatus && !isFacturada);
       const matchCategory = filterCategory === 'all' || p.serviceCategory === filterCategory;
       const matchArtist = filterArtist === 'all' || p.artistId === filterArtist;
 
@@ -83,15 +87,15 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
 
   // Key KPI Metrics
   const totalCotizaciones = proformas.length;
-  const pendingCount = proformas.filter(p => p.status === 'pending').length;
-  const acceptedCount = proformas.filter(p => p.status === 'accepted').length;
+  const pendingCount = proformas.filter(p => p.status === 'pending' && !p.invoiceNumber).length;
+  const acceptedCount = proformas.filter(p => p.status === 'accepted' && !p.invoiceNumber).length;
   const invoicedCount = proformas.filter(p => Boolean(p.invoiceNumber) || p.status === 'invoiced').length;
   const totalCotizado = proformas.reduce((acc, p) => acc + p.total, 0);
 
   const getStatusBadge = (status: ProformaStatus, invoiceNumber?: string) => {
     if (invoiceNumber || status === 'invoiced') {
       return {
-        label: `Facturada (${invoiceNumber ? '#' + invoiceNumber : 'POS'})`,
+        label: invoiceNumber ? `Facturada (${invoiceNumber})` : 'Facturada',
         className: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
       };
     }
@@ -390,15 +394,20 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                         )}
                       </td>
 
-                      {/* Estado con Selector Rápido */}
+                      {/* Estado con Selector Rápido o Número de Factura Emitida */}
                       <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
                           <span
-                            className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 max-w-fit ${badge.className}`}
+                            className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border inline-flex items-center gap-1 max-w-fit ${badge.className}`}
                           >
-                            {badge.label}
+                            {isInvoiced && <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
+                            <span>{badge.label}</span>
                           </span>
-                          {!isInvoiced && (
+                          {isInvoiced && proforma.invoiceNumber ? (
+                            <span className="text-[10px] font-mono text-emerald-400 font-semibold pl-1">
+                              Factura N° {proforma.invoiceNumber}
+                            </span>
+                          ) : (
                             <select
                               value={proforma.status}
                               onChange={e =>
