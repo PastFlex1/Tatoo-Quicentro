@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   Calendar as CalendarIcon,
@@ -326,7 +327,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:flex items-center gap-2.5">
-          <select
+          <UiSelect
             value={filterArtist}
             onChange={e => setFilterArtist(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-full px-3 py-1.5 text-xs text-neutral-300 focus:border-[#FF3366] focus:outline-hidden"
@@ -337,9 +338,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                 {art.name} ({art.role})
               </option>
             ))}
-          </select>
+          </UiSelect>
 
-          <select
+          <UiSelect
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-full px-3 py-1.5 text-xs text-neutral-300 focus:border-[#FF3366] focus:outline-hidden"
@@ -349,9 +350,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             <option value="piercing">Piercings</option>
             <option value="jewelry">Joyería</option>
             <option value="other">Retoques / Consultas</option>
-          </select>
+          </UiSelect>
 
-          <select
+          <UiSelect
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-full px-3 py-1.5 text-xs text-neutral-300 focus:border-[#FF3366] focus:outline-hidden"
@@ -363,7 +364,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             <option value="completed">Completadas / Facturadas</option>
             <option value="no_show">No Asistió</option>
             <option value="cancelled">Canceladas</option>
-          </select>
+          </UiSelect>
         </div>
       </div>
 
@@ -633,7 +634,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                               </button>
                             )}
 
-                            <select
+                            <UiSelect
                               value={apt.status}
                               onChange={e =>
                                 changeStatus(apt.id, e.target.value as AppointmentStatus)
@@ -646,7 +647,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                               <option value="completed">Completada</option>
                               <option value="no_show">No Asistió</option>
                               <option value="cancelled">Cancelada</option>
-                            </select>
+                            </UiSelect>
 
                             <button
                               onClick={() => {
@@ -915,7 +916,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                               </button>
                             )}
 
-                            <select
+                            <UiSelect
                               value={apt.status}
                               onChange={e =>
                                 changeStatus(apt.id, e.target.value as AppointmentStatus)
@@ -928,7 +929,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                               <option value="completed">Completada</option>
                               <option value="no_show">No Asistió</option>
                               <option value="cancelled">Cancelada</option>
-                            </select>
+                            </UiSelect>
 
                             <button
                               onClick={() => {

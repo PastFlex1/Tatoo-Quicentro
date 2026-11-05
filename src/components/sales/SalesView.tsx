@@ -27,11 +27,13 @@ import { SriStatusBadge } from '../common/SriStatusBadge';
 interface SalesViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
   onOpenNewSale: () => void;
+  /** Sub-sección inicial (la sección "Notas de Crédito" del menú abre directamente la pestaña 04) */
+  initialSubTab?: 'invoices' | 'sales_notes' | 'credit_notes';
 }
 
 type BillingTabType = 'invoices' | 'sales_notes' | 'credit_notes';
 
-export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSale }) => {
+export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSale, initialSubTab = 'invoices' }) => {
   const {
     filteredSales,
     filteredCreditNotes,
@@ -54,7 +56,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ onOpenReceipt, onOpenNewSa
     if (guardPermission('sales.print')) printCreditNote(cn);
   };
   // Active Billing Tab
-  const [activeSubTab, setActiveSubTab] = useState<BillingTabType>('invoices');
+  const [activeSubTab, setActiveSubTab] = useState<BillingTabType>(initialSubTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');

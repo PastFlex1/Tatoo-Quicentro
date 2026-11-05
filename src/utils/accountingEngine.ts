@@ -7,6 +7,7 @@
  * el Balance de Comprobación y los reportes leen siempre de este motor, de modo que
  * los saldos coinciden en todas las pantallas.
  */
+import { saleLines } from './saleLines';
 import {
   ArtistSettlement,
   CashShift,
@@ -223,8 +224,21 @@ export function buildJournalEntries(input: AccountingInput): UnifiedJournalEntry
       const bank = r2(collected - cash);
       const b = new EntryBuilder(`sale-${s.id}`)
         .debit('1101', cash, `Cobro en efectivo: ${s.serviceName}`)
-        .debit('1102', bank, `Cobro ${s.paymentMethod === 'card' ? 'con tarjeta' : s.paymentMethod === 'split' ? 'mixto (POS/banco)' : 'por transferencia'}`)
-        .credit(revenueAccountFor(s.serviceCategory), revenue, `Venta: ${s.serviceName}`)
+        .debit('1102', bank, `Cobro ${s.paymentMethod === 'card' ? 'con tarjeta' : s.paymentMethod === 'split' ? 'mixto (POS/banco)' : 'por transferencia'}`);
+      // Ingreso por cuenta según la categoría de cada línea (tatuaje, piercing, joyería…)
+      const lines = saleLines(s);
+      const byAccount = new Map<string, number>();
+      lines.forEach(l => byAccount.set(revenueAccountFor(l.category), (byAccount.get(revenueAccountFor(l.category)) || 0) + l.base));
+      const linesTotal = [...byAccount.values()].reduce((a, v) => a + v, 0);
+      let assigned = 0;
+      const accounts = [...byAccount.entries()];
+      accounts.forEach(([acc, v], i) => {
+        // La última cuenta absorbe la diferencia de redondeo para que el asiento cuadre
+        const amount = i === accounts.length - 1 ? r2(revenue - assigned) : r2(linesTotal > 0 ? (v / linesTotal) * revenue : 0);
+        assigned += amount;
+        b.credit(acc, amount, lines.length > 1 ? `Venta (${acc === '4101' ? 'tatuaje' : acc === '4102' ? 'piercing' : 'productos'})` : `Venta: ${s.serviceName}`);
+      });
+      b
         .credit('2102', tax, `IVA en ventas (${s.taxRate || 0}%)`)
         .credit('2101', tip, `Propina para ${s.artistName}`)
         .debit('5101', s.artistShare || 0, `Comisión ${s.artistName} (${s.artistCommissionPercent || 0}%)`)

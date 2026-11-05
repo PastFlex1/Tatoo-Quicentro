@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   Boxes,
@@ -314,7 +315,7 @@ export const KardexView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Item filter */}
-          <select
+          <UiSelect
             value={selectedItemFilter}
             onChange={e => setSelectedItemFilter(e.target.value)}
             className="px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white focus:border-[#FF3366]/60"
@@ -325,10 +326,10 @@ export const KardexView: React.FC = () => {
                 {item.name} ({item.currentStock} {item.unit})
               </option>
             ))}
-          </select>
+          </UiSelect>
 
           {/* Type filter */}
-          <select
+          <UiSelect
             value={kardexTypeFilter}
             onChange={e => setKardexTypeFilter(e.target.value)}
             className="px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white focus:border-[#FF3366]/60"
@@ -339,7 +340,7 @@ export const KardexView: React.FC = () => {
             <option value="cabin_out">Consumo Cabina</option>
             <option value="retail_sale">Venta Mostrador</option>
             <option value="adjustment">Ajuste de Stock</option>
-          </select>
+          </UiSelect>
         </div>
       </div>
 
@@ -504,7 +505,7 @@ export const KardexView: React.FC = () => {
             <form onSubmit={handleCreateKardexMovement} className="p-6 space-y-4 text-xs">
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Insumo o Joyería *</label>
-                <select
+                <UiSelect
                   value={kdxItemId}
                   onChange={e => setKdxItemId(e.target.value)}
                   className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
@@ -514,13 +515,13 @@ export const KardexView: React.FC = () => {
                       {item.name} — Stock Actual: {item.currentStock} {item.unit} (${item.unitCost.toFixed(2)}/u)
                     </option>
                   ))}
-                </select>
+                </UiSelect>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] text-neutral-400 block mb-1">Tipo de Movimiento</label>
-                  <select
+                  <UiSelect
                     value={kdxType}
                     onChange={e => setKdxType(e.target.value as KardexMovementType)}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
@@ -529,7 +530,7 @@ export const KardexView: React.FC = () => {
                     <option value="purchase_in">Compra / Entrada (Ingreso)</option>
                     <option value="retail_sale">Venta de Mostrador</option>
                     <option value="adjustment">Ajuste de Inventario</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div>
@@ -619,7 +620,7 @@ export const KardexView: React.FC = () => {
 
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Responsable / Artista</label>
-                <select
+                <UiSelect
                   value={kdxResponsible}
                   onChange={e => setKdxResponsible(e.target.value)}
                   className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
@@ -630,7 +631,7 @@ export const KardexView: React.FC = () => {
                       {a.name} ({a.role})
                     </option>
                   ))}
-                </select>
+                </UiSelect>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#24242A]">

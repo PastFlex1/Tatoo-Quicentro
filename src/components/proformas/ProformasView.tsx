@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   FileText,
@@ -308,7 +309,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
 
         <div className="flex flex-wrap items-center gap-2">
           {/* Quick Filter: Status */}
-          <select
+          <UiSelect
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
@@ -320,10 +321,10 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
             <option value="converted">Convertidas a Cita</option>
             <option value="draft">Borradores</option>
             <option value="expired">Expiradas</option>
-          </select>
+          </UiSelect>
 
           {/* Quick Filter: Category */}
-          <select
+          <UiSelect
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
@@ -333,10 +334,10 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
             <option value="piercing">Piercings</option>
             <option value="jewelry">Joyería</option>
             <option value="aftercare">Aftercare</option>
-          </select>
+          </UiSelect>
 
           {/* Quick Filter: Artist */}
-          <select
+          <UiSelect
             value={filterArtist}
             onChange={e => setFilterArtist(e.target.value)}
             className="bg-[#121215] border border-[#272730] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
@@ -347,7 +348,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                 {a.name}
               </option>
             ))}
-          </select>
+          </UiSelect>
         </div>
       </div>
 
@@ -414,7 +415,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                               Factura N° {proforma.invoiceNumber}
                             </span>
                           ) : (
-                            <select
+                            <UiSelect
                               value={proforma.status}
                               onChange={e =>
                                 updateProforma(proforma.id, { status: e.target.value as any })
@@ -426,7 +427,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                               <option value="accepted">Aceptada</option>
                               <option value="converted">Convertida Cita</option>
                               <option value="expired">Expirada</option>
-                            </select>
+                            </UiSelect>
                           )}
                         </div>
                       </td>

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import {
   X,
   User,
@@ -12,8 +13,12 @@ import {
   CheckCircle2,
   Search,
   ShieldAlert,
+  RefreshCw,
+  Save,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
+import { useAlertModal } from '../../context/AlertModalContext';
+import { consultarIdentificacion } from '../../services/sriService';
 import { ClientProfile, ConsentForm, ConsentGuardian, HealthSheet } from '../../types';
 import {
   ALLERGIES,
@@ -35,6 +40,8 @@ import { SignaturePad } from './SignaturePad';
 interface ConsentWizardModalProps {
   isOpen: boolean;
   initialClient?: ClientProfile | null;
+  /** El usuario puede ver/firmar fichas de salud y consentimientos */
+  canConsent?: boolean;
   onClose: () => void;
   onSaved: (form: ConsentForm) => void;
 }
@@ -113,8 +120,9 @@ const ChipGroup: React.FC<{
   </div>
 );
 
-export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, initialClient, onClose, onSaved }) => {
+export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, initialClient, canConsent = true, onClose, onSaved }) => {
   const { clients, artists, addClient, updateClient, currentUser } = useStudio();
+  const { showAlert } = useAlertModal();
   const [step, setStep] = useState(1);
   const [showErrors, setShowErrors] = useState(false);
 
@@ -134,6 +142,18 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
   const [emPhone, setEmPhone] = useState(initialClient?.emergencyContactPhone || '');
   const [emRelation, setEmRelation] = useState(initialClient?.emergencyContactRelation || '');
   const [guardian, setGuardian] = useState<ConsentGuardian>({ name: '', dni: '', relationship: '', phone: '' });
+  const [instagram, setInstagram] = useState(initialClient?.instagram || '');
+  const [sri, setSri] = useState({
+    tradeName: initialClient?.tradeName || '',
+    regime: initialClient?.taxpayerRegime || '',
+    type: initialClient?.taxpayerType || '',
+    status: initialClient?.sriStatus || '',
+    verified: Boolean(initialClient?.sriVerified),
+  });
+  const [sriLoading, setSriLoading] = useState(false);
+  const [sriMsg, setSriMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const isEdit = Boolean(initialClient);
 
   // ---- Paso 2: salud
   const [health, setHealth] = useState<HealthSheet>(() => ({
@@ -191,7 +211,43 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
     setEmPhone(c.emergencyContactPhone || '');
     setEmRelation(c.emergencyContactRelation || '');
     setHealth({ ...emptyHealthSheet(), ...(c.healthSheet || {}), bloodType: c.healthSheet?.bloodType || c.bloodType || '' });
+    setInstagram(c.instagram || '');
+    setSri({ tradeName: c.tradeName || '', regime: c.taxpayerRegime || '', type: c.taxpayerType || '', status: c.sriStatus || '', verified: Boolean(c.sriVerified) });
     setSearch('');
+  };
+
+  // Consulta de cédula / RUC en el SRI y Registro Civil (rellena nombre y datos tributarios)
+  const lookupSri = async () => {
+    const id = dni.trim();
+    if (!id) return setSriMsg({ text: 'Ingrese la cédula o RUC para consultar.', ok: false });
+    const existing = clients.find(c => (c.dni || '').replace(/\D/g, '') === id.replace(/\D/g, ''));
+    if (existing && existing.id !== clientId) {
+      loadClient(existing);
+      setSriMsg({ text: 'Este cliente ya estaba registrado: se cargó su ficha.', ok: true });
+      return;
+    }
+    setSriLoading(true);
+    setSriMsg(null);
+    try {
+      const res = await consultarIdentificacion(id);
+      if (res.found && res.nombre) {
+        setName(res.nombre);
+        setSri({
+          tradeName: res.nombreComercial || '',
+          regime: res.regimen || '',
+          type: res.tipoPersona || res.tipoContribuyente || '',
+          status: res.estado || 'ACTIVO',
+          verified: true,
+        });
+        setSriMsg({ text: `Identificación verificada: ${res.nombre}${res.regimen ? ` · ${res.regimen}` : ''}`, ok: true });
+      } else {
+        setSriMsg({ text: res.error || 'No se encontró en el SRI ni en el Registro Civil; escriba el nombre.', ok: false });
+      }
+    } catch {
+      setSriMsg({ text: 'Sin conexión con el SRI; escriba el nombre manualmente.', ok: false });
+    } finally {
+      setSriLoading(false);
+    }
   };
 
   const toggleIn = (field: 'allergies' | 'conditions' | 'medications' | 'currentState', key: string) => {
@@ -254,6 +310,14 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
       return;
     }
     setShowErrors(false);
+    // Evita duplicar clientes: si la cédula ya existe, se actualiza esa ficha
+    if (step === 1 && !clientId && dni.trim()) {
+      const dup = clients.find(c => (c.dni || '').replace(/\D/g, '') === dni.replace(/\D/g, ''));
+      if (dup) {
+        setClientId(dup.id);
+        setNotice(`Ya existía un cliente con esa cédula (${dup.name}). Se actualizará su ficha en lugar de crear otra.`);
+      }
+    }
     setStep(s => Math.min(5, s + 1));
   };
 
@@ -300,6 +364,12 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
       emergencyContactPhone: emPhone.trim(),
       emergencyContactRelation: emRelation.trim() || undefined,
       emergencyContact: `${emName.trim()} · ${emPhone.trim()}${emRelation ? ` (${emRelation})` : ''}`,
+      instagram: instagram.trim() || undefined,
+      tradeName: sri.tradeName || undefined,
+      taxpayerRegime: sri.regime || undefined,
+      taxpayerType: sri.type || undefined,
+      sriStatus: sri.status || undefined,
+      sriVerified: sri.verified,
       bloodType: health.bloodType || undefined,
       allergies: allergyText || 'Ninguna conocida',
       medicalConditions: conditionText || 'Ninguna',
@@ -308,7 +378,8 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
       consentSigned: true,
     };
 
-    let targetId = clientId;
+    // Un cliente "descubierto" desde ventas antiguas aún no existe en la lista real: se crea su ficha
+    let targetId = clientId && clients.some(c => c.id === clientId) ? clientId : null;
     let existingForms: ConsentForm[] = [];
     if (targetId) {
       existingForms = clients.find(c => c.id === targetId)?.consentForms || [];
@@ -356,6 +427,51 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
     onSaved(form);
   };
 
+  // Guardar únicamente los datos del cliente (sin ficha de salud ni carta). Queda "pendiente de consentimiento".
+  const handleSaveOnly = () => {
+    if (!name.trim()) {
+      setShowErrors(true);
+      setStep(1);
+      return;
+    }
+    const base: Partial<ClientProfile> = {
+      name: name.trim(),
+      dni: dni.trim() || undefined,
+      birthDate: birthDate || undefined,
+      gender,
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
+      address: address.trim() || undefined,
+      city: city.trim() || undefined,
+      occupation: occupation.trim() || undefined,
+      instagram: instagram.trim() || undefined,
+      emergencyContactName: emName.trim() || undefined,
+      emergencyContactPhone: emPhone.trim() || undefined,
+      emergencyContactRelation: emRelation.trim() || undefined,
+      emergencyContact: emName.trim() ? `${emName.trim()} · ${emPhone.trim()}${emRelation ? ` (${emRelation})` : ''}` : undefined,
+      tradeName: sri.tradeName || undefined,
+      taxpayerRegime: sri.regime || undefined,
+      taxpayerType: sri.type || undefined,
+      sriStatus: sri.status || undefined,
+      sriVerified: sri.verified,
+    };
+    let targetId = clientId && clients.some(c => c.id === clientId) ? clientId : null;
+    if (!targetId && dni.trim()) {
+      targetId = clients.find(c => (c.dni || '').replace(/\D/g, '') === dni.replace(/\D/g, ''))?.id || null;
+    }
+    if (targetId) {
+      updateClient(targetId, base);
+    } else {
+      addClient({ ...(base as ClientProfile), name: name.trim(), consentSigned: false, tags: ['Nuevo'] });
+    }
+    showAlert({
+      title: isEdit || targetId ? 'Cliente actualizado' : 'Cliente registrado',
+      message: 'Se guardaron los datos. Recuerde completar la ficha de salud y firmar el consentimiento ANTES de realizar el procedimiento.',
+      type: 'success',
+    });
+    onClose();
+  };
+
   const filteredClients = search.trim()
     ? clients
         .filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.dni || '').includes(search))
@@ -372,8 +488,12 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
         <div className="px-5 sm:px-6 pt-4 pb-3 border-b border-[#25252E] shrink-0 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-white">Ficha del cliente y carta de consentimiento</h3>
-              <p className="text-[11px] text-neutral-400">Complete los 5 pasos. Los campos con * son obligatorios.</p>
+              <h3 className="text-sm font-bold text-white">{isEdit ? `Ficha de ${initialClient?.name}` : 'Nuevo cliente'}</h3>
+              <p className="text-[11px] text-neutral-400">
+                {canConsent
+                  ? 'Datos del cliente, ficha de salud y carta de consentimiento en un solo formulario. Los campos con * son obligatorios.'
+                  : 'Registre los datos del cliente. (Su rol no permite firmar fichas de salud ni consentimientos.)'}
+              </p>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-full text-neutral-400 hover:text-white hover:bg-[#25252E] cursor-pointer" aria-label="Cerrar">
               <X className="w-5 h-5" />
@@ -444,26 +564,56 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
                 </div>
               )}
 
+              {sriMsg && (
+                <div className={`p-2.5 rounded-xl border text-[11px] ${sriMsg.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200' : 'bg-amber-500/10 border-amber-500/30 text-amber-200'}`}>
+                  {sriMsg.text}
+                </div>
+              )}
+              {notice && <div className="p-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200 text-[11px]">{notice}</div>}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <Field label="Nombre completo" required error={err(!name.trim())} className="lg:col-span-2">
                   <input value={name} onChange={e => setName(e.target.value)} className={input} />
                 </Field>
-                <Field label="Cédula / pasaporte" required error={err(!dni.trim())}>
-                  <input value={dni} onChange={e => setDni(e.target.value)} className={`${input} font-mono`} />
+                <Field label="Cédula / RUC / pasaporte" required error={err(!dni.trim())}>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={dni}
+                      onChange={e => {
+                        setDni(e.target.value);
+                        setSriMsg(null);
+                      }}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupSri())}
+                      className={`${input} font-mono`}
+                    />
+                    <button
+                      type="button"
+                      onClick={lookupSri}
+                      disabled={sriLoading}
+                      title="Buscar en el SRI y Registro Civil"
+                      className="px-2.5 rounded-xl bg-[#25252E] hover:bg-[#30303B] text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      {sriLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                      SRI
+                    </button>
+                  </div>
                 </Field>
                 <Field label={`Fecha de nacimiento${age !== undefined ? ` (${age} años)` : ''}`} required error={err(!birthDate)}>
                   <input type="date" value={birthDate} max={procedureDate} onChange={e => setBirthDate(e.target.value)} className={input} />
                 </Field>
                 <Field label="Sexo">
-                  <select value={gender} onChange={e => setGender(e.target.value as ClientProfile['gender'])} className={input}>
+                  <UiSelect value={gender} onChange={e => setGender(e.target.value as ClientProfile['gender'])} className={input}>
                     <option value="">Prefiere no decir</option>
                     <option value="F">Femenino</option>
                     <option value="M">Masculino</option>
                     <option value="O">Otro</option>
-                  </select>
+                  </UiSelect>
                 </Field>
                 <Field label="Ocupación">
                   <input value={occupation} onChange={e => setOccupation(e.target.value)} className={input} />
+                </Field>
+                <Field label="Instagram">
+                  <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="@usuario" className={input} />
                 </Field>
                 <Field label="Teléfono / WhatsApp" required error={err(!phone.trim())}>
                   <input value={phone} onChange={e => setPhone(e.target.value)} className={input} />
@@ -538,12 +688,12 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Field label="Tipo de sangre">
-                  <select value={health.bloodType} onChange={e => setHealth(h => ({ ...h, bloodType: e.target.value }))} className={input}>
+                  <UiSelect value={health.bloodType} onChange={e => setHealth(h => ({ ...h, bloodType: e.target.value }))} className={input}>
                     <option value="">No sabe</option>
                     {['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'].map(b => (
                       <option key={b}>{b}</option>
                     ))}
-                  </select>
+                  </UiSelect>
                 </Field>
                 <Field label="Reacciones en tatuajes / piercings anteriores" className="sm:col-span-2">
                   <input value={health.previousTattooReactions} onChange={e => setHealth(h => ({ ...h, previousTattooReactions: e.target.value }))} placeholder="Ninguna / describa" className={input} />
@@ -590,12 +740,12 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
                   <textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Ej. Rosa blackwork 12x8 cm con texto 'Libertad'" className={input} />
                 </Field>
                 <Field label="Zona del cuerpo" required error={err(!zone || (zone === 'Otra' && !zoneOther.trim()))}>
-                  <select value={zone} onChange={e => setZone(e.target.value)} className={input}>
+                  <UiSelect value={zone} onChange={e => setZone(e.target.value)} className={input}>
                     <option value="">Seleccione…</option>
                     {BODY_ZONES.map(z => (
                       <option key={z}>{z}</option>
                     ))}
-                  </select>
+                  </UiSelect>
                 </Field>
                 {zone === 'Otra' && (
                   <Field label="Especifique la zona" required>
@@ -603,14 +753,14 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
                   </Field>
                 )}
                 <Field label="Artista responsable" required error={err(!artistId)}>
-                  <select value={artistId} onChange={e => setArtistId(e.target.value)} className={input}>
+                  <UiSelect value={artistId} onChange={e => setArtistId(e.target.value)} className={input}>
                     <option value="">Seleccione…</option>
                     {artists.filter(a => a.active).map(a => (
                       <option key={a.id} value={a.id}>
                         {a.name}
                       </option>
                     ))}
-                  </select>
+                  </UiSelect>
                 </Field>
                 <Field label="Fecha del procedimiento">
                   <input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className={input} />
@@ -748,10 +898,25 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
           </button>
           <span className="text-[11px] text-neutral-500">Paso {step} de 5</span>
           {step < 5 ? (
-            <button type="button" onClick={next} className="px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1 cursor-pointer">
-              Siguiente
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {step === 1 && (
+                <button
+                  type="button"
+                  onClick={handleSaveOnly}
+                  className="px-3.5 py-2 rounded-full border border-[#2B2B36] text-neutral-200 hover:text-white hover:border-[#3A3A48] text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  title="Guarda los datos ahora; el consentimiento queda pendiente"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  {canConsent ? (isEdit ? 'Guardar y firmar después' : 'Guardar y firmar después') : isEdit ? 'Guardar cambios' : 'Guardar cliente'}
+                </button>
+              )}
+              {(canConsent || step > 1) && (
+                <button type="button" onClick={next} className="px-5 py-2 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold flex items-center gap-1 cursor-pointer">
+                  {step === 1 ? 'Continuar: ficha de salud' : 'Siguiente'}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           ) : (
             <button type="button" onClick={handleSave} className="px-5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer">
               <CheckCircle2 className="w-4 h-4" />

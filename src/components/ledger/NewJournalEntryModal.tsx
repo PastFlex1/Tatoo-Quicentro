@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   X,
@@ -374,7 +375,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
               <label className="text-[10px] text-neutral-400 block mb-1 font-semibold uppercase">
                 Tipo de Asiento
               </label>
-              <select
+              <UiSelect
                 value={entryType}
                 onChange={e => setEntryType(e.target.value as JournalEntryType)}
                 className="w-full bg-[#18181D] border border-[#2B2B36] rounded-xl px-3 py-1.5 text-white text-xs focus:border-[#FF3366] focus:outline-none cursor-pointer"
@@ -383,7 +384,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
                 <option value="ajuste">Asiento de Ajuste / Regularización</option>
                 <option value="apertura">Asiento de Apertura / Capital</option>
                 <option value="cierre">Asiento de Cierre Contable</option>
-              </select>
+              </UiSelect>
             </div>
 
             <div>
@@ -447,7 +448,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
                     {lines.map((line, idx) => (
                       <tr key={line.id} className="hover:bg-[#16161D]">
                         <td className="py-2 px-3">
-                          <select
+                          <UiSelect
                             value={line.accountCode}
                             onChange={e => handleUpdateLine(line.id, 'accountCode', e.target.value)}
                             className="w-full bg-[#1A1A22] border border-[#2B2B36] rounded-xl px-2.5 py-1.5 text-white text-xs focus:border-[#FF3366] focus:outline-none cursor-pointer"
@@ -457,7 +458,7 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
                                 {acc.code} · {acc.name} ({acc.group})
                               </option>
                             ))}
-                          </select>
+                          </UiSelect>
                         </td>
 
                         <td className="py-2 px-3">

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   Truck,
@@ -433,7 +434,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
           {/* Categoría Selector */}
           <div className="flex items-center gap-1.5 bg-[#1A1A20] border border-[#2B2B36] px-3 py-1.5 rounded-xl">
             <Tag className="w-3.5 h-3.5 text-neutral-400" />
-            <select
+            <UiSelect
               value={filterCategory}
               onChange={e => setFilterCategory(e.target.value)}
               className="bg-transparent text-white text-xs outline-none cursor-pointer"
@@ -446,12 +447,12 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
               <option value="alquiler">Arriendo / Alícuotas</option>
               <option value="servicios">Servicios Básicos</option>
               <option value="otros">Otros</option>
-            </select>
+            </UiSelect>
           </div>
 
           {/* Estado Selector */}
           <div className="flex items-center gap-1.5 bg-[#1A1A20] border border-[#2B2B36] px-3 py-1.5 rounded-xl">
-            <select
+            <UiSelect
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value as any)}
               className="bg-transparent text-white text-xs outline-none cursor-pointer"
@@ -459,7 +460,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
               <option value="all">Todos los Estados</option>
               <option value="ACTIVO">Solo Activos</option>
               <option value="INACTIVO">Solo Inactivos</option>
-            </select>
+            </UiSelect>
           </div>
         </div>
       </div>
@@ -914,7 +915,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Categoría de Insumos *
                   </label>
-                  <select
+                  <UiSelect
                     value={formCategoria}
                     onChange={e => setFormCategoria(e.target.value as SupplierCategory)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-semibold cursor-pointer"
@@ -926,21 +927,21 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     <option value="alquiler">Alquiler Local & Alícuotas Quicentro</option>
                     <option value="servicios">Servicios Básicos (Luz, Internet, etc.)</option>
                     <option value="otros">Otros Gastos Generales</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Estado del Proveedor
                   </label>
-                  <select
+                  <UiSelect
                     value={formEstado}
                     onChange={e => setFormEstado(e.target.value as any)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-semibold cursor-pointer"
                   >
                     <option value="ACTIVO">ACTIVO (Habilitado)</option>
                     <option value="INACTIVO">INACTIVO (Suspendido)</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div>
@@ -1146,7 +1147,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     <label className="block font-semibold text-neutral-300 mb-1">
                       Banco del Proveedor
                     </label>
-                    <select
+                    <UiSelect
                       value={formBancoNombre}
                       onChange={e => setFormBancoNombre(e.target.value)}
                       className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:border-[#FF3366] outline-none cursor-pointer"
@@ -1159,21 +1160,21 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                       <option value="Banco Internacional">Banco Internacional</option>
                       <option value="Cooperativa JEP">Cooperativa JEP</option>
                       <option value="Otro">Otro</option>
-                    </select>
+                    </UiSelect>
                   </div>
 
                   <div>
                     <label className="block font-semibold text-neutral-300 mb-1">
                       Tipo de Cuenta
                     </label>
-                    <select
+                    <UiSelect
                       value={formBancoTipoCuenta}
                       onChange={e => setFormBancoTipoCuenta(e.target.value as any)}
                       className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:border-[#FF3366] outline-none cursor-pointer"
                     >
                       <option value="CORRIENTE">Cuenta Corriente</option>
                       <option value="AHORROS">Cuenta de Ahorros</option>
-                    </select>
+                    </UiSelect>
                   </div>
 
                   <div>
@@ -1193,7 +1194,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     <label className="block font-semibold text-neutral-300 mb-1">
                       % Retención IVA Sugerida
                     </label>
-                    <select
+                    <UiSelect
                       value={formRetencionIva}
                       onChange={e => setFormRetencionIva(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white font-mono focus:border-[#FF3366] outline-none cursor-pointer"
@@ -1202,14 +1203,14 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                       <option value="70">70% (Servicios)</option>
                       <option value="100">100% (Honorarios / Liquidación)</option>
                       <option value="0">0% (Sin retención / Especial)</option>
-                    </select>
+                    </UiSelect>
                   </div>
 
                   <div className="sm:col-span-2">
                     <label className="block font-semibold text-neutral-300 mb-1">
                       % Retención Renta Sugerida
                     </label>
-                    <select
+                    <UiSelect
                       value={formRetencionRenta}
                       onChange={e => setFormRetencionRenta(parseFloat(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white font-mono focus:border-[#FF3366] outline-none cursor-pointer"
@@ -1219,7 +1220,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                       <option value="8">8% (Arrendamiento Mercantil Inmuebles)</option>
                       <option value="10">10% (Honorarios Profesionales)</option>
                       <option value="0">0% (Exento)</option>
-                    </select>
+                    </UiSelect>
                   </div>
                 </div>
               </div>

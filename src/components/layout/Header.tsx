@@ -46,6 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Cotizaciones & Proformas Oficiales';
       case 'sales':
         return 'Libro Diario de Ventas';
+      case 'credit-notes':
+        return 'Notas de Crédito (Tipo 04)';
       case 'expenses':
         return 'Gastos & Compras';
       case 'suppliers':

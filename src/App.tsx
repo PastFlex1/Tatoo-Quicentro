@@ -100,6 +100,15 @@ const MainLayout: React.FC = () => {
             onOpenNewSale={() => setActiveTab('pos')}
           />
         );
+      case 'credit-notes':
+        return (
+          <SalesView
+            key="credit-notes"
+            initialSubTab="credit_notes"
+            onOpenReceipt={sale => setReceiptSale(sale)}
+            onOpenNewSale={() => setActiveTab('pos')}
+          />
+        );
       case 'expenses':
         return <ExpensesView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
       case 'suppliers':

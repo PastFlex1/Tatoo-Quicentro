@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { X, RefreshCw, AlertCircle, FileText, CheckCircle2, Boxes } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -156,7 +157,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
             <label className="block font-semibold text-neutral-300 mb-1.5">
               Factura a Modificar / Anular (Comprobante Origen) <span className="text-[#FF3366]">*</span>
             </label>
-            <select
+            <UiSelect
               value={selectedInvoiceId}
               onChange={e => handleSelectInvoice(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs focus:border-[#FF3366]/60"
@@ -167,7 +168,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
                   {s.invoiceNumber} — {s.clientName} ({formatMoney(s.total)}) · {new Date(s.date).toLocaleDateString()}
                 </option>
               ))}
-            </select>
+            </UiSelect>
           </div>
 
           {/* Active Invoice Info Card */}
@@ -197,7 +198,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
             <label className="block font-semibold text-neutral-300 mb-1.5">
               Motivo de Modificación (Según Ficha Técnica SRI) <span className="text-[#FF3366]">*</span>
             </label>
-            <select
+            <UiSelect
               value={reason}
               onChange={e => handleReasonChange(e.target.value as CreditNoteReason)}
               className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs focus:border-[#FF3366]/60"
@@ -206,7 +207,7 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
               <option value="DEVOLUCION_MERCADERIA">02 - DEVOLUCIÓN DE MERCADERÍA / JOYERÍA</option>
               <option value="DESCUENTO_BONIFICACION">03 - DESCUENTO O BONIFICACIÓN POSTERIOR</option>
               <option value="ERROR_DATOS">04 - CORRECCIÓN POR ERROR EN DATOS DE CLIENTE</option>
-            </select>
+            </UiSelect>
           </div>
 
           <div>

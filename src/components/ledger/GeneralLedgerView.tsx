@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   BookOpen,
@@ -630,7 +631,7 @@ export const GeneralLedgerView: React.FC = () => {
 
             <div className="flex items-center gap-2">
               <span className="text-xs text-neutral-400 whitespace-nowrap hidden sm:inline">Cuenta Mayor:</span>
-              <select
+              <UiSelect
                 value={selectedAccountCode}
                 onChange={e => setSelectedAccountCode(e.target.value)}
                 className="w-full md:w-80 px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-full text-xs text-white focus:border-[#FF3366]/60 cursor-pointer"
@@ -641,7 +642,7 @@ export const GeneralLedgerView: React.FC = () => {
                     {acc.code} - {acc.name} ({acc.group})
                   </option>
                 ))}
-              </select>
+              </UiSelect>
             </div>
           </div>
 

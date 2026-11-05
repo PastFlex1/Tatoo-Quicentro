@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { ConsentWizardModal } from './ConsentWizardModal';
 import { ConsentLetterModal } from './ConsentLetterModal';
@@ -30,7 +31,6 @@ import {
   Eye,
   FileCheck,
   Building2,
-  RefreshCw,
   CheckCircle2,
   Share2,
   FileText,
@@ -43,7 +43,6 @@ import {
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, ClientProfile, ProcedureConsentRecord, SaleRecord, ServiceCategory } from '../../types';
-import { consultarIdentificacion } from '../../services/sriService';
 import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
 
 interface ClientsViewProps {
@@ -69,7 +68,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
     setActiveTab,
   } = useStudio();
 
-  const { guard: guardPermission } = usePermission();
+  const { guard: guardPermission, can } = usePermission();
 
   // Pestañas del módulo y flujo de ficha + consentimiento
   const [clientsTab, setClientsTab] = useState<'directory' | 'health' | 'consents'>('directory');
@@ -122,40 +121,16 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const [viewingProcedureConsent, setViewingProcedureConsent] = useState<ProcedureConsentRecord | null>(null);
 
   // Modal 2: Crear / Editar Cliente
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<ClientProfile | null>(null);
 
   // Form Fields
-  const [formName, setFormName] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formDni, setFormDni] = useState('');
-  const [formInstagram, setFormInstagram] = useState('');
-  const [formBirthDate, setFormBirthDate] = useState('');
-  const [formBloodType, setFormBloodType] = useState('');
-  const [formAllergies, setFormAllergies] = useState('');
-  const [formMedicalConditions, setFormMedicalConditions] = useState('');
-  const [formSkinNotes, setFormSkinNotes] = useState('');
-  const [formEmergencyContact, setFormEmergencyContact] = useState('');
-  const [formNotes, setFormNotes] = useState('');
-  const [formConsent, setFormConsent] = useState(true);
-  const [formTags, setFormTags] = useState('Frecuente');
 
   // SRI Metadata in Form
-  const [formTradeName, setFormTradeName] = useState('');
-  const [formRegimen, setFormRegimen] = useState('');
-  const [formTaxpayerType, setFormTaxpayerType] = useState('');
-  const [formSriStatus, setFormSriStatus] = useState('');
-  const [formSriVerified, setFormSriVerified] = useState(false);
-  const [isSearchingSri, setIsSearchingSri] = useState(false);
-  const [sriMessage, setSriMessage] = useState<{ text: string; type: 'success' | 'warning' | 'error' } | null>(null);
 
   // Close modals on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setViewHistoryClient(null);
-        setIsModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -298,56 +273,15 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   const sriVerifiedCount = unifiedClients.filter(c => c.sriVerified).length;
 
   // Handlers
+  // Crear y editar clientes usa SIEMPRE el mismo formulario por pasos (datos + salud + consentimiento)
   const handleOpenAddModal = () => {
     if (!guardPermission('clients.create')) return;
-    setEditingClient(null);
-    setFormName('');
-    setFormPhone('');
-    setFormEmail('');
-    setFormDni('');
-    setFormInstagram('');
-    setFormBirthDate('');
-    setFormBloodType('');
-    setFormAllergies('');
-    setFormMedicalConditions('');
-    setFormSkinNotes('');
-    setFormEmergencyContact('');
-    setFormNotes('');
-    setFormConsent(true);
-    setFormTags('Nuevo');
-    setFormTradeName('');
-    setFormRegimen('');
-    setFormTaxpayerType('');
-    setFormSriStatus('');
-    setFormSriVerified(false);
-    setSriMessage(null);
-    setIsModalOpen(true);
+    setConsentWizard({ client: null, key: Date.now() });
   };
 
   const handleOpenEditModal = (client: ClientProfile) => {
     if (!guardPermission('clients.edit')) return;
-    setEditingClient(client);
-    setFormName(client.name);
-    setFormPhone(client.phone || '');
-    setFormEmail(client.email || '');
-    setFormDni(client.dni || '');
-    setFormInstagram(client.instagram || '');
-    setFormBirthDate(client.birthDate || '');
-    setFormBloodType(client.bloodType || '');
-    setFormAllergies(client.allergies || '');
-    setFormMedicalConditions(client.medicalConditions || '');
-    setFormSkinNotes(client.skinNotes || '');
-    setFormEmergencyContact(client.emergencyContact || '');
-    setFormNotes(client.notes || '');
-    setFormConsent(client.consentSigned);
-    setFormTags(client.tags?.join(', ') || 'Frecuente');
-    setFormTradeName(client.tradeName || '');
-    setFormRegimen(client.taxpayerRegime || '');
-    setFormTaxpayerType(client.taxpayerType || '');
-    setFormSriStatus(client.sriStatus || '');
-    setFormSriVerified(client.sriVerified || false);
-    setSriMessage(null);
-    setIsModalOpen(true);
+    setConsentWizard({ client, key: Date.now() });
   };
 
   const handleDeleteClient = (client: ClientProfile) => {
@@ -361,104 +295,6 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
   };
 
   // Real-time lookup with SRI / Registro Civil
-  const handleLookupSri = async (dniValue?: string) => {
-    const targetDni = (dniValue || formDni || '').trim();
-    if (!targetDni) {
-      setSriMessage({ text: 'Ingresa un número de cédula o RUC para consultar.', type: 'warning' });
-      return;
-    }
-
-    setIsSearchingSri(true);
-    setSriMessage(null);
-
-    try {
-      const res = await consultarIdentificacion(targetDni);
-      if (res.found && res.nombre) {
-        setFormName(res.nombre);
-        if (res.nombreComercial) {
-          setFormTradeName(res.nombreComercial);
-        }
-        if (res.regimen) {
-          setFormRegimen(res.regimen);
-        }
-        if (res.tipoPersona || res.tipoContribuyente) {
-          setFormTaxpayerType(res.tipoPersona || res.tipoContribuyente || '');
-        }
-        setFormSriStatus(res.estado || 'ACTIVO');
-        setFormSriVerified(true);
-
-        const sourceLabel =
-          res.source === 'SRI_CATASTRO'
-            ? 'Catastro SRI'
-            : res.source === 'SRI_PERSONA'
-            ? 'Persona SRI'
-            : res.source === 'REGISTRO_CIVIL'
-            ? 'Registro Civil'
-            : 'SRI Móvil';
-
-        setSriMessage({
-          text: `✓ Identificación verificada (${sourceLabel}): ${res.nombre}${
-            res.regimen ? ` • Régimen ${res.regimen}` : ''
-          }`,
-          type: 'success',
-        });
-      } else {
-        setSriMessage({
-          text: res.error || 'No se encontraron registros en el SRI ni Registro Civil para esta identificación.',
-          type: 'error',
-        });
-      }
-    } catch {
-      setSriMessage({
-        text: 'Error de conexión al consultar los servicios tributarios del SRI.',
-        type: 'error',
-      });
-    } finally {
-      setIsSearchingSri(false);
-    }
-  };
-
-  const handleSaveClient = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!guardPermission(editingClient ? 'clients.edit' : 'clients.create')) return;
-    if (!formName.trim()) return;
-
-    const parsedTags = formTags
-      .split(',')
-      .map(t => t.trim())
-      .filter(Boolean);
-
-    const clientData = {
-      name: formName.trim(),
-      phone: formPhone.trim() || undefined,
-      email: formEmail.trim() || undefined,
-      dni: formDni.trim() || undefined,
-      instagram: formInstagram.trim() || undefined,
-      birthDate: formBirthDate || undefined,
-      bloodType: formBloodType || undefined,
-      allergies: formAllergies.trim() || undefined,
-      medicalConditions: formMedicalConditions.trim() || undefined,
-      skinNotes: formSkinNotes.trim() || undefined,
-      emergencyContact: formEmergencyContact.trim() || undefined,
-      notes: formNotes.trim() || undefined,
-      consentSigned: formConsent,
-      tags: parsedTags.length > 0 ? parsedTags : ['Frecuente'],
-      tradeName: formTradeName.trim() || undefined,
-      taxpayerRegime: formRegimen.trim() || undefined,
-      taxpayerType: formTaxpayerType.trim() || undefined,
-      sriStatus: formSriStatus || undefined,
-      sriVerified: formSriVerified,
-    };
-
-    if (editingClient) {
-      updateClient(editingClient.id, clientData);
-    } else {
-      addClient(clientData);
-    }
-
-    setIsModalOpen(false);
-  };
-
   const handleCobrarEnPos = (client: ClientProfile) => {
     if (!guardPermission('pos.charge')) return;
     if (onSelectClientForPos) {
@@ -837,27 +673,18 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
               Directorio & Historial de Clientes
             </h1>
             <p className="text-[11px] text-neutral-400">
-              Gestión horizontal de cartera de clientes, visualización de expediente clínico, compras históricas y acciones rápidas.
+              Registre al cliente con su ficha de salud y su carta de consentimiento en un solo formulario.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 shrink-0">
-          <button
-            onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#1C1C24] hover:bg-[#252530] text-white text-xs font-bold border border-[#2B2B38] cursor-pointer whitespace-nowrap"
-          >
-            <PlusCircle className="w-4 h-4 text-[#FF3366]" />
-            <span>Cliente rápido</span>
-          </button>
-          <button
-            onClick={() => openConsentWizard(null)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_16px_rgba(255,51,102,0.35)] active:scale-95 cursor-pointer whitespace-nowrap"
-          >
-            <FileSignature className="w-4 h-4" />
-            <span>Ficha completa + Consentimiento</span>
-          </button>
-        </div>
+        <button
+          onClick={handleOpenAddModal}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-xs font-bold transition-all shadow-[0_0_16px_rgba(255,51,102,0.35)] active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
+        >
+          <PlusCircle className="w-4 h-4" />
+          <span>Nuevo cliente</span>
+        </button>
       </div>
 
       {/* Pestañas del módulo */}
@@ -985,7 +812,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
           </div>
 
           {/* Quick Filter: Consent */}
-          <select
+          <UiSelect
             value={consentFilter}
             onChange={e => setConsentFilter(e.target.value as any)}
             className="bg-[#121215] border border-[#272730] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
@@ -993,7 +820,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
             <option value="all">Ficha Sanitaria: Todos</option>
             <option value="signed">✓ Firmados</option>
             <option value="pending">⚠ Pendientes</option>
-          </select>
+          </UiSelect>
         </div>
       </div>
 
@@ -2029,7 +1856,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
 
                               <div>
                                 <label className="block font-semibold text-neutral-300 mb-1">Categoría</label>
-                                <select
+                                <UiSelect
                                   value={clientPhotoCategory}
                                   onChange={e => setClientPhotoCategory(e.target.value as any)}
                                   className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
@@ -2038,12 +1865,12 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                   <option value="piercing">Piercing</option>
                                   <option value="healed">Cicatrizado (Healed)</option>
                                   <option value="coverup">Cover Up</option>
-                                </select>
+                                </UiSelect>
                               </div>
 
                               <div>
                                 <label className="block font-semibold text-neutral-300 mb-1">Artista Autor</label>
-                                <select
+                                <UiSelect
                                   value={clientPhotoArtistId}
                                   onChange={e => setClientPhotoArtistId(e.target.value)}
                                   className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
@@ -2051,7 +1878,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                   {artists.map(art => (
                                     <option key={art.id} value={art.id}>{art.name}</option>
                                   ))}
-                                </select>
+                                </UiSelect>
                               </div>
 
                               <div>
@@ -2252,216 +2079,6 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
       )}
 
       {/* =========================================================================
-          MODAL 2: CREAR / EDITAR CLIENTE (CON CONSULTA SRI EN TIEMPO REAL)
-          ========================================================================= */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
-          <div className="bg-[#17171C] border border-[#2B2B36] rounded-3xl max-w-xl w-full shadow-2xl p-5 sm:p-6 space-y-4 my-auto max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#25252E] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-[#FF3366]/15 text-[#FF3366]">
-                  <Users className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm font-bold text-white tracking-wide">
-                  {editingClient ? 'Editar Ficha del Cliente' : 'Registrar Nuevo Cliente'}
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveClient} className="space-y-4 text-xs">
-              {/* Cédula / RUC con Verificación SRI */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Cédula / RUC (Ecuador)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Ej. 1712345678 o 1790012345001"
-                    value={formDni}
-                    onChange={e => setFormDni(e.target.value)}
-                    className="flex-1 px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleLookupSri()}
-                    disabled={isSearchingSri}
-                    className="px-4 py-2.5 rounded-xl bg-[#1C1C24] hover:bg-[#252530] text-emerald-400 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSri ? 'animate-spin' : ''}`} />
-                    <span>{isSearchingSri ? 'Consultando...' : 'Consultar SRI'}</span>
-                  </button>
-                </div>
-                {sriMessage && (
-                  <p
-                    className={`text-[11px] mt-1.5 p-2 rounded-lg ${
-                      sriMessage.type === 'success'
-                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                        : sriMessage.type === 'warning'
-                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        : 'bg-red-500/15 text-red-300 border border-red-500/30'
-                    }`}
-                  >
-                    {sriMessage.text}
-                  </p>
-                )}
-              </div>
-
-              {/* Nombre Completo */}
-              <div>
-                <label className="block font-semibold text-neutral-300 mb-1.5">
-                  Nombres Completos / Razón Social *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Carlos Patricio Mendoza Silva"
-                  value={formName}
-                  onChange={e => setFormName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                />
-              </div>
-
-              {/* Teléfono & Email */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1.5">Teléfono / WhatsApp</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. 0987654321"
-                    value={formPhone}
-                    onChange={e => setFormPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1.5">Correo Electrónico</label>
-                  <input
-                    type="email"
-                    placeholder="cliente@gmail.com"
-                    value={formEmail}
-                    onChange={e => setFormEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Instagram & Tags */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1.5">Usuario Instagram</label>
-                  <input
-                    type="text"
-                    placeholder="@usuario_tattoo"
-                    value={formInstagram}
-                    onChange={e => setFormInstagram(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-neutral-300 mb-1.5">Etiquetas (separadas por coma)</label>
-                  <input
-                    type="text"
-                    placeholder="VIP, Coleccionista, Piercing"
-                    value={formTags}
-                    onChange={e => setFormTags(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Sección Médica */}
-              <div className="p-3.5 rounded-2xl bg-[#121215] border border-[#272730] space-y-3">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <HeartPulse className="w-4 h-4 text-[#FF3366]" />
-                  <span>Ficha Sanitaria & Bioseguridad</span>
-                </span>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium text-neutral-300 mb-1">Alergias Conocidas</label>
-                    <input
-                      type="text"
-                      placeholder="Látex, pigmentos rojos, níquel..."
-                      value={formAllergies}
-                      onChange={e => setFormAllergies(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-neutral-300 mb-1">Tipo de Sangre</label>
-                    <select
-                      value={formBloodType}
-                      onChange={e => setFormBloodType(e.target.value)}
-                      className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 cursor-pointer"
-                    >
-                      <option value="">No especificado</option>
-                      <option value="O+">O+</option>
-                      <option value="O-">O-</option>
-                      <option value="A+">A+</option>
-                      <option value="A-">A-</option>
-                      <option value="B+">B+</option>
-                      <option value="B-">B-</option>
-                      <option value="AB+">AB+</option>
-                      <option value="AB-">AB-</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-neutral-300 mb-1">Contacto de Emergencia</label>
-                  <input
-                    type="text"
-                    placeholder="Nombre y teléfono de familiar"
-                    value={formEmergencyContact}
-                    onChange={e => setFormEmergencyContact(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#17171C] border border-[#2B2B36] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
-                  />
-                </div>
-
-                <div className="pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formConsent}
-                      onChange={e => setFormConsent(e.target.checked)}
-                      className="rounded accent-[#FF3366] w-4 h-4 cursor-pointer"
-                    />
-                    <span className="text-neutral-200 font-medium text-xs">
-                      Consentimiento informado y ficha sanitaria firmada digitalmente
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Botones de Acción */}
-              <div className="pt-3 border-t border-[#25252E] flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-neutral-400 hover:text-white cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white font-bold shadow-[0_0_12px_rgba(255,51,102,0.3)] transition-all cursor-pointer"
-                >
-                  {editingClient ? 'Guardar Cambios' : 'Registrar Cliente'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================================
           MODAL 3: SUBIR / REGISTRAR CONSENTIMIENTO FIRMADO POR PROCEDIMIENTO
           ========================================================================= */}
       {isConsentUploadModalOpen && viewHistoryClient && (
@@ -2505,7 +2122,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                     <label className="block font-semibold text-neutral-300 mb-1">
                       Vincular a Procedimiento del Cliente
                     </label>
-                    <select
+                    <UiSelect
                       value={
                         consentProcedureRefId
                           ? `${consentProcedureType}:${consentProcedureRefId}`
@@ -2562,7 +2179,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                           ))}
                         </optgroup>
                       )}
-                    </select>
+                    </UiSelect>
                   </div>
                 );
               })()}
@@ -2586,7 +2203,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Artista / Profesional Responsable *
                   </label>
-                  <select
+                  <UiSelect
                     value={consentArtistName}
                     onChange={e => setConsentArtistName(e.target.value)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white outline-none focus:border-[#FF3366] cursor-pointer"
@@ -2599,7 +2216,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                     {!artists.some(a => a.name === consentArtistName) && consentArtistName && (
                       <option value={consentArtistName}>{consentArtistName}</option>
                     )}
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div>
@@ -2873,6 +2490,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
           key={consentWizard.key}
           isOpen
           initialClient={consentWizard.client}
+          canConsent={can('clients.view_medical')}
           onClose={() => setConsentWizard(null)}
           onSaved={form => {
             setConsentWizard(null);

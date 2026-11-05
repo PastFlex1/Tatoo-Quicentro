@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect, UiSuggestInput } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   PlusCircle,
@@ -747,7 +748,7 @@ export const InventoryView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1.5">Categoría</label>
-                  <select
+                  <UiSelect
                     value={category}
                     onChange={e => setCategory(e.target.value as any)}
                     className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors cursor-pointer"
@@ -758,7 +759,7 @@ export const InventoryView: React.FC = () => {
                     <option value="aftercare">Aftercare & Bálsamos Cicatrizantes</option>
                     <option value="hygiene">Bioseguridad & Desinfección</option>
                     <option value="equipment">Equipamiento & Fuentes</option>
-                  </select>
+                  </UiSelect>
                 </div>
               </div>
 
@@ -769,19 +770,14 @@ export const InventoryView: React.FC = () => {
                     <Truck className="w-3.5 h-3.5 text-[#FF3366]" />
                     <span>Proveedor / Distribuidor</span>
                   </label>
-                  <input
+                  <UiSuggestInput
                     type="text"
-                    list="suppliers-datalist"
+                    suggestions={existingSuppliers.map(s => ({ value: s }))}
                     placeholder="Ej. Kwadron Ecuador, Dynamic Imports, Titanium Supply"
                     value={supplier}
                     onChange={e => setSupplier(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
                   />
-                  <datalist id="suppliers-datalist">
-                    {existingSuppliers.map(s => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
                 </div>
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1.5">
@@ -904,7 +900,7 @@ export const InventoryView: React.FC = () => {
                     <label className="block font-medium text-neutral-300 mb-1 text-[11px]">
                       Tipo de IVA (SRI)
                     </label>
-                    <select
+                    <UiSelect
                       value={String(taxRate)}
                       onChange={e => {
                         const v = e.target.value;
@@ -919,7 +915,7 @@ export const InventoryView: React.FC = () => {
                       <option value="0">0% (Tarifa 0% Insumos Médicos)</option>
                       <option value="NO_OBJETO">No Objeto de IVA</option>
                       <option value="EXENTO">Exento de IVA</option>
-                    </select>
+                    </UiSelect>
                   </div>
 
                   {/* Precio Sin IVA */}

@@ -10,6 +10,7 @@
  */
 import { CompanyConfig, CreditNoteRecord, SaleRecord, StudioSettings } from '../types';
 import { generateSriClaveAcceso } from '../utils/sriCalculations';
+import { saleLines } from '../utils/saleLines';
 
 export const DEFAULT_SRI_API_URL = 'http://localhost:8081';
 
@@ -159,15 +160,22 @@ export function buildAccessKey(
 export function buildFacturaXml(sale: SaleRecord, s: StudioSettings, claveAcceso: string): string {
   const { estab, pto, sec } = serieOf(sale.invoiceNumber, s);
   const buyer = buyerOf(sale.clientDni, sale.clientName);
-  const rate = sale.taxRate || 0;
-  const codPct = ivaCodigoPorcentaje(rate);
-  const pieces = sale.pieces && sale.pieces > 0 ? sale.pieces : 1;
-  const discount = sale.discount || 0;
-  const base = Math.max(0, (sale.subtotal || 0) - discount);
-  const tax = sale.taxAmount || 0;
+  // Líneas de detalle (factura de varios ítems o de una sola línea)
+  const lines = saleLines(sale);
+  const discount = lines.reduce((a, l) => a + l.discount, 0);
+  const base = lines.reduce((a, l) => a + l.base, 0);
+  const tax = lines.reduce((a, l) => a + l.taxAmount, 0);
   const tip = sale.tipAmount || 0;
   const importeTotal = base + tax + tip;
-  const unitPrice = (sale.subtotal || 0) / pieces;
+  // Totales de impuesto agrupados por tarifa de IVA
+  const taxGroups = new Map<string, { base: number; value: number }>();
+  lines.forEach(l => {
+    const code = ivaCodigoPorcentaje(l.taxRate);
+    const g = taxGroups.get(code) || { base: 0, value: 0 };
+    g.base += l.base;
+    g.value += l.taxAmount;
+    taxGroups.set(code, g);
+  });
 
   // Formas de pago (tabla 24): 01 sin sistema financiero, 19 tarjeta de crédito, 20 otros con sistema financiero
   const pagos: Array<[string, number]> = [];
@@ -199,12 +207,12 @@ ${infoTributaria(s, claveAcceso, '01', estab, pto, sec)}
     <totalSinImpuestos>${money(base)}</totalSinImpuestos>
     <totalDescuento>${money(discount)}</totalDescuento>
     <totalConImpuestos>
-      <totalImpuesto>
+${[...taxGroups.entries()].map(([code, g]) => `      <totalImpuesto>
         <codigo>2</codigo>
-        <codigoPorcentaje>${codPct}</codigoPorcentaje>
-        <baseImponible>${money(base)}</baseImponible>
-        <valor>${money(tax)}</valor>
-      </totalImpuesto>
+        <codigoPorcentaje>${code}</codigoPorcentaje>
+        <baseImponible>${money(g.base)}</baseImponible>
+        <valor>${money(g.value)}</valor>
+      </totalImpuesto>`).join(String.fromCharCode(10))}
     </totalConImpuestos>
     <propina>${money(tip)}</propina>
     <importeTotal>${money(importeTotal)}</importeTotal>
@@ -217,23 +225,23 @@ ${pagos.map(([code, v]) => `      <pago>
     </pagos>
   </infoFactura>
   <detalles>
-    <detalle>
-      <codigoPrincipal>${escapeXml((sale.serviceCategory || 'SERV').toUpperCase().slice(0, 25))}</codigoPrincipal>
-      <descripcion>${escapeXml((sale.serviceName || 'Servicio').slice(0, 300))}</descripcion>
-      <cantidad>${qty(pieces)}</cantidad>
-      <precioUnitario>${qty(unitPrice)}</precioUnitario>
-      <descuento>${money(discount)}</descuento>
-      <precioTotalSinImpuesto>${money(base)}</precioTotalSinImpuesto>
+${lines.map(l => `    <detalle>
+      <codigoPrincipal>${escapeXml(l.code)}</codigoPrincipal>
+      <descripcion>${escapeXml((l.description || 'Servicio').slice(0, 300))}</descripcion>
+      <cantidad>${qty(l.quantity)}</cantidad>
+      <precioUnitario>${qty(l.unitPrice)}</precioUnitario>
+      <descuento>${money(l.discount)}</descuento>
+      <precioTotalSinImpuesto>${money(l.base)}</precioTotalSinImpuesto>
       <impuestos>
         <impuesto>
           <codigo>2</codigo>
-          <codigoPorcentaje>${codPct}</codigoPorcentaje>
-          <tarifa>${money(rate)}</tarifa>
-          <baseImponible>${money(base)}</baseImponible>
-          <valor>${money(tax)}</valor>
+          <codigoPorcentaje>${ivaCodigoPorcentaje(l.taxRate)}</codigoPorcentaje>
+          <tarifa>${money(l.taxRate)}</tarifa>
+          <baseImponible>${money(l.base)}</baseImponible>
+          <valor>${money(l.taxAmount)}</valor>
         </impuesto>
       </impuestos>
-    </detalle>
+    </detalle>`).join(String.fromCharCode(10))}
   </detalles>
 ${infoAdicional([
   ['Email', sale.clientEmail],

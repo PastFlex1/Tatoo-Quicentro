@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import {
   X,
   User,
@@ -316,7 +317,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 <label className="block text-xs font-semibold text-neutral-300 mb-1">
                   Rol del Usuario *
                 </label>
-                <select
+                <UiSelect
                   value={rol}
                   onChange={e => setRol(e.target.value as UserRole)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#FF3366]"
@@ -327,7 +328,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                       {r.description ? ` — ${r.description}` : ''}
                     </option>
                   ))}
-                </select>
+                </UiSelect>
               </div>
 
               {/* PIN */}
@@ -352,7 +353,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 <label className="block text-xs font-bold text-purple-300">
                   Vincular con Artista del Estudio:
                 </label>
-                <select
+                <UiSelect
                   value={artistId}
                   onChange={e => setArtistId(e.target.value)}
                   className="w-full bg-[#1C1C24] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
@@ -363,7 +364,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                       {art.name} ({art.role} - Comisión: {art.defaultCommissionRate}%)
                     </option>
                   ))}
-                </select>
+                </UiSelect>
                 <p className="text-[10px] text-neutral-400">
                   Permite que este usuario vea directamente sus citas agendadas, clientes atendidos y el cálculo de sus liquidaciones de comisión.
                 </p>

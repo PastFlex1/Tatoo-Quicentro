@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { DEFAULT_SRI_API_URL } from '../../services/sriElectronicService';
 import {
@@ -754,7 +755,7 @@ export const SettingsView: React.FC = () => {
                 <label className="block font-semibold text-neutral-300 mb-1.5">
                   Régimen Tributario SRI *
                 </label>
-                <select
+                <UiSelect
                   value={regimenTributario}
                   onChange={e => setRegimenTributario(e.target.value)}
                   className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60 font-semibold"
@@ -762,7 +763,7 @@ export const SettingsView: React.FC = () => {
                   <option value="RIMPE_EMPRENDEDOR">CONTRIBUYENTE RÉGIMEN RIMPE (Emprendedor)</option>
                   <option value="RIMPE_NEGOCIO_POPULAR">CONTRIBUYENTE RÉGIMEN RIMPE (Negocio Popular)</option>
                   <option value="GENERAL">RÉGIMEN GENERAL</option>
-                </select>
+                </UiSelect>
               </div>
 
               {/* Ambiente del SRI */}
@@ -770,14 +771,14 @@ export const SettingsView: React.FC = () => {
                 <label className="block font-semibold text-neutral-300 mb-1.5">
                   Ambiente del SRI *
                 </label>
-                <select
+                <UiSelect
                   value={ambiente}
                   onChange={e => setAmbiente(e.target.value as SriAmbiente)}
                   className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60 font-mono"
                 >
                   <option value="PRUEBAS">1 - PRUEBAS (Ambiente de Pruebas / Certificación)</option>
                   <option value="PRODUCCION">2 - PRODUCCIÓN (Emisión Legal en Vivo)</option>
-                </select>
+                </UiSelect>
               </div>
 
               {/* URL de la API Java de facturación electrónica */}
@@ -802,14 +803,14 @@ export const SettingsView: React.FC = () => {
                 <label className="block font-semibold text-neutral-300 mb-1.5">
                   ¿Obligado a Llevar Contabilidad?
                 </label>
-                <select
+                <UiSelect
                   value={obligadoContabilidad}
                   onChange={e => setObligadoContabilidad(e.target.value as 'SI' | 'NO')}
                   className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
                 >
                   <option value="NO">NO</option>
                   <option value="SI">SI</option>
-                </select>
+                </UiSelect>
               </div>
 
               {/* Agente de Retención */}
@@ -817,14 +818,14 @@ export const SettingsView: React.FC = () => {
                 <label className="block font-semibold text-neutral-300 mb-1.5">
                   ¿Agente de Retención?
                 </label>
-                <select
+                <UiSelect
                   value={agenteRetencion}
                   onChange={e => setAgenteRetencion(e.target.value as 'SI' | 'NO')}
                   className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60"
                 >
                   <option value="NO">NO</option>
                   <option value="SI">SI</option>
-                </select>
+                </UiSelect>
               </div>
 
               {/* Contribuyente Especial */}

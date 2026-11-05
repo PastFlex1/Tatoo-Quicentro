@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   Camera,
@@ -418,7 +419,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
           {/* Artist Filter */}
           <div className="flex items-center gap-1.5 bg-[#1A1A20] border border-[#2B2B36] px-3 py-1.5 rounded-xl">
             <User className="w-3.5 h-3.5 text-neutral-400" />
-            <select
+            <UiSelect
               value={selectedArtistId}
               onChange={e => setSelectedArtistId(e.target.value)}
               className="bg-transparent text-white text-xs outline-none cursor-pointer"
@@ -429,7 +430,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                   {art.name}
                 </option>
               ))}
-            </select>
+            </UiSelect>
           </div>
 
           {/* Category Tabs */}
@@ -931,7 +932,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Categoría de la Obra *
                   </label>
-                  <select
+                  <UiSelect
                     value={uploadCategory}
                     onChange={e => setUploadCategory(e.target.value as any)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-semibold cursor-pointer"
@@ -941,7 +942,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                     <option value="healed">Cicatrizado (Healed)</option>
                     <option value="flash">Flash / Diseño Original</option>
                     <option value="coverup">Cover Up / Cobertura</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 {/* Artista Autor */}
@@ -949,7 +950,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Artista Autor *
                   </label>
-                  <select
+                  <UiSelect
                     value={uploadArtistId}
                     onChange={e => setUploadArtistId(e.target.value)}
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-semibold cursor-pointer"
@@ -959,7 +960,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                         {art.name} ({art.role || 'Artista'})
                       </option>
                     ))}
-                  </select>
+                  </UiSelect>
                 </div>
 
                 {/* Cliente Vinculado */}
@@ -967,7 +968,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Cliente del Directorio (Opcional)
                   </label>
-                  <select
+                  <UiSelect
                     value={uploadClientId}
                     onChange={e => {
                       setUploadClientId(e.target.value);
@@ -981,7 +982,7 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                         {c.name}
                       </option>
                     ))}
-                  </select>
+                  </UiSelect>
                 </div>
 
                 {/* O escribir nombre de cliente libre */}

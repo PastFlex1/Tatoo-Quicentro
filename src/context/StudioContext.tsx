@@ -1049,7 +1049,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return currentPermissions.has(permission);
   };
 
-  const canAccessTab = (tabId: string): boolean => can(`${tabId}.view`);
+  // Secciones del menú que comparten permisos con otro módulo
+  const TAB_PERMISSION_ALIAS: Record<string, string> = { 'credit-notes': 'sales.view' };
+  const canAccessTab = (tabId: string): boolean => can(TAB_PERMISSION_ALIAS[tabId] || `${tabId}.view`);
 
   const getRole = (roleId: string) => roles.find(r => r.id === roleId);
 
@@ -1643,8 +1645,24 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Sincronización automática de inventario y Kardex
     const itemsToDeduct: { itemId: string; name: string; sku?: string; qty: number; type: KardexMovementType; concept: string }[] = [];
 
-    // 1. Si se especificó un ítem directo de inventario (venta mostrador / retail)
-    if (saleData.inventoryItemId) {
+    // 0. Factura de varias líneas: cada producto de inventario descarga su propio stock
+    if (saleData.items && saleData.items.length > 0) {
+      saleData.items.forEach(it => {
+        if (!it.inventoryItemId) return;
+        const invItem = inventory.find(i => i.id === it.inventoryItemId);
+        if (invItem && it.quantity > 0) {
+          itemsToDeduct.push({
+            itemId: invItem.id,
+            name: invItem.name,
+            sku: invItem.sku,
+            qty: it.quantity,
+            type: 'retail_sale',
+            concept: `Venta mostrador (${invoiceNumber}) - Cliente: ${saleData.clientName}`,
+          });
+        }
+      });
+    } else if (saleData.inventoryItemId) {
+      // 1. Si se especificó un ítem directo de inventario (venta mostrador / retail)
       const invItem = inventory.find(i => i.id === saleData.inventoryItemId);
       if (invItem) {
         itemsToDeduct.push({

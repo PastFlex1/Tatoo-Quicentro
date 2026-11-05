@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   PlusCircle,
@@ -1245,14 +1246,14 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                 <label className="block font-semibold text-neutral-300 mb-1">
                   Forma de Pago del Estudio
                 </label>
-                <select
+                <UiSelect
                   value={settleMethod}
                   onChange={e => setSettleMethod(e.target.value as any)}
                   className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60 cursor-pointer"
                 >
                   <option value="transfer">Transferencia Bancaria / Pago Digital</option>
                   <option value="cash">Efectivo de Caja Chica / Arqueo</option>
-                </select>
+                </UiSelect>
               </div>
 
               <div>
@@ -1363,7 +1364,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
 
                 <div>
                   <label className="block font-semibold text-neutral-300 mb-1">Rol</label>
-                  <select
+                  <UiSelect
                     value={role}
                     onChange={e => setRole(e.target.value as any)}
                     className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366]/60 cursor-pointer"
@@ -1372,7 +1373,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                     <option value="Tatuadora">Tatuadora Residente</option>
                     <option value="Piercer">Piercer / Anillador</option>
                     <option value="Invitado / Guest">Artista Guest</option>
-                  </select>
+                  </UiSelect>
                 </div>
               </div>
 

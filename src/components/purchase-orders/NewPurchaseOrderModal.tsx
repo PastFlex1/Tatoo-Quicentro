@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   X,
@@ -563,7 +564,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                 <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
                   Condición de Pago
                 </label>
-                <select
+                <UiSelect
                   value={paymentTerms}
                   onChange={e => setPaymentTerms(e.target.value)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
@@ -573,14 +574,14 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <option value="Crédito 30 días">Crédito 30 días</option>
                   <option value="Crédito 60 días">Crédito 60 días</option>
                   <option value="50% Anticipo - 50% Entrega">50% Anticipo - 50% Entrega</option>
-                </select>
+                </UiSelect>
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
                   Método de Pago Sugerido
                 </label>
-                <select
+                <UiSelect
                   value={paymentMethod}
                   onChange={e => setPaymentMethod(e.target.value as any)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
@@ -588,14 +589,14 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <option value="bank_transfer">Transferencia Bancaria (Pichincha / Produbanco)</option>
                   <option value="cash">Efectivo en Caja</option>
                   <option value="credit_card">Tarjeta de Crédito Corporativa</option>
-                </select>
+                </UiSelect>
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
                   Estado de la Orden
                 </label>
-                <select
+                <UiSelect
                   value={status}
                   onChange={e => setStatus(e.target.value as PurchaseOrderStatus)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
@@ -604,7 +605,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <option value="sent">Enviada a Proveedor (Sent)</option>
                   <option value="received">Recibida en Bodega (Received)</option>
                   <option value="cancelled">Cancelada (Cancelled)</option>
-                </select>
+                </UiSelect>
               </div>
             </div>
           </div>
@@ -792,7 +793,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <label className="block text-[10px] font-semibold text-neutral-400 mb-1">
                     Unidad
                   </label>
-                  <select
+                  <UiSelect
                     value={itemUnit}
                     onChange={e => setItemUnit(e.target.value)}
                     className="w-full bg-[#1A1A22] border border-[#30303D] rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
@@ -802,7 +803,7 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                     <option value="piezas">piezas / unidades</option>
                     <option value="rollos">rollos</option>
                     <option value="paquetes">paquetes</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div>
@@ -823,14 +824,14 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                   <label className="block text-[10px] font-semibold text-neutral-400 mb-1">
                     IVA (%)
                   </label>
-                  <select
+                  <UiSelect
                     value={itemTaxRate}
                     onChange={e => setItemTaxRate(parseInt(e.target.value) || 0)}
                     className="w-full bg-[#1A1A22] border border-[#30303D] rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
                   >
                     <option value="15">15% (General)</option>
                     <option value="0">0% (Exento)</option>
-                  </select>
+                  </UiSelect>
                 </div>
 
                 <div className="col-span-2 sm:col-span-2">

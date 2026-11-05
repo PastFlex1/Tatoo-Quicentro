@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { saleLines } from '../../utils/saleLines';
 import {
   X,
   Printer,
@@ -63,9 +64,10 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
 
   // SRI Totals calculation
   const subtotalSinImpuestos = Math.max(0, sale.subtotal - sale.discount);
-  const isVatApplicable = (sale.taxRate || 0) > 0;
-  const subtotal15 = isVatApplicable ? subtotalSinImpuestos : 0;
-  const subtotal0 = isVatApplicable ? 0 : subtotalSinImpuestos;
+  // Bases por tarifa (una factura puede tener líneas con IVA y líneas con tarifa 0%)
+  const receiptLines = saleLines(sale);
+  const subtotal15 = Math.round(receiptLines.filter(l => l.taxRate > 0).reduce((a, l) => a + l.base, 0) * 100) / 100;
+  const subtotal0 = Math.round(receiptLines.filter(l => !(l.taxRate > 0)).reduce((a, l) => a + l.base, 0) * 100) / 100;
   const taxAmount = sale.taxAmount || 0;
   const totalAmount = sale.total || 0;
 
@@ -462,33 +464,23 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                     </tr>
                   </thead>
                   <tbody>
-                    <tr className="border-b border-black text-black">
-                      <td className="border-r border-black p-1.5 text-center font-mono">0001</td>
-                      <td className="border-r border-black p-1.5 text-center font-mono">
-                        {sale.serviceCategory.toUpperCase()}
-                      </td>
-                      <td className="border-r border-black p-1.5 text-center font-medium">
-                        {(sale.pieces || 1).toFixed(2)}
-                      </td>
+                    {saleLines(sale).map((l, idx) => (
+                    <tr key={idx} className="border-b border-black text-black">
+                      <td className="border-r border-black p-1.5 text-center font-mono">{String(idx + 1).padStart(4, '0')}</td>
+                      <td className="border-r border-black p-1.5 text-center font-mono">{l.code}</td>
+                      <td className="border-r border-black p-1.5 text-center font-medium">{l.quantity.toFixed(2)}</td>
                       <td className="border-r border-black p-1.5 text-left font-medium">
-                        {sale.serviceName}
-                        {sale.hours ? ` (${sale.hours} hrs)` : ''}
+                        {l.description}
+                        {l.hours ? ` (${l.hours} hrs)` : ''}
                       </td>
-                      <td className="border-r border-black p-1.5 text-center font-bold text-[9px]">
-                        IVA {sale.taxRate || 15}%
-                      </td>
-                      <td className="border-r border-black p-1.5 text-right font-mono">
-                        ${((sale.subtotal + sale.discount) / (sale.pieces || 1)).toFixed(2)}
-                      </td>
+                      <td className="border-r border-black p-1.5 text-center font-bold text-[9px]">IVA {l.taxRate}%</td>
+                      <td className="border-r border-black p-1.5 text-right font-mono">${l.unitPrice.toFixed(2)}</td>
                       <td className="border-r border-black p-1.5 text-center font-mono">0.00</td>
                       <td className="border-r border-black p-1.5 text-center font-mono">0.00</td>
-                      <td className="border-r border-black p-1.5 text-right font-mono">
-                        ${(sale.discount || 0).toFixed(2)}
-                      </td>
-                      <td className="p-1.5 text-right font-bold font-mono">
-                        ${sale.subtotal.toFixed(2)}
-                      </td>
+                      <td className="border-r border-black p-1.5 text-right font-mono">${l.discount.toFixed(2)}</td>
+                      <td className="p-1.5 text-right font-bold font-mono">${l.base.toFixed(2)}</td>
                     </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -694,24 +686,20 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                   <span className="w-14 text-right">V.UNI</span>
                   <span className="w-14 text-right">TOTAL</span>
                 </div>
-                <div className="space-y-0.5 text-[10px]">
+                {saleLines(sale).map((l, idx) => (
+                <div key={idx} className="space-y-0.5 text-[10px]">
                   <div className="flex justify-between items-start">
-                    <p className="font-bold text-slate-900 truncate flex-1">{sale.serviceName}</p>
-                    <span className="text-[9px] font-semibold text-neutral-600 ml-1">
-                      IVA {sale.taxRate || 15}%
-                    </span>
+                    <p className="font-bold text-slate-900 truncate flex-1">{l.description}</p>
+                    <span className="text-[9px] font-semibold text-neutral-600 ml-1">IVA {l.taxRate}%</span>
                   </div>
                   <div className="flex text-[10px] text-neutral-700">
-                    <span className="w-8">{(sale.pieces || 1).toFixed(0)}</span>
-                    <span className="flex-1 text-neutral-500 truncate">{getCategoryLabel(sale.serviceCategory)}</span>
-                    <span className="w-14 text-right">
-                      ${((sale.subtotal + sale.discount) / (sale.pieces || 1)).toFixed(2)}
-                    </span>
-                    <span className="w-14 text-right font-bold text-neutral-900">
-                      ${sale.subtotal.toFixed(2)}
-                    </span>
+                    <span className="w-8">{l.quantity}</span>
+                    <span className="flex-1 text-neutral-500 truncate">{getCategoryLabel(l.category)}{l.discount > 0 ? ` · desc. $${l.discount.toFixed(2)}` : ''}</span>
+                    <span className="w-14 text-right">${l.unitPrice.toFixed(2)}</span>
+                    <span className="w-14 text-right font-bold text-neutral-900">${l.base.toFixed(2)}</span>
                   </div>
                 </div>
+                ))}
               </div>
 
               {/* Totals Breakdown */}

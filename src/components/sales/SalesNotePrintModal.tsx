@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { saleLines } from '../../utils/saleLines';
 import { X, Printer, Share2 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { SaleRecord } from '../../types';
@@ -248,17 +249,18 @@ export const SalesNotePrintModal: React.FC<SalesNotePrintModalProps> = ({
                 <span>Descripción</span>
                 <span>Total</span>
               </div>
-              <div className="flex justify-between text-[11px]">
-                <div className="pr-2">
-                  <span className="font-bold block text-black">{sale.serviceName}</span>
-                  <span className="text-[9px] text-neutral-500 capitalize">
-                    {sale.serviceCategory} {sale.pieces ? `· Cant: ${sale.pieces}` : ''}
-                  </span>
+              {saleLines(sale).map((l, idx) => (
+                <div key={idx} className="flex justify-between text-[11px]">
+                  <div className="pr-2">
+                    <span className="font-bold block text-black">{l.description}</span>
+                    <span className="text-[9px] text-neutral-500 capitalize">
+                      {l.category} · Cant: {l.quantity} × {formatMoney(l.unitPrice)}
+                      {l.discount > 0 ? ` · desc. ${formatMoney(l.discount)}` : ''}
+                    </span>
+                  </div>
+                  <span className="font-mono font-bold text-black shrink-0">{formatMoney(l.base + l.taxAmount)}</span>
                 </div>
-                <span className="font-mono font-bold text-black shrink-0">
-                  {formatMoney(sale.total)}
-                </span>
-              </div>
+              ))}
             </div>
 
             {/* Total (Sin desglose de IVA) */}

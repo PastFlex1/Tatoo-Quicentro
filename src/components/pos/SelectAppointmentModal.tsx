@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import {
   Calendar,
   Search,
@@ -178,7 +179,7 @@ export const SelectAppointmentModal: React.FC<SelectAppointmentModalProps> = ({
 
             {/* Artist Filter Dropdown */}
             <div className="sm:w-56 shrink-0">
-              <select
+              <UiSelect
                 value={selectedArtistFilter}
                 onChange={e => setSelectedArtistFilter(e.target.value)}
                 className="w-full bg-[#101013] border border-[#26262F] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white outline-none cursor-pointer"
@@ -189,7 +190,7 @@ export const SelectAppointmentModal: React.FC<SelectAppointmentModalProps> = ({
                     {art.name} ({art.defaultCommissionRate}%)
                   </option>
                 ))}
-              </select>
+              </UiSelect>
             </div>
           </div>
 

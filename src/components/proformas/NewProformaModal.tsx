@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { UiSelect, UiSuggestInput } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   X,
@@ -330,20 +331,15 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                 <label className="block text-[11px] text-neutral-400 mb-1">
                   Nombre Completo *
                 </label>
-                <input
+                <UiSuggestInput
                   type="text"
                   required
                   value={clientName}
                   onChange={e => handleSelectClient(e.target.value)}
                   placeholder="Ej: Sofía Martínez"
-                  list="clients-list"
+                  suggestions={clients.map(c => ({ value: c.name, hint: c.dni }))}
                   className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]"
                 />
-                <datalist id="clients-list">
-                  {clients.map(c => (
-                    <option key={c.id} value={c.name} />
-                  ))}
-                </datalist>
               </div>
 
               <div>
@@ -399,7 +395,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                 <label className="block text-[11px] text-neutral-400 mb-1">
                   Artista Responsable
                 </label>
-                <select
+                <UiSelect
                   value={artistId}
                   onChange={e => setArtistId(e.target.value)}
                   className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#FF3366]"
@@ -409,7 +405,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                       {a.name} ({a.role} - {a.specialty})
                     </option>
                   ))}
-                </select>
+                </UiSelect>
               </div>
 
               <div>
@@ -456,7 +452,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                 <label className="block text-[11px] text-neutral-400 mb-1">
                   Complejidad del Diseño
                 </label>
-                <select
+                <UiSelect
                   value={complexity}
                   onChange={e => setComplexity(e.target.value as any)}
                   className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden focus:border-[#FF3366]"
@@ -465,7 +461,7 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                   <option value="Medio">Medio</option>
                   <option value="Complejo / Detallado">Complejo / Detallado</option>
                   <option value="Gran Formato">Gran Formato (Manga / Espalda)</option>
-                </select>
+                </UiSelect>
               </div>
 
               <div>

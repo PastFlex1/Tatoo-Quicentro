@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import {
   X,
@@ -415,7 +416,7 @@ export const SriXmlImportModal: React.FC<SriXmlImportModalProps> = ({
                           </div>
 
                           <div className="flex items-center gap-1.5">
-                            <select
+                            <UiSelect
                               value={item.chosenCategory}
                               onChange={e => {
                                 const newCat = e.target.value as ExpenseCategory;
@@ -437,7 +438,7 @@ export const SriXmlImportModal: React.FC<SriXmlImportModalProps> = ({
                               <option value="marketing_ads">Marketing</option>
                               <option value="maintenance">Mantenimiento</option>
                               <option value="other_expense">Otros Gastos</option>
-                            </select>
+                            </UiSelect>
 
                             <button
                               type="button"

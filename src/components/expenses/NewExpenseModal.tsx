@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { UiSelect, UiSuggestInput } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { X, FileCode, UploadCloud, CheckCircle2, AlertCircle, Building2, RefreshCw } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -224,7 +225,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
             <label className="block font-semibold text-neutral-300 mb-1.5">
               Categoría de Gasto
             </label>
-            <select
+            <UiSelect
               value={category}
               onChange={e => setCategory(e.target.value as ExpenseCategory)}
               className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
@@ -239,7 +240,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
               <option value="marketing_ads">Marketing & Redes Sociales</option>
               <option value="maintenance">Mantenimiento de Máquinas & Cabinas</option>
               <option value="other_expense">Otros Gastos Generales</option>
-            </select>
+            </UiSelect>
           </div>
 
           {/* Insumos Kardex Link (se muestra cuando la categoría es un insumo o mercadería) */}
@@ -269,7 +270,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                     <label className="block text-[10px] font-semibold text-neutral-400 mb-1">
                       Insumo o Joyería a Reponer
                     </label>
-                    <select
+                    <UiSelect
                       value={kardexItemId}
                       onChange={e => setKardexItemId(e.target.value)}
                       className="w-full px-3 py-1.5 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs"
@@ -280,7 +281,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                           {item.name} (Stock: {item.currentStock} {item.unit})
                         </option>
                       ))}
-                    </select>
+                    </UiSelect>
                   </div>
 
                   <div>
@@ -358,10 +359,13 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
               <label className="block font-semibold text-neutral-300 mb-1.5">
                 Razón Social / Proveedor <span className="text-[#FF3366]">*</span>
               </label>
-              <input
+              <UiSuggestInput
                 type="text"
                 required
-                list="suppliers-modal-datalist"
+                suggestions={suppliers.map(s => ({
+                  value: s.nombreComercial || s.razonSocial,
+                  hint: s.ruc,
+                }))}
                 placeholder="Ej. Kwadron Ecuador, Dynamic Ink..."
                 value={supplier}
                 onChange={e => {
@@ -378,13 +382,6 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                 }}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white text-xs placeholder-neutral-500 focus:outline-hidden focus:border-[#FF3366]/60"
               />
-              <datalist id="suppliers-modal-datalist">
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.nombreComercial || s.razonSocial}>
-                    {s.ruc} - {s.razonSocial}
-                  </option>
-                ))}
-              </datalist>
             </div>
           </div>
 
@@ -433,7 +430,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
               <label className="block font-semibold text-neutral-300 mb-1.5">
                 Forma de Pago
               </label>
-              <select
+              <UiSelect
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value as any)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60"
@@ -441,7 +438,7 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                 <option value="bank_transfer">Transferencia Bancaria</option>
                 <option value="credit_card">Tarjeta Bancaria / Débito</option>
                 <option value="cash">Efectivo de la Caja</option>
-              </select>
+              </UiSelect>
             </div>
           </div>
 

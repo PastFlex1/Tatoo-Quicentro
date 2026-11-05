@@ -9,6 +9,24 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'split';
 
 export type SaleStatus = 'completed' | 'deposit_only' | 'pending_balance' | 'cancelled';
 
+/** Línea de detalle de una venta (servicio o producto). Precios sin IVA. */
+export interface SaleLineItem {
+  id: string;
+  kind: 'service' | 'product';
+  category: ServiceCategory;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  taxRate: number;
+  /** Producto de inventario (descarga stock y kardex) */
+  inventoryItemId?: string;
+  sku?: string;
+  /** % de comisión del artista para esta línea */
+  commissionPercent: number;
+  hours?: number;
+}
+
 export interface SaleRecord {
   id: string;
   invoiceNumber: string;
@@ -42,6 +60,8 @@ export interface SaleRecord {
   materialCostDeducted?: number; // Insumos cobrados al artista si aplica
   inventoryItemId?: string; // ID del producto de inventario vendido directamente
   consumedSupplies?: { itemId: string; name: string; quantity: number }[]; // Consumibles descargados en cabina
+  /** Líneas de la factura (POS con varios ítems). Si no existe, la venta es de una sola línea. */
+  items?: SaleLineItem[];
   status: SaleStatus;
   consentFormSigned: boolean; // Consentimiento informado de salud
   consentDocumentUrl?: string; // URL o Base64 del consentimiento firmado subido para este procedimiento

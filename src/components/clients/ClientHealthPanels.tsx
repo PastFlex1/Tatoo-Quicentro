@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { AlertTriangle, FileSignature, Printer, Search, X, Eye, Baby } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { ClientProfile, ConsentForm } from '../../types';
@@ -81,14 +82,14 @@ export const HealthControlPanel: React.FC<{
           <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-2" />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select value={allergyFilter} onChange={e => setAllergyFilter(e.target.value)} className="px-3 py-2 bg-[#121215] border border-[#272730] rounded-full text-white">
+          <UiSelect value={allergyFilter} onChange={e => setAllergyFilter(e.target.value)} className="px-3 py-2 bg-[#121215] border border-[#272730] rounded-full text-white">
             <option value="">Todas las alergias</option>
             {ALLERGIES.map(a => (
               <option key={a.key} value={a.key}>
                 {a.label}
               </option>
             ))}
-          </select>
+          </UiSelect>
           <label className="flex items-center gap-1.5 text-neutral-300 cursor-pointer">
             <input type="checkbox" checked={onlyAlerts} onChange={e => setOnlyAlerts(e.target.checked)} />
             Solo con alertas

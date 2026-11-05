@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { UiSelect } from '../common/UiSelect';
 import { usePermission } from '../../hooks/usePermission';
 import { X, Sparkles, User, FileText, Minus, Plus, ShieldCheck } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
@@ -197,7 +198,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                 Tatuador / Piercer Asignado
               </label>
-              <select
+              <UiSelect
                 value={artistId}
                 onChange={e => handleArtistChange(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"
@@ -207,7 +208,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
                     {art.name} ({art.role} - {art.defaultCommissionRate}%)
                   </option>
                 ))}
-              </select>
+              </UiSelect>
             </div>
           </div>
 
@@ -372,7 +373,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
                 Método de Pago
               </label>
-              <select
+              <UiSelect
                 value={paymentMethod}
                 onChange={e => setPaymentMethod(e.target.value as PaymentMethod)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-xs text-white focus:outline-hidden focus:border-[#FF3366]/60"
@@ -381,7 +382,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
                 <option value="cash">Efectivo en Caja</option>
                 <option value="transfer">Transferencia / Bizum / Zelle</option>
                 <option value="split">Cobro Mixto (Efectivo + Tarjeta)</option>
-              </select>
+              </UiSelect>
             </div>
 
             <div>
