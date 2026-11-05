@@ -600,6 +600,83 @@ export interface ClientProfile {
   sriStatus?: string; // ACTIVO, SUSPENDIDO
   sriVerified?: boolean;
   address?: string;
+  // Datos personales ampliados
+  gender?: 'F' | 'M' | 'O' | '';
+  occupation?: string;
+  city?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  /** Ficha de salud estructurada (última versión) */
+  healthSheet?: HealthSheet;
+  /** Cartas de consentimiento informado firmadas digitalmente */
+  consentForms?: ConsentForm[];
+}
+
+/** Ficha de salud estructurada del cliente (cuestionario pre-procedimiento). */
+export interface HealthSheet {
+  allergies: string[]; // claves del catálogo
+  allergiesOther?: string;
+  conditions: string[];
+  conditionsDetail?: string;
+  medications: string[];
+  medicationsDetail?: string;
+  /** Estado en las últimas 24-48 h (alcohol, ayuno, sol, etc.) */
+  currentState: string[];
+  bloodType?: string;
+  pregnantOrNursing?: boolean;
+  previousTattooReactions?: string;
+  skinNotes?: string;
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+export interface ConsentGuardian {
+  name: string;
+  dni: string;
+  relationship: string;
+  phone?: string;
+}
+
+/** Carta de consentimiento informado firmada (con copia congelada de los datos al firmar). */
+export interface ConsentForm {
+  id: string;
+  number: string; // CI-000001
+  createdAt: string;
+  // Cliente al momento de firmar
+  clientId: string;
+  clientName: string;
+  clientDni: string;
+  clientBirthDate?: string;
+  clientAge?: number;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  isMinor: boolean;
+  guardian?: ConsentGuardian;
+  // Procedimiento
+  procedureType: 'tattoo' | 'piercing' | 'removal' | 'other';
+  procedureDescription: string;
+  bodyZone: string;
+  artistId?: string;
+  artistName: string;
+  procedureDate: string;
+  estimatedSessions?: number;
+  estimatedPrice?: number;
+  jewelryMaterial?: string;
+  // Salud
+  health: HealthSheet;
+  riskFlags: string[];
+  riskAssessmentNote?: string;
+  // Declaraciones aceptadas
+  acceptedDeclarations: string[];
+  photoAuthorization: boolean;
+  // Firmas (PNG base64)
+  clientSignature: string;
+  guardianSignature?: string;
+  artistSignature: string;
+  signedAt: string;
+  registeredBy?: string;
 }
 
 export type GalleryCategory = 'all' | 'tattoo' | 'piercing' | 'healed' | 'flash' | 'coverup';

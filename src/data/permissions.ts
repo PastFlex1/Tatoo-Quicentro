@@ -57,7 +57,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
       a('clients', 'create', 'Crear clientes'),
       a('clients', 'edit', 'Editar clientes'),
       a('clients', 'delete', 'Eliminar clientes', true),
-      a('clients', 'view_medical', 'Gestionar consentimientos informados', true),
+      a('clients', 'view_medical', 'Ficha de salud, nómina de alergias y cartas de consentimiento', true),
       a('clients', 'export', 'Exportar datos de clientes', true),
     ],
   },
