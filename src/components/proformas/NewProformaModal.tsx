@@ -17,6 +17,7 @@ import {
 import { ServiceCategory, Proforma, ProformaItem } from '../../types';
 import { useStudio } from '../../context/StudioContext';
 import { consultarIdentificacion } from '../../services/sriService';
+import { DatePicker, TimePicker } from '../common/DatePicker';
 
 interface NewProformaModalProps {
   isOpen: boolean;
@@ -655,23 +656,19 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                   <label className="block text-[11px] text-neutral-400 mb-1">
                     Fecha de la Cita
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={scheduleDate}
-                    onChange={e => setScheduleDate(e.target.value)}
-                    className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white"
-                  />
+                    onChange={v => setScheduleDate(v)}
+                    className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white" />
                 </div>
                 <div>
                   <label className="block text-[11px] text-neutral-400 mb-1">
                     Hora de Inicio
                   </label>
-                  <input
-                    type="time"
+                  <TimePicker
                     value={scheduleTime}
-                    onChange={e => setScheduleTime(e.target.value)}
-                    className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white"
-                  />
+                    onChange={v => setScheduleTime(v)}
+                    className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white" />
                 </div>
               </div>
             )}

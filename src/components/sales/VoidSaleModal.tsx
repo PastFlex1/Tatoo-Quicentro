@@ -3,6 +3,7 @@ import { X, Ban, AlertTriangle, Copy, CheckCircle2, ExternalLink } from 'lucide-
 import { useStudio } from '../../context/StudioContext';
 import { SaleRecord } from '../../types';
 import { UiSelect } from '../common/UiSelect';
+import { DatePicker } from '../common/DatePicker';
 
 interface VoidSaleModalProps {
   sale: SaleRecord | null;
@@ -141,7 +142,7 @@ export const VoidSaleModal: React.FC<VoidSaleModalProps> = ({ sale, onClose, onD
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <label className="block">
                   <span className="block text-[11px] font-semibold text-amber-100/90 mb-1">Fecha de anulación en el SRI *</span>
-                  <input type="date" value={sriDate} max={todayLocal()} onChange={e => setSriDate(e.target.value)} className={input} />
+                  <DatePicker value={sriDate} max={todayLocal()} onChange={v => setSriDate(v)} className={input} />
                 </label>
                 <label className="block">
                   <span className="block text-[11px] font-semibold text-amber-100/90 mb-1">N° de solicitud / referencia</span>

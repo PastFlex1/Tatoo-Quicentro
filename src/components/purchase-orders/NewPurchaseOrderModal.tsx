@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PurchaseOrder, PurchaseOrderItem, PurchaseOrderStatus, Supplier, InventoryItem } from '../../types';
 import { useStudio } from '../../context/StudioContext';
+import { DatePicker } from '../common/DatePicker';
 
 interface NewPurchaseOrderModalProps {
   isOpen: boolean;
@@ -537,25 +538,21 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                 <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
                   Fecha de Emisión
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={date}
-                  onChange={e => setDate(e.target.value)}
+                  onChange={v => setDate(v)}
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
-                  required
-                />
+                  required />
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
                   Fecha Requerida de Entrega
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={expectedDate}
-                  onChange={e => setExpectedDate(e.target.value)}
-                  className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]"
-                />
+                  onChange={v => setExpectedDate(v)}
+                  className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF3366]" />
               </div>
             </div>
 

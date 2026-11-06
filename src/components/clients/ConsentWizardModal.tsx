@@ -36,6 +36,7 @@ import {
   riskFlagsOf,
 } from '../../data/consentCatalog';
 import { SignaturePad } from './SignaturePad';
+import { DatePicker } from '../common/DatePicker';
 
 interface ConsentWizardModalProps {
   isOpen: boolean;
@@ -599,7 +600,7 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
                   </div>
                 </Field>
                 <Field label={`Fecha de nacimiento${age !== undefined ? ` (${age} años)` : ''}`} required error={err(!birthDate)}>
-                  <input type="date" value={birthDate} max={procedureDate} onChange={e => setBirthDate(e.target.value)} className={input} />
+                  <DatePicker value={birthDate} max={procedureDate} onChange={v => setBirthDate(v)} className={input} />
                 </Field>
                 <Field label="Sexo">
                   <UiSelect value={gender} onChange={e => setGender(e.target.value as ClientProfile['gender'])} className={input}>
@@ -763,7 +764,7 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
                   </UiSelect>
                 </Field>
                 <Field label="Fecha del procedimiento">
-                  <input type="date" value={procedureDate} onChange={e => setProcedureDate(e.target.value)} className={input} />
+                  <DatePicker value={procedureDate} onChange={v => setProcedureDate(v)} className={input} />
                 </Field>
                 <Field label="Sesiones estimadas">
                   <input type="number" min="1" value={sessions} onChange={e => setSessions(e.target.value)} className={input} />

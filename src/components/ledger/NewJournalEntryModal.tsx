@@ -16,6 +16,7 @@ import {
 import { useStudio } from '../../context/StudioContext';
 import { JournalEntryLine, JournalEntryType, ManualJournalEntry } from '../../types';
 import { CHART_OF_ACCOUNTS } from './GeneralLedgerView';
+import { DatePicker } from '../common/DatePicker';
 
 interface NewJournalEntryModalProps {
   isOpen: boolean;
@@ -363,12 +364,10 @@ export const NewJournalEntryModal: React.FC<NewJournalEntryModalProps> = ({
               <label className="text-[10px] text-neutral-400 block mb-1 font-semibold uppercase">
                 Fecha de Emisión
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full bg-[#18181D] border border-[#2B2B36] rounded-xl px-3 py-1.5 font-mono text-white text-xs focus:border-[#FF3366] focus:outline-none"
-              />
+                onChange={v => setDate(v)}
+                className="w-full bg-[#18181D] border border-[#2B2B36] rounded-xl px-3 py-1.5 font-mono text-white text-xs focus:border-[#FF3366] focus:outline-none" />
             </div>
 
             <div>

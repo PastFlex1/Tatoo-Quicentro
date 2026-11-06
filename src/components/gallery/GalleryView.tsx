@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { GalleryPhoto, GalleryCategory } from '../../types';
+import { DatePicker } from '../common/DatePicker';
 
 interface GalleryViewProps {
   onOpenReceipt?: (sale: any) => void;
@@ -1033,12 +1034,10 @@ export const GalleryView: React.FC<GalleryViewProps> = () => {
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Fecha de la Sesión
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={uploadDate}
-                    onChange={e => setUploadDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-mono"
-                  />
+                    onChange={v => setUploadDate(v)}
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-mono" />
                 </div>
 
                 {/* Duración Sesión (Horas) */}

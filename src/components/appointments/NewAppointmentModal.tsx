@@ -21,6 +21,7 @@ import {
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, ServiceCategory, PaymentMethod } from '../../types';
 import { consultarIdentificacion } from '../../services/sriService';
+import { DatePicker, TimePicker } from '../common/DatePicker';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -417,39 +418,31 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Fecha de la Cita *</label>
-                <input
-                  type="date"
+                <DatePicker
                   required
                   value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
-                />
+                  onChange={v => setDate(v)}
+                  className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden" />
               </div>
 
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Hora Inicio *</label>
                 <div className="relative">
-                  <Clock className="w-3.5 h-3.5 absolute left-3 top-3 text-neutral-500" />
-                  <input
-                    type="time"
+                  <TimePicker
                     required
                     value={startTime}
-                    onChange={e => setStartTime(e.target.value)}
-                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-hidden"
-                  />
+                    onChange={v => setStartTime(v)}
+                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden" />
                 </div>
               </div>
 
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Hora Fin Estimada</label>
                 <div className="relative">
-                  <Clock className="w-3.5 h-3.5 absolute left-3 top-3 text-neutral-500" />
-                  <input
-                    type="time"
+                  <TimePicker
                     value={endTime}
-                    onChange={e => setEndTime(e.target.value)}
-                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-hidden"
-                  />
+                    onChange={v => setEndTime(v)}
+                    className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden" />
                 </div>
               </div>
             </div>

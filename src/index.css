@@ -39,6 +39,19 @@
     appearance: textfield;
   }
 
+  /* Columnas del selector de hora */
+  .ink-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #ff336655 transparent;
+  }
+  .ink-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .ink-scroll::-webkit-scrollbar-thumb {
+    background: #ff336655;
+    border-radius: 9999px;
+  }
+
   button, a, input, select, textarea {
     outline: none !important;
     -webkit-tap-highlight-color: transparent;

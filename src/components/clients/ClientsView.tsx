@@ -44,6 +44,7 @@ import {
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, ClientProfile, ProcedureConsentRecord, SaleRecord, ServiceCategory } from '../../types';
 import { validarIdentificacionEcuador } from '../../utils/ecuadorIdValidator';
+import { DatePicker } from '../common/DatePicker';
 
 interface ClientsViewProps {
   onOpenReceipt: (sale: SaleRecord) => void;
@@ -2223,13 +2224,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                   <label className="block font-semibold text-neutral-300 mb-1">
                     Fecha del Procedimiento *
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     required
                     value={consentDate}
-                    onChange={e => setConsentDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono outline-none focus:border-[#FF3366]"
-                  />
+                    onChange={v => setConsentDate(v)}
+                    className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono outline-none focus:border-[#FF3366]" />
                 </div>
 
                 <div>

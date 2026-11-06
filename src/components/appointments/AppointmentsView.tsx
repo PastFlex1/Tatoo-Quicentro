@@ -23,6 +23,7 @@ import { useStudio } from '../../context/StudioContext';
 import { Appointment, AppointmentStatus, PaymentMethod, SaleRecord, Proforma } from '../../types';
 import { NewAppointmentModal } from './NewAppointmentModal';
 import { ProformaModal } from '../proformas/ProformaModal';
+import { DatePicker, todayKey, toDateKey } from '../common/DatePicker';
 
 interface AppointmentsViewProps {
   onOpenReceipt?: (sale: SaleRecord) => void;
@@ -73,7 +74,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   // Calendar Date State (default to current month/year)
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDayString, setSelectedDayString] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    todayKey()
   );
 
   // Quick navigation for Month
@@ -88,7 +89,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const handleJumpToday = () => {
     const now = new Date();
     setCurrentDate(now);
-    setSelectedDayString(now.toISOString().split('T')[0]);
+    setSelectedDayString(toDateKey(now));
   };
 
   // Month calculations
@@ -97,7 +98,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const monthName = currentDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay(); // 0 is Sun
+  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7; // la semana empieza en lunes
 
   // Filtered Appointments
   const filteredAppointments = useMemo(() => {
@@ -125,7 +126,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   }, [filteredAppointments, selectedDayString]);
 
   // Today's appointments count & metrics
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = todayKey();
   const todayAppointments = useMemo(() => {
     return appointments.filter(a => a.date === todayStr);
   }, [appointments, todayStr]);
@@ -422,14 +423,12 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs font-bold text-neutral-400 py-1">
-              <span>Dom</span>
-              <span>Lun</span>
-              <span>Mar</span>
-              <span>Mié</span>
-              <span>Jue</span>
-              <span>Vie</span>
-              <span>Sáb</span>
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1">
+              {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d, i) => (
+                <span key={d} className={i >= 5 ? 'text-[#FF3366]/70' : 'text-neutral-500'}>
+                  {d}
+                </span>
+              ))}
             </div>
 
             <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
@@ -453,7 +452,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                       isSelected
                         ? 'bg-[#1F1F27] border-[#FF3366] shadow-[0_0_12px_rgba(255,51,102,0.25)]'
                         : isToday
-                        ? 'bg-[#18181E] border-neutral-600 hover:border-[#FF3366]/50'
+                        ? 'bg-[#FF3366]/10 border-[#FF3366]/50 hover:border-[#FF3366]'
                         : 'bg-[#131317] border-[#222229] hover:bg-[#1A1A20] hover:border-neutral-700'
                     }`}
                   >
@@ -461,9 +460,9 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                       <span
                         className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-mono font-bold ${
                           isSelected
-                            ? 'bg-[#FF3366] text-white shadow-[0_0_8px_#FF3366]'
+                            ? 'bg-gradient-to-br from-[#FF3366] to-[#C81E4E] text-white shadow-[0_4px_14px_rgba(255,51,102,0.45)]'
                             : isToday
-                            ? 'bg-white text-black font-bold'
+                            ? 'ring-1 ring-inset ring-[#FF3366] text-white font-bold'
                             : 'text-neutral-400 group-hover:text-white'
                         }`}
                       >
@@ -715,12 +714,10 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
+              <DatePicker
                 value={selectedDayString}
-                onChange={e => setSelectedDayString(e.target.value)}
-                className="bg-[#121215] border border-[#272730] rounded-full px-3 py-1.5 text-xs text-white focus:outline-hidden"
-              />
+                onChange={v => setSelectedDayString(v)}
+                className="bg-[#121215] border border-[#272730] rounded-full px-3 py-1.5 text-xs text-white focus:outline-hidden" />
             </div>
           </div>
 

@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   PlusCircle,
   ArrowDownRight,
   Sun,
   Moon,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   X,
   Menu,
   User,
@@ -14,6 +12,7 @@ import {
 import { useStudio } from '../../context/StudioContext';
 import { DateFilterRange } from '../../types';
 import { UserSwitcherModal } from '../users/UserSwitcherModal';
+import { CalendarPanel, todayKey } from '../common/DatePicker';
 
 interface HeaderProps {
   onOpenNewSale: () => void;
@@ -26,7 +25,12 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewExpense,
   onToggleSidebar,
 }) => {
-  const { activeTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser, currentRole } = useStudio();
+  const { activeTab, setActiveTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser, currentRole, appointments } = useStudio();
+  const appointmentDays = useMemo(() => {
+    const map: Record<string, number> = {};
+    appointments.filter(a => a.status !== 'cancelled').forEach(a => (map[a.date] = (map[a.date] || 0) + 1));
+    return map;
+  }, [appointments]);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
 
@@ -247,71 +251,52 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Calendar Popover */}
+      {/* Mini calendario (mismo diseño que todos los calendarios del sistema) */}
       {showCalendarModal && (
-        <div className="absolute right-3 sm:right-6 top-14 sm:top-16 z-50 mt-2 p-4 bg-[#17171C] border border-[#2B2B34] rounded-2xl shadow-2xl w-72 max-w-[calc(100vw-1.5rem)] text-xs">
-          <div className="flex items-center justify-between pb-3 border-b border-[#25252E] mb-3">
+        <div className="absolute right-3 sm:right-6 top-14 sm:top-16 z-50 mt-2 p-3 bg-[#17171C] border border-[#2E2E38] rounded-2xl shadow-[0_18px_50px_rgba(0,0,0,0.6)] w-72 max-w-[calc(100vw-1.5rem)] text-xs">
+          <div className="absolute inset-x-6 -top-px h-px bg-gradient-to-r from-transparent via-[#FF3366] to-transparent" />
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-white font-semibold">
               <Calendar className="w-3.5 h-3.5 text-[#FF3366]" />
-              <span>Octubre 2026</span>
+              <span>Calendario</span>
             </div>
-            <div className="flex items-center gap-1 text-neutral-400">
-              <button className="p-1 hover:text-white"><ChevronLeft className="w-3.5 h-3.5" /></button>
-              <button className="p-1 hover:text-white"><ChevronRight className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setShowCalendarModal(false)} className="p-1 hover:text-white ml-1">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button onClick={() => setShowCalendarModal(false)} className="p-1 text-neutral-400 hover:text-white cursor-pointer" aria-label="Cerrar">
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-
-          {/* Days of week */}
-          <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] text-neutral-500 mb-2">
-            <span>D</span><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span>
-          </div>
-
-          {/* Days grid */}
-          <div className="grid grid-cols-7 gap-1 text-center font-mono text-xs">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31].map(d => {
-              const isSelected = d === 10 || d === 14 || d === 29;
-              return (
+          <CalendarPanel
+            value={todayKey()}
+            markedDays={appointmentDays}
+            onSelect={() => {
+              setActiveTab('appointments');
+              setShowCalendarModal(false);
+            }}
+            footer={
+              <div className="flex justify-between text-[11px]">
                 <button
-                  key={d}
                   onClick={() => {
-                    setDateFilter('month');
+                    setDateFilter('today');
                     setShowCalendarModal(false);
                   }}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? 'bg-[#FF3366] text-white font-bold shadow-[0_0_8px_#FF3366]'
-                      : 'text-neutral-300 hover:bg-[#25252E] hover:text-white'
-                  }`}
+                  className="px-3 py-1.5 rounded-lg bg-[#FF3366]/15 text-[#FF3366] font-bold hover:bg-[#FF3366]/25 cursor-pointer"
                 >
-                  {d}
+                  Filtrar hoy
                 </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-[#25252E] flex justify-between text-[11px]">
-            <button
-              onClick={() => {
-                setDateFilter('today');
-                setShowCalendarModal(false);
-              }}
-              className="text-[#FF3366] hover:underline"
-            >
-              Filtrar Hoy
-            </button>
-            <button
-              onClick={() => {
-                setDateFilter('all');
-                setShowCalendarModal(false);
-              }}
-              className="text-neutral-400 hover:text-white"
-            >
-              Ver Todo
-            </button>
-          </div>
+                <button
+                  onClick={() => {
+                    setDateFilter('all');
+                    setShowCalendarModal(false);
+                  }}
+                  className="text-neutral-400 hover:text-white cursor-pointer"
+                >
+                  Ver todo
+                </button>
+              </div>
+            }
+          />
+          <p className="mt-2 text-[10px] text-neutral-500 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#FF3366]" /> Días con citas · toque un día para abrir la agenda
+          </p>
         </div>
       )}
     </header>
