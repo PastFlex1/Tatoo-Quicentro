@@ -110,6 +110,7 @@ export const getDefaultTabsForRole = (role: UserRole): string[] => {
         'artists',
         'cash',
         'inventory',
+        'services',
         'kardex',
         'ledger',
         'reports',
@@ -126,6 +127,7 @@ export const getDefaultTabsForRole = (role: UserRole): string[] => {
         'proformas',
         'sales',
         'cash',
+        'services',
       ];
     case 'ARTISTA':
       return [

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UiSelect } from '../common/UiSelect';
 import {
   Search,
@@ -23,10 +23,15 @@ import {
   Keyboard,
   HeartPulse,
   Package,
+  Hash,
+  Lock,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { usePermission } from '../../hooks/usePermission';
-import { Appointment, ClientProfile, InventoryItem, PaymentMethod, SaleLineItem, SaleRecord, ServiceCategory } from '../../types';
+import { Appointment, ClientProfile, InventoryItem, PaymentMethod, SaleLineItem, SaleRecord, StudioService } from '../../types';
+import { getServiceCatalog, serviceCategoryLabel } from '../../data/serviceCatalog';
+import { fetchSequenceState } from '../../services/sequenceService';
+import { formatDocumentNumber, padCode, parseDocumentSequential } from '../../utils/documentNumber';
 import { consultarIdentificacion } from '../../services/sriService';
 import { validateSriBusinessConfig } from '../../utils/sriBusinessConfig';
 import { lineBase, lineTax } from '../../utils/saleLines';
@@ -45,16 +50,6 @@ interface PosViewProps {
 }
 
 const r2 = (n: number) => Math.round((n || 0) * 100) / 100;
-
-/** Accesos rápidos de servicios del estudio */
-const QUICK_SERVICES: { label: string; category: ServiceCategory; description: string; price: number; hours?: number }[] = [
-  { label: 'Tatuaje por sesión', category: 'tattoo', description: 'Tatuaje personalizado (sesión)', price: 0, hours: 3 },
-  { label: 'Tatuaje pequeño', category: 'tattoo', description: 'Tatuaje pequeño / minimalista', price: 0, hours: 1 },
-  { label: 'Retoque', category: 'tattoo', description: 'Retoque de tatuaje', price: 0, hours: 1 },
-  { label: 'Perforación', category: 'piercing', description: 'Perforación (piercing)', price: 0 },
-  { label: 'Cambio de joya', category: 'piercing', description: 'Cambio / colocación de joya', price: 0 },
-  { label: 'Otro servicio', category: 'other', description: 'Servicio del estudio', price: 0 },
-];
 
 const newId = () => `li-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
@@ -85,7 +80,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const canDiscount = can('pos.discount');
   const canChangeCommission = can('pos.change_commission');
   const canChangeTax = can('pos.change_tax');
-  const canChangePrice = can('pos.change_price');
+  const serviceCatalog = useMemo(() => getServiceCatalog(settings).filter(s => s.active), [settings]);
 
   const standardVatRate =
     !settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12 ? 15 : settings.defaultTaxRate;
@@ -196,29 +191,72 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       .filter(i => !q || i.name.toLowerCase().includes(q) || (i.brand || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q));
   }, [inventory, query]);
 
+  // ---------------------------------------------------------------- secuencial del próximo comprobante
+  const estab = padCode(settings.codigoEstablecimiento, 3, '001');
+  const pto = padCode(settings.puntoEmision, 3, '001');
+  const [serverNext, setServerNext] = useState<{ factura: number; nota_venta: number } | null>(null);
+  const [sequenceOffline, setSequenceOffline] = useState(false);
+
+  const refreshSequence = useCallback(async () => {
+    try {
+      const rows = await fetchSequenceState(estab, pto);
+      setServerNext({
+        factura: rows.find(r => r.type === 'factura')?.next || 1,
+        nota_venta: rows.find(r => r.type === 'nota_venta')?.next || 1,
+      });
+      setSequenceOffline(false);
+    } catch {
+      setSequenceOffline(true);
+    }
+  }, [estab, pto]);
+
+  useEffect(() => {
+    void refreshSequence();
+    const t = setInterval(() => void refreshSequence(), 15000);
+    return () => clearInterval(t);
+  }, [refreshSequence, sales.length]);
+
+  const nextDocumentNumber = useMemo(() => {
+    if (!serverNext) return null;
+    // Igual que al emitir: el contador nunca queda por debajo de lo que este equipo ya emitió
+    const localMax = sales
+      .filter(s => (documentType === 'nota_venta' ? s.documentType === 'nota_venta' : s.documentType !== 'nota_venta'))
+      .reduce((max, s) => Math.max(max, parseDocumentSequential(documentType, s.invoiceNumber, estab, pto)), 0);
+    return formatDocumentNumber(documentType, Math.max(serverNext[documentType], localMax + 1), estab, pto);
+  }, [serverNext, sales, documentType, estab, pto]);
+
   const recentSales = useMemo(
     () => [...sales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5),
     [sales]
   );
 
   // ---------------------------------------------------------------- carrito
-  const addService = (svc: (typeof QUICK_SERVICES)[number]) => {
+  const addService = (svc: StudioService) => {
     setError(null);
-    setLines(prev => [
-      ...prev,
-      {
-        id: newId(),
-        kind: 'service',
-        category: svc.category,
-        description: svc.description,
-        quantity: 1,
-        unitPrice: svc.price,
-        discount: 0,
-        taxRate: standardVatRate,
-        commissionPercent: commission,
-        hours: svc.hours,
-      },
-    ]);
+    if (svc.price <= 0) {
+      setError(`"${svc.name}" no tiene precio. Defínalo en Catálogo de Servicios.`);
+      return;
+    }
+    setLines(prev => {
+      const existing = prev.find(l => l.serviceId === svc.id);
+      if (existing) return prev.map(l => (l.id === existing.id ? { ...l, quantity: l.quantity + 1 } : l));
+      return [
+        ...prev,
+        {
+          id: newId(),
+          kind: 'service',
+          category: svc.category,
+          description: svc.description?.trim() || svc.name,
+          quantity: 1,
+          unitPrice: svc.price,
+          discount: 0,
+          taxRate: svc.taxRate,
+          commissionPercent: commission,
+          hours: svc.hours,
+          serviceId: svc.id,
+        },
+      ];
+    });
   };
 
   const addProduct = (item: InventoryItem) => {
@@ -388,7 +426,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const validate = (): string | null => {
     if (lines.length === 0) return 'Agregue al menos un servicio o producto.';
     if (lines.some(l => !l.description.trim())) return 'Todas las líneas deben tener descripción.';
-    if (lines.some(l => l.unitPrice <= 0)) return 'Hay líneas con precio $0. Ingrese el precio.';
+    if (lines.some(l => l.unitPrice <= 0))
+      return 'Hay líneas con precio $0. Defina el precio en el Catálogo de Servicios, en Inventario o en la cita.';
     if (!clientName.trim()) return 'Ingrese el cliente o use "Consumidor final".';
     if (!artistId) return 'Seleccione el artista.';
     if (cfBlocked) return consumidorFinalLimitMessage(computed.total + tipNum);
@@ -536,6 +575,16 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-semibold ${
+              sequenceOffline ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-[#FF3366]/10 border-[#FF3366]/40 text-white'
+            }`}
+            title="Número que recibirá el comprobante al cobrar. Lo asigna el servidor de numeración."
+          >
+            <Hash className="w-3.5 h-3.5 text-[#FF3366]" />
+            {isNotaVenta ? 'Nota de venta' : 'Factura'} N°{' '}
+            <span className="font-mono">{sequenceOffline ? 'sin conexión' : nextDocumentNumber || '…'}</span>
+          </div>
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
@@ -605,21 +654,38 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             </div>
 
             {catalogTab === 'services' && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {QUICK_SERVICES.map(s => (
-                  <button
-                    key={s.label}
-                    type="button"
-                    onClick={() => addService(s)}
-                    className="p-3 rounded-xl bg-[#121215] border border-[#2B2B36] hover:border-[#FF3366]/60 text-left cursor-pointer group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">{s.label}</span>
-                      <Plus className="w-4 h-4 text-neutral-500 group-hover:text-[#FF3366]" />
-                    </div>
-                    <span className="text-[10px] text-neutral-500 capitalize">{s.category === 'tattoo' ? 'Tatuaje' : s.category === 'piercing' ? 'Piercing' : 'Servicio'}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
+                {serviceCatalog.length === 0 ? (
+                  <p className="col-span-full text-center text-[11px] text-neutral-500 py-6">
+                    No hay servicios activos.{' '}
+                    <button type="button" onClick={() => setActiveTab('services')} className="underline text-neutral-300 cursor-pointer">
+                      Registre servicios en el Catálogo de Servicios
+                    </button>
+                  </p>
+                ) : (
+                  serviceCatalog.map(s => {
+                    const noPrice = s.price <= 0;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        disabled={noPrice}
+                        onClick={() => addService(s)}
+                        title={noPrice ? 'Sin precio: defínalo en Catálogo de Servicios' : undefined}
+                        className="p-2.5 rounded-xl bg-[#121215] border border-[#2B2B36] hover:border-[#FF3366]/60 text-left cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="text-xs font-bold text-white line-clamp-2">{s.name}</span>
+                          <Plus className="w-4 h-4 shrink-0 text-neutral-500 group-hover:text-[#FF3366]" />
+                        </div>
+                        <div className="flex justify-between items-end mt-1">
+                          <span className="font-mono text-xs text-[#FF3366] font-bold">{noPrice ? 'Sin precio' : formatMoney(r2(s.price * (1 + s.taxRate / 100)))}</span>
+                          <span className="text-[10px] text-neutral-500">{serviceCategoryLabel(s.category)}</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             )}
 
@@ -718,38 +784,27 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   </thead>
                   <tbody className="divide-y divide-[#222228]">
                     {lines.map(l => {
-                      const priceLocked = !canChangePrice && (l.kind === 'product' || l.id.startsWith('apt-'));
+                      const isAppointment = l.id.startsWith('apt-');
                       const rate = effectiveTax(l);
                       const lineTotal = r2(lineBase(l) * (1 + rate / 100));
                       return (
                         <tr key={l.id} className="align-middle">
                           <td className="py-2 px-3">
-                            <input
-                              value={l.description}
-                              onChange={e => updateLine(l.id, { description: e.target.value })}
-                              disabled={l.kind === 'product'}
-                              className="w-full bg-transparent border-b border-transparent focus:border-[#FF3366]/60 text-white text-xs focus:outline-none disabled:opacity-100"
-                            />
+                            <div className="text-white text-xs flex items-center gap-1.5">
+                              <Lock className="w-3 h-3 shrink-0 text-neutral-600" aria-hidden />
+                              <span className="truncate" title={l.description}>
+                                {l.description}
+                              </span>
+                            </div>
                             <div className="text-[10px] text-neutral-500">
-                              {l.kind === 'product' ? `Producto${l.sku ? ` · ${l.sku}` : ''}` : l.category === 'tattoo' ? 'Tatuaje' : l.category === 'piercing' ? 'Piercing' : 'Servicio'}
-                              {l.category === 'tattoo' && (
-                                <>
-                                  {' · '}
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.5"
-                                    value={l.hours ?? ''}
-                                    onChange={e => updateLine(l.id, { hours: parseFloat(e.target.value) || 0 })}
-                                    className="w-10 bg-transparent text-neutral-300 text-[10px] border-b border-[#2B2B36] focus:outline-none"
-                                    aria-label="Horas"
-                                  />{' '}
-                                  h
-                                </>
-                              )}
+                              {l.kind === 'product' ? `Producto${l.sku ? ` · ${l.sku}` : ''}` : isAppointment ? `Cita · ${serviceCategoryLabel(l.category)}` : serviceCategoryLabel(l.category)}
+                              {l.category === 'tattoo' && l.hours ? ` · ${l.hours} h` : ''}
                             </div>
                           </td>
                           <td className="py-2 px-2">
+                            {isAppointment ? (
+                              <div className="text-center font-mono text-white">{l.quantity}</div>
+                            ) : (
                             <div className="flex items-center justify-center gap-1">
                               <button type="button" onClick={() => updateLine(l.id, { quantity: l.quantity - 1 })} className="w-6 h-6 rounded-lg bg-[#121215] border border-[#2B2B36] flex items-center justify-center text-neutral-400 hover:text-white cursor-pointer" aria-label="Restar">
                                 <Minus className="w-3 h-3" />
@@ -759,20 +814,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                                 <Plus className="w-3 h-3" />
                               </button>
                             </div>
+                            )}
                           </td>
-                          <td className="py-2 px-2">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={l.unitPrice || ''}
-                              placeholder="0.00"
-                              disabled={priceLocked}
-                              title={priceLocked ? 'Sin permiso para modificar el precio' : undefined}
-                              onChange={e => updateLine(l.id, { unitPrice: parseFloat(e.target.value) || 0 })}
-                              className={`${numCls} ${l.unitPrice <= 0 ? 'border-amber-500/60' : ''}`}
-                              autoFocus={l.kind === 'service' && l.unitPrice === 0}
-                            />
+                          <td className={`py-2 px-2 text-right font-mono ${l.unitPrice <= 0 ? 'text-amber-300' : 'text-neutral-200'}`}>
+                            {l.unitPrice > 0 ? formatMoney(l.unitPrice) : 'Sin precio'}
                           </td>
                           <td className="py-2 px-2">
                             <input
@@ -1008,6 +1053,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
                   {t === 'factura' ? `Factura electrónica (IVA ${standardVatRate}%)` : 'Nota de venta RIMPE'}
                 </button>
               ))}
+            </div>
+            <div className="col-span-2 flex items-center justify-between px-3 py-2 rounded-xl bg-[#121215] border border-[#2B2B36]">
+              <span className="text-[10px] uppercase text-neutral-400">Secuencial {isNotaVenta ? 'nota de venta' : 'factura'}</span>
+              <span className={`font-mono text-sm font-bold ${sequenceOffline ? 'text-red-300' : 'text-white'}`}>
+                {sequenceOffline ? 'Servidor sin conexión' : nextDocumentNumber || 'Cargando…'}
+              </span>
             </div>
           </div>
 

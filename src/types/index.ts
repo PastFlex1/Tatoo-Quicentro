@@ -32,6 +32,8 @@ export interface SaleLineItem {
   /** Producto de inventario (descarga stock y kardex) */
   inventoryItemId?: string;
   sku?: string;
+  /** Servicio del catálogo de servicios */
+  serviceId?: string;
   /** % de comisión del artista para esta línea */
   commissionPercent: number;
   hours?: number;
@@ -553,6 +555,20 @@ export interface StudioSettings extends CompanyConfig {
   defaultArtistCommission: number; // e.g. 60%
   receiptFooterMessage: string;
   healthSanitaryRegistration: string; // N° registro sanitario de la clínica/estudio
+  /** Catálogo de servicios del estudio (precios oficiales que usa el POS) */
+  serviceCatalog?: StudioService[];
+}
+
+/** Servicio del catálogo. Precio sin IVA. */
+export interface StudioService {
+  id: string;
+  name: string;
+  category: ServiceCategory;
+  description?: string;
+  price: number;
+  taxRate: number;
+  hours?: number;
+  active: boolean;
 }
 
 export type DateFilterRange = 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all';

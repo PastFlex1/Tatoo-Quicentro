@@ -16,6 +16,7 @@ import { ArtistsView } from './components/artists/ArtistsView';
 import { CashRegisterView } from './components/cash/CashRegisterView';
 import { InventoryView } from './components/inventory/InventoryView';
 import { KardexView } from './components/kardex/KardexView';
+import { ServicesView } from './components/services/ServicesView';
 import { GeneralLedgerView } from './components/ledger/GeneralLedgerView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AppointmentsView } from './components/appointments/AppointmentsView';
@@ -121,6 +122,8 @@ const MainLayout: React.FC = () => {
         return <CashRegisterView />;
       case 'inventory':
         return <InventoryView />;
+      case 'services':
+        return <ServicesView />;
       case 'kardex':
         return <KardexView />;
       case 'ledger':

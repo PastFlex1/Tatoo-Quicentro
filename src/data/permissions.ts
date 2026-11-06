@@ -155,6 +155,17 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     ],
   },
   {
+    id: 'services',
+    label: 'Catálogo de Servicios',
+    group: 'Compras e Inventario',
+    actions: [
+      a('services', 'view', 'Ver servicios'),
+      a('services', 'create', 'Crear servicios'),
+      a('services', 'edit', 'Editar servicios y precios', true),
+      a('services', 'delete', 'Eliminar servicios', true),
+    ],
+  },
+  {
     id: 'kardex',
     label: 'Kardex de Insumos',
     group: 'Compras e Inventario',
@@ -263,6 +274,7 @@ export const DEFAULT_ROLES: SystemRole[] = [
     permissions: [
       ...pick('dashboard.view'),
       ...pick('pos.view', 'pos.charge', 'pos.discount'),
+      ...pick('services.view'),
       ...pick('clients.view', 'clients.create', 'clients.edit', 'clients.view_medical'),
       ...pick('gallery.view', 'gallery.upload'),
       ...pick('appointments.view', 'appointments.view_all', 'appointments.create', 'appointments.edit', 'appointments.cancel'),
