@@ -3,9 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "start": "tsx server.ts --start-server",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
@@ -14,6 +18,7 @@
     "sri:parser": "node --experimental-strip-types --no-warnings scripts/probar-sri-parser.ts",
     "sri:mongo": "node --experimental-strip-types --no-warnings scripts/probar-sri-mongo.ts",
     "server": "tsx server.ts --start-server",
+    "tunnel": "powershell -ExecutionPolicy Bypass -File scripts/iniciar-tunel-cloudflare.ps1",
     "sri:api": "node --experimental-strip-types --no-warnings scripts/probar-sri-api.ts",
     "sri:final": "node --experimental-strip-types --no-warnings scripts/probar-sri-final.ts",
     "sri:test": "npm run sri:probar && npm run sri:parser && npm run sri:mongo && npm run sri:api && npm run sri:final"
@@ -31,6 +36,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "tsx": "^4.23.15",
     "vite": "^8.3.0"
   },
   "devDependencies": {
@@ -41,7 +47,6 @@
     "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }

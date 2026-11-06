@@ -21,7 +21,7 @@ import {
   isSeriesDocument,
   padCode,
   sequenceKey,
-} from './documentNumber';
+} from './documentNumber.ts';
 
 interface StoreFile {
   version: 1;

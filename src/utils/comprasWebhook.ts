@@ -19,7 +19,7 @@
  *   "xml_raw_base64": "..."                                            (recomendado: obligación de conservar el XML)
  * }
  */
-import type { ComprobanteRecibido, ItemComprobanteRecibido } from '../types';
+import type { ComprobanteRecibido, ItemComprobanteRecibido } from '../types/index.ts';
 import { TIPO_COMPROBANTE, validarClaveAcceso } from './claveAcceso.ts';
 
 const r2 = (n: number) => Math.round((n || 0) * 100) / 100;

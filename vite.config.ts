@@ -107,6 +107,12 @@ export default defineConfig(({ mode }) => {
   }
   return {
     plugins: [react(), tailwindcss(), sriDevApiPlugin()],
+    server: {
+      allowedHosts: true,
+    },
+    preview: {
+      allowedHosts: true,
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, '.'),

@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import type { IncomingMessage, ServerResponse } from 'http';
-import type { ComprobanteRecibido } from '../types';
+import type { ComprobanteRecibido } from '../types/index.ts';
 import { normalizarCompraWebhook } from './comprasWebhook.ts';
 import { migrar } from '../server/modules/sri/sri.service.ts';
 

@@ -13,3 +13,4 @@ data_compras_recibidas.json
 data_compras_recibidas.json.tmp
 tmp-sri/
 logs/
+cloudflared.exe
