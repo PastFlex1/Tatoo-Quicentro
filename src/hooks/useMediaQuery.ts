@@ -11,7 +11,12 @@ export function useMediaQuery(query: string): boolean {
     const onChange = () => setMatches(mql.matches);
     onChange();
     mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
+    // Respaldo: algunos navegadores/emuladores no disparan `change` al redimensionar
+    window.addEventListener('resize', onChange);
+    return () => {
+      mql.removeEventListener('change', onChange);
+      window.removeEventListener('resize', onChange);
+    };
   }, [query]);
 
   return matches;

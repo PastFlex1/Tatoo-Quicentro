@@ -37,10 +37,9 @@ const MainLayout: React.FC = () => {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [receiptSale, setReceiptSale] = useState<SaleRecord | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  // En pantallas de 1366 px o menos el POS ocupa toda la pantalla (como una caja registradora);
-  // el menú lateral pasa a ser un cajón que se abre con el botón ☰.
-  const isTerminalScreen = useMediaQuery(POS_TERMINAL_QUERY);
-  const posFullScreen = activeTab === 'pos' && isTerminalScreen;
+  // En pantallas de 1366 px o menos el menú lateral es un cajón en TODAS las secciones: se abre con
+  // el botón ☰ y se cierra solo al elegir una sección, así el contenido usa todo el ancho.
+  const drawerSidebar = useMediaQuery(POS_TERMINAL_QUERY);
 
   // Close mobile sidebar when activeTab changes or window resizes to desktop
   useEffect(() => {
@@ -49,7 +48,7 @@ const MainLayout: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) {
+      if (window.innerWidth > 1366) {
         setIsMobileSidebarOpen(false);
       }
     };
@@ -156,7 +155,7 @@ const MainLayout: React.FC = () => {
       <Sidebar
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
-        forceDrawer={posFullScreen}
+        forceDrawer={drawerSidebar}
       />
 
       {/* Main Content Viewport */}
@@ -165,7 +164,7 @@ const MainLayout: React.FC = () => {
           onOpenNewSale={() => setActiveTab('pos')}
           onOpenNewExpense={() => setIsExpenseModalOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
-          forceMenuButton={posFullScreen}
+          forceMenuButton={drawerSidebar}
         />
 
         <main className="flex-1 w-full overflow-y-auto overflow-x-hidden outline-none focus:outline-none">
