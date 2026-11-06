@@ -35,7 +35,9 @@ export const PurchaseOrdersView: React.FC = () => {
     deletePurchaseOrder,
     receivePurchaseOrder,
     formatMoney,
+    currentUser,
   } = useStudio();
+  const currentUserName = `${currentUser?.nombres || ''} ${currentUser?.apellidos || ''}`.trim() || currentUser?.username || '';
 
   const { guard: guardPermission } = usePermission();
   // Search & Filter state
@@ -49,7 +51,7 @@ export const PurchaseOrdersView: React.FC = () => {
 
   // Receive Modal state
   const [orderToReceive, setOrderToReceive] = useState<PurchaseOrder | null>(null);
-  const [receivedBy, setReceivedBy] = useState('Alex Palma - Administrador');
+  const [receivedBy, setReceivedBy] = useState('');
   const [invoiceReference, setInvoiceReference] = useState('');
   const [updateInventoryStock, setUpdateInventoryStock] = useState(true);
   const [registerExpense, setRegisterExpense] = useState(true);
@@ -92,7 +94,7 @@ export const PurchaseOrdersView: React.FC = () => {
   const handleOpenReceive = (order: PurchaseOrder) => {
     if (!guardPermission('purchase-orders.receive')) return;
     setOrderToReceive(order);
-    setReceivedBy('Alex Palma - Administrador');
+    setReceivedBy('');
     setInvoiceReference(order.invoiceReference || '');
     setUpdateInventoryStock(true);
     setRegisterExpense(true);
@@ -102,7 +104,7 @@ export const PurchaseOrdersView: React.FC = () => {
     if (!guardPermission('purchase-orders.receive')) return;
     if (!orderToReceive) return;
     receivePurchaseOrder(orderToReceive.id, {
-      receivedBy,
+      receivedBy: receivedBy.trim() || currentUserName,
       invoiceReference: invoiceReference.trim(),
       updateInventoryStock,
       registerExpense,
@@ -637,6 +639,7 @@ export const PurchaseOrdersView: React.FC = () => {
                     type="text"
                     value={receivedBy}
                     onChange={e => setReceivedBy(e.target.value)}
+                    placeholder={currentUserName ? `Ej: ${currentUserName}` : 'Nombre de quien recibe'}
                     className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>

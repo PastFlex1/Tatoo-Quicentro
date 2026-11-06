@@ -70,9 +70,9 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
   const [formTelefono, setFormTelefono] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formDireccion, setFormDireccion] = useState('');
-  const [formCiudad, setFormCiudad] = useState('QUITO');
-  const [formDiasCredito, setFormDiasCredito] = useState<number>(15);
-  const [formCupoCredito, setFormCupoCredito] = useState<number>(1500);
+  const [formCiudad, setFormCiudad] = useState('');
+  const [formDiasCredito, setFormDiasCredito] = useState<number>(0);
+  const [formCupoCredito, setFormCupoCredito] = useState<number>(0);
   const [formBancoNombre, setFormBancoNombre] = useState('Banco Pichincha');
   const [formBancoTipoCuenta, setFormBancoTipoCuenta] = useState<'CORRIENTE' | 'AHORROS'>('CORRIENTE');
   const [formBancoNumeroCuenta, setFormBancoNumeroCuenta] = useState('');
@@ -185,7 +185,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
     setFormTelefono('');
     setFormEmail('');
     setFormDireccion('');
-    setFormCiudad('QUITO');
+    setFormCiudad('');
     setFormDiasCredito(15);
     setFormCupoCredito(1500);
     setFormBancoNombre('Banco Pichincha');
@@ -1004,7 +1004,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                     type="text"
                     value={formCiudad}
                     onChange={e => setFormCiudad(e.target.value.toUpperCase())}
-                    placeholder="QUITO"
+                    placeholder="Ej: QUITO"
                     className="w-full px-3 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white focus:border-[#FF3366] outline-none font-semibold uppercase"
                   />
                 </div>
@@ -1038,7 +1038,7 @@ export const SuppliersView: React.FC<SuppliersViewProps> = () => {
                         type="number"
                         min="0"
                         max="180"
-                        value={formDiasCredito}
+                        value={formDiasCredito || ''}
                         onChange={e => {
                           const days = Math.max(0, parseInt(e.target.value, 10) || 0);
                           setFormDiasCredito(days);

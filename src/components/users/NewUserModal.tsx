@@ -44,7 +44,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [rol, setRol] = useState<UserRole>('CAJERO_RECEPCION');
-  const [pin, setPin] = useState('1234');
+  const [pin, setPin] = useState('');
   const [artistId, setArtistId] = useState<string>('');
   const [estado, setEstado] = useState<'ACTIVO' | 'INACTIVO'>('ACTIVO');
 
@@ -72,7 +72,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       setEmail('');
       setTelefono('');
       setRol('CAJERO_RECEPCION');
-      setPin('1234');
+      setPin('');
       setArtistId(artists[0]?.id || '');
       setEstado('ACTIVO');
     }
@@ -341,7 +341,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                   maxLength={6}
                   value={pin}
                   onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
-                  placeholder="1234"
+                  placeholder="Ej: 1234"
                   className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white font-mono tracking-widest text-center focus:outline-none focus:border-[#FF3366]"
                 />
               </div>

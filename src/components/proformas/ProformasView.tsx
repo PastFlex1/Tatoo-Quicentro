@@ -700,7 +700,8 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                     type="number"
                     step="0.01"
                     min="1"
-                    value={billingFinalPrice}
+                    value={billingFinalPrice || ''}
+                    placeholder="0.00"
                     onChange={e => setBillingFinalPrice(parseFloat(e.target.value) || 0)}
                     onFocus={e => e.target.select()}
                     className="w-full bg-[#121215] border border-[#272730] rounded-xl pl-8 pr-4 py-2.5 text-white font-mono text-sm font-bold focus:outline-hidden focus:border-emerald-500 transition-colors"

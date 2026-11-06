@@ -256,7 +256,8 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
                 type="number"
                 step="0.01"
                 min="0"
-                value={creditSubtotal}
+                value={creditSubtotal || ''}
+                placeholder="0.00"
                 onChange={e => {
                   const val = parseFloat(e.target.value) || 0;
                   setCreditSubtotal(val);
@@ -276,7 +277,8 @@ export const NewCreditNoteModal: React.FC<NewCreditNoteModalProps> = ({
                 type="number"
                 step="0.01"
                 min="0"
-                value={creditTax}
+                value={creditTax || ''}
+                placeholder="0.00"
                 onChange={e => setCreditTax(parseFloat(e.target.value) || 0)}
                 className="w-full px-3 py-1.5 bg-[#17171C] border border-[#272730] rounded-xl text-white font-mono font-bold text-xs"
               />

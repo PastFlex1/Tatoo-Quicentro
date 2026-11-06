@@ -26,7 +26,7 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
   const [artistId, setArtistId] = useState('');
   const [hours, setHours] = useState<number>(3);
   const [pieces, setPieces] = useState<number>(1);
-  const [subtotal, setSubtotal] = useState<number>(200);
+  const [subtotal, setSubtotal] = useState<number>(0);
   const [discount, setDiscount] = useState<number>(0);
   const [taxRate, setTaxRate] = useState<number>(
     (!settings.defaultTaxRate || settings.defaultTaxRate === 8 || settings.defaultTaxRate === 12)
@@ -313,7 +313,8 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
                   type="number"
                   step="0.01"
                   min="0"
-                  value={subtotal}
+                  value={subtotal || ''}
+                  placeholder="0.00"
                   onChange={e => setSubtotal(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-1.5 bg-[#18181D] border border-[#272730] rounded-lg text-white font-mono focus:border-[#FF3366]/60"
                 />
@@ -325,7 +326,8 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
                   type="number"
                   step="0.01"
                   min="0"
-                  value={discount}
+                  value={discount || ''}
+                  placeholder="0.00"
                   onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-1.5 bg-[#18181D] border border-[#272730] rounded-lg text-white font-mono focus:border-[#FF3366]/60"
                 />
@@ -349,7 +351,8 @@ export const NewSaleModal: React.FC<NewSaleModalProps> = ({ isOpen, onClose, onS
                   type="number"
                   step="0.01"
                   min="0"
-                  value={depositAmount}
+                  value={depositAmount || ''}
+                  placeholder="0.00"
                   onChange={e => setDepositAmount(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-1.5 bg-[#18181D] border border-[#272730] rounded-lg text-white font-mono focus:border-[#FF3366]/60"
                 />

@@ -811,7 +811,8 @@ export const NewPurchaseOrderModal: React.FC<NewPurchaseOrderModalProps> = ({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={itemUnitCost}
+                    value={itemUnitCost || ''}
+                    placeholder="0.00"
                     onChange={e => setItemUnitCost(Math.max(0, parseFloat(e.target.value) || 0))}
                     className="w-full bg-[#1A1A22] border border-[#30303D] rounded-xl px-3 py-2 text-xs text-white font-mono text-right focus:outline-none focus:border-[#FF3366]"
                   />

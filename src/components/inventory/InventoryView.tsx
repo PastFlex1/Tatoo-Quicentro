@@ -47,10 +47,10 @@ export const InventoryView: React.FC = () => {
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState<InventoryCategory>('cartridge');
-  const [currentStockStr, setCurrentStockStr] = useState<string>('10');
-  const [minStockAlertStr, setMinStockAlertStr] = useState<string>('3');
-  const [unit, setUnit] = useState('cajas');
-  const [unitCostStr, setUnitCostStr] = useState<string>('25.00');
+  const [currentStockStr, setCurrentStockStr] = useState<string>('');
+  const [minStockAlertStr, setMinStockAlertStr] = useState<string>('');
+  const [unit, setUnit] = useState('');
+  const [unitCostStr, setUnitCostStr] = useState<string>('');
 
   // Supplier & SRI VAT fields
   const [supplier, setSupplier] = useState<string>('');
@@ -159,10 +159,10 @@ export const InventoryView: React.FC = () => {
     setName('');
     setBrand('');
     setCategory('cartridge');
-    setCurrentStockStr('5');
-    setMinStockAlertStr('2');
-    setUnit('piezas');
-    setUnitCostStr('15.00');
+    setCurrentStockStr('');
+    setMinStockAlertStr('');
+    setUnit('');
+    setUnitCostStr('');
     setSupplier('');
     setTaxRate(15);
     setPriceWithoutVatStr('');
@@ -833,7 +833,7 @@ export const InventoryView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="piezas, cajas, frascos, ml"
+                    placeholder="Ej: piezas, cajas, frascos, ml"
                     value={unit}
                     onChange={e => setUnit(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-[#121215] border border-[#272730] rounded-xl text-white focus:outline-hidden focus:border-[#FF3366]/60 transition-colors"

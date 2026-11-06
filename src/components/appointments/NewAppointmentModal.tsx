@@ -87,12 +87,12 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
   const [date, setDate] = useState(initialDate || todayStr);
-  const [startTime, setStartTime] = useState('11:00');
-  const [endTime, setEndTime] = useState('14:00');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [estimatedHours, setEstimatedHours] = useState<number>(3.0);
-  const [estimatedPrice, setEstimatedPrice] = useState<number>(250);
-  const [depositAmount, setDepositAmount] = useState<number>(50);
-  const [depositPaid, setDepositPaid] = useState<boolean>(true);
+  const [estimatedPrice, setEstimatedPrice] = useState<number>(0);
+  const [depositAmount, setDepositAmount] = useState<number>(0);
+  const [depositPaid, setDepositPaid] = useState<boolean>(false);
   const [depositPaymentMethod, setDepositPaymentMethod] = useState<PaymentMethod>('card');
   const [bodyPlacement, setBodyPlacement] = useState('');
   const [sizeApprox, setSizeApprox] = useState('');
@@ -312,7 +312,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                     required
                     value={clientPhone}
                     onChange={e => setClientPhone(e.target.value)}
-                    placeholder="Ej. +1 (555) 432-8765"
+                    placeholder="Ej. 099 123 4567"
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-600 focus:outline-hidden"
                   />
                 </div>
@@ -497,7 +497,8 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                     type="number"
                     min="0"
                     step="5"
-                    value={estimatedPrice}
+                    value={estimatedPrice || ''}
+                    placeholder="0.00"
                     onChange={e => setEstimatedPrice(Number(e.target.value))}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-bold text-white focus:outline-hidden"
                   />
@@ -514,7 +515,8 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                     type="number"
                     min="0"
                     step="5"
-                    value={depositAmount}
+                    value={depositAmount || ''}
+                    placeholder="0.00"
                     onChange={e => setDepositAmount(Number(e.target.value))}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl pl-9 pr-3 py-2 text-xs font-mono font-bold text-[#FF3366] focus:outline-hidden"
                   />

@@ -94,12 +94,12 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
 
   const [discount, setDiscount] = useState<number>(0);
   const [taxRate, setTaxRate] = useState<number>(settings.defaultTaxRate || 0);
-  const [suggestedDeposit, setSuggestedDeposit] = useState<number>(50);
+  const [suggestedDeposit, setSuggestedDeposit] = useState<number>(0);
   const [validDays, setValidDays] = useState<number>(15);
   const [notes, setNotes] = useState('');
   const [autoSchedule, setAutoSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
-  const [scheduleTime, setScheduleTime] = useState('11:00');
+  const [scheduleTime, setScheduleTime] = useState('');
 
   if (!isOpen) return null;
 
@@ -155,6 +155,10 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
     if (!guardPermission('proformas.create')) return;
     if (!clientName.trim() || !serviceName.trim()) {
       alert('Por favor indica el nombre del cliente y el nombre del servicio o concepto.');
+      return;
+    }
+    if (autoSchedule && (!scheduleDate || !scheduleTime)) {
+      alert('Para agendar la cita indica la fecha y la hora de inicio.');
       return;
     }
 
@@ -554,7 +558,8 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                         type="number"
                         min="0"
                         step="1"
-                        value={item.unitPrice}
+                        value={item.unitPrice || ''}
+                        placeholder="0.00"
                         onChange={e => handleUpdateItem(index, { unitPrice: Number(e.target.value) })}
                         className="w-16 bg-[#1A1A20] border border-[#2C2C36] rounded px-1.5 py-1 text-right text-xs text-white font-mono"
                       />
@@ -588,7 +593,8 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                   type="number"
                   min="0"
                   step="1"
-                  value={discount}
+                  value={discount || ''}
+                  placeholder="0.00"
                   onChange={e => setDiscount(Number(e.target.value))}
                   className="w-full bg-[#121215] border border-[#2A2A34] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-hidden focus:border-[#FF3366]"
                 />
@@ -618,7 +624,8 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
                 <input
                   type="number"
                   min="0"
-                  value={suggestedDeposit}
+                  value={suggestedDeposit || ''}
+                  placeholder="0.00"
                   onChange={e => setSuggestedDeposit(Number(e.target.value))}
                   className="w-full bg-[#121215] border border-emerald-500/40 rounded-xl px-3 py-2 text-xs text-emerald-300 font-mono font-bold focus:outline-hidden focus:border-emerald-500"
                 />

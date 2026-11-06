@@ -19,9 +19,9 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
   const [category, setCategory] = useState<ExpenseCategory>('supplies_tattoo');
   const [description, setDescription] = useState('');
   const [supplier, setSupplier] = useState('');
-  const [amount, setAmount] = useState<number>(50);
+  const [amount, setAmount] = useState<number>(0);
   const [taxDeductible, setTaxDeductible] = useState<boolean>(true);
-  const [taxAmount, setTaxAmount] = useState<number>(6.52);
+  const [taxAmount, setTaxAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'credit_card' | 'bank_transfer'>('credit_card');
   const [invoiceReference, setInvoiceReference] = useState('');
   const [notes, setNotes] = useState('');
@@ -420,7 +420,8 @@ export const NewExpenseModal: React.FC<NewExpenseModalProps> = ({ isOpen, onClos
                 step="0.01"
                 min="0.01"
                 required
-                value={amount}
+                value={amount || ''}
+                placeholder="0.00"
                 onChange={e => handleAmountChange(parseFloat(e.target.value) || 0)}
                 className="w-full px-3.5 py-2 bg-[#121215] border border-[#272730] rounded-xl text-white font-mono font-bold focus:outline-hidden focus:border-[#FF3366]/60"
               />

@@ -1183,7 +1183,8 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   step="0.01"
                   required
                   min="0"
-                  value={settleAmount}
+                  value={settleAmount || ''}
+                  placeholder="0.00"
                   onChange={e => {
                     setSettleAmount(parseFloat(e.target.value) || 0);
                     setSettleError(null);
@@ -1212,7 +1213,8 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={settleTips}
+                  value={settleTips || ''}
+                  placeholder="0.00"
                   onChange={e => {
                     setSettleTips(parseFloat(e.target.value) || 0);
                     setSettleError(null);
@@ -1230,7 +1232,8 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={settleDeductions}
+                  value={settleDeductions || ''}
+                  placeholder="0.00"
                   onChange={e => {
                     setSettleDeductions(parseFloat(e.target.value) || 0);
                     setSettleError(null);

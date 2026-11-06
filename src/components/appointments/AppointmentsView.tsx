@@ -1021,7 +1021,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                   <span>Precio Acordado / Final:</span>
                   <input
                     type="number"
-                    value={billingFinalPrice}
+                    value={billingFinalPrice || ''}
+                    placeholder="0.00"
                     onChange={e => setBillingFinalPrice(Number(e.target.value))}
                     className="w-24 bg-[#111114] border border-[#2A2A33] rounded-lg px-2 py-1 text-right font-mono font-bold text-white focus:outline-hidden"
                   />
