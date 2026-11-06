@@ -18,12 +18,15 @@ interface HeaderProps {
   onOpenNewSale: () => void;
   onOpenNewExpense: () => void;
   onToggleSidebar?: () => void;
+  /** Muestra el botón ☰ también en escritorio (POS a pantalla completa) */
+  forceMenuButton?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenNewSale,
   onOpenNewExpense,
   onToggleSidebar,
+  forceMenuButton = false,
 }) => {
   const { activeTab, setActiveTab, dateFilter, setDateFilter, theme, toggleTheme, currentUser, currentRole, appointments } = useStudio();
   const appointmentDays = useMemo(() => {
@@ -111,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onToggleSidebar && (
             <button
               onClick={onToggleSidebar}
-              className="lg:hidden p-2 rounded-xl bg-[#1A1A20] border border-[#2D2D36] text-neutral-300 hover:text-white hover:border-[#FF3366]/50 transition-colors shrink-0"
+              className={`${forceMenuButton ? '' : 'lg:hidden'} p-2 rounded-xl bg-[#1A1A20] border border-[#2D2D36] text-neutral-300 hover:text-white hover:border-[#FF3366]/50 transition-colors shrink-0`}
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-4 h-4 text-[#FF3366]" />

@@ -28,6 +28,7 @@ import { ReceiptModal } from './components/sales/ReceiptModal';
 import { SalesNotePrintModal } from './components/sales/SalesNotePrintModal';
 import { SaleRecord } from './types';
 import { ShieldAlert } from 'lucide-react';
+import { POS_TERMINAL_QUERY, useMediaQuery } from './hooks/useMediaQuery';
 
 const MainLayout: React.FC = () => {
   const { activeTab, setActiveTab, currentUser, canAccessTab, currentRole } = useStudio();
@@ -36,6 +37,10 @@ const MainLayout: React.FC = () => {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [receiptSale, setReceiptSale] = useState<SaleRecord | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  // En pantallas de 1366 px o menos el POS ocupa toda la pantalla (como una caja registradora);
+  // el menú lateral pasa a ser un cajón que se abre con el botón ☰.
+  const isTerminalScreen = useMediaQuery(POS_TERMINAL_QUERY);
+  const posFullScreen = activeTab === 'pos' && isTerminalScreen;
 
   // Close mobile sidebar when activeTab changes or window resizes to desktop
   useEffect(() => {
@@ -151,6 +156,7 @@ const MainLayout: React.FC = () => {
       <Sidebar
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
+        forceDrawer={posFullScreen}
       />
 
       {/* Main Content Viewport */}
@@ -159,6 +165,7 @@ const MainLayout: React.FC = () => {
           onOpenNewSale={() => setActiveTab('pos')}
           onOpenNewExpense={() => setIsExpenseModalOpen(true)}
           onToggleSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+          forceMenuButton={posFullScreen}
         />
 
         <main className="flex-1 w-full overflow-y-auto overflow-x-hidden outline-none focus:outline-none">

@@ -30,9 +30,11 @@ import { UserSwitcherModal } from '../users/UserSwitcherModal';
 interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
+  /** Se comporta como cajón también en escritorio (POS a pantalla completa) */
+  forceDrawer?: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose, forceDrawer = false }) => {
   const {
     activeTab,
     setActiveTab,
@@ -95,13 +97,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose }) => 
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-black/75 backdrop-blur-xs lg:hidden transition-opacity"
+          className={`fixed inset-0 z-40 bg-black/75 backdrop-blur-xs transition-opacity ${forceDrawer ? '' : 'lg:hidden'}`}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 xl:w-68 shrink-0 bg-[#141417] border-r border-[#24242A] flex flex-col justify-between select-none transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 xl:w-68 shrink-0 bg-[#141417] border-r border-[#24242A] flex flex-col justify-between select-none transition-transform duration-300 ease-in-out ${forceDrawer ? '' : 'lg:static lg:translate-x-0'} ${
           isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
         }`}
       >
