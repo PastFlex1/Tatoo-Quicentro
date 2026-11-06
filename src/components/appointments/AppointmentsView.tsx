@@ -18,6 +18,7 @@ import {
   MessageCircle,
   FileText,
   X,
+  Banknote,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { Appointment, AppointmentStatus, PaymentMethod, SaleRecord, Proforma } from '../../types';
@@ -925,9 +926,10 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                             {apt.status !== 'completed' && (
                               <button
                                 onClick={() => handleStartBilling(apt)}
-                                className="px-3 py-1 rounded-full bg-[#FF3366] hover:bg-[#E62557] text-white text-[11px] font-bold shadow-[0_0_8px_rgba(255,51,102,0.3)] transition-all cursor-pointer"
+                                className="p-1.5 rounded-lg bg-[#FF3366] hover:bg-[#E62557] text-white shadow-[0_0_8px_rgba(255,51,102,0.3)] transition-all cursor-pointer"
+                                title="Cobrar cita"
                               >
-                                Cobrar
+                                <Banknote className="w-3.5 h-3.5" />
                               </button>
                             )}
 
@@ -954,6 +956,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
                                 }
                               }}
                               className="p-1 rounded-lg text-neutral-500 hover:text-red-400"
+                              title="Eliminar cita"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

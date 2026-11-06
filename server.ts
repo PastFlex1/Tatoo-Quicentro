@@ -6,6 +6,12 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { consultarIdentificacionSriBackend, consultarRucSriBackend } from './src/utils/sriServerHandler.ts';
 import { sequenceMiddleware } from './src/utils/sequenceServer.ts';
+import { sriAutorizacionMiddleware } from './src/utils/sriAutorizacionServer.ts';
+import { comprasWebhookMiddleware } from './src/utils/comprasWebhookServer.ts';
+import { sriMiddleware } from './src/server/modules/sri/sri.routes.ts';
+import { cerrarMongo } from './src/server/db/mongo.ts';
+import { cancelarSincronizacion } from './src/server/modules/sri/sri.service.ts';
+import { detenerProgramador, iniciarProgramador } from './src/server/modules/sri/sri.scheduler.ts';
 
 dotenv.config();
 
@@ -32,6 +38,17 @@ async function startServer() {
 
   // Numeración central de documentos: /api/sequence/state · /next · /set · /log
   app.use(sequenceMiddleware);
+
+  // Comprobantes recibidos: XML autorizado por clave de acceso (servicio público del SRI)
+  app.use(sriAutorizacionMiddleware);
+
+  // Webhook de compras: POST /api/v1/compras/sri-webhook (token) · GET /api/v1/compras/recibidas
+  app.use(comprasWebhookMiddleware);
+
+  // Comprobantes recibidos SRI (MongoDB): /api/sri/sincronizar, /api/sri/comprobantes-recibidos, …
+  app.use(sriMiddleware());
+  // Sincronización automática mientras el servidor esté encendido
+  iniciarProgramador();
 
   // ==============================================================
   // SRI & REGISTRO CIVIL ENDPOINTS (Catastro, Persona, SECAP)
@@ -92,7 +109,8 @@ async function startServer() {
   console.log(`[Express] Sirviendo archivos estáticos desde: ${distPath}`);
   app.use(express.static(distPath));
 
-  app.get('*', (req, res) => {
+  // Express 5: el comodín debe tener nombre
+  app.get('/{*ruta}', (req, res) => {
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'Endpoint API no encontrado' });
     }
@@ -109,6 +127,23 @@ async function startServer() {
     console.log(`  ➜  Local:   http://localhost:${PORT}/`);
     console.log(`  ➜  Network: http://0.0.0.0:${PORT}/\n`);
   });
+
+  // Cierre ordenado (Ctrl+C o apagado de Windows): la sincronización en curso se cancela,
+  // sus claves pendientes quedan en la cola y se cierra la conexión a MongoDB.
+  let cerrando = false;
+  const cerrar = async (senal: string) => {
+    if (cerrando) return;
+    cerrando = true;
+    console.log(`\n[Servidor] ${senal} recibido: cerrando…`);
+    detenerProgramador();
+    cancelarSincronizacion();
+    httpServer.close();
+    await cerrarMongo().catch(() => {});
+    process.exitCode = 0;
+    setTimeout(() => process.exit(0), 3000).unref();
+  };
+  process.on('SIGINT', () => void cerrar('SIGINT'));
+  process.on('SIGTERM', () => void cerrar('SIGTERM'));
 }
 
 // Iniciar servidor si se ejecuta directamente con Node / tsx

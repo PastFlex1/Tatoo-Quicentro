@@ -509,11 +509,10 @@ export const PurchaseOrdersView: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenReceive(order)}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                             title="Recibir mercadería en bodega y actualizar Kardex"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Recibir</span>
                           </button>
                         )}
 

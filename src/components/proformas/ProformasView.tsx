@@ -528,11 +528,10 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                           {/* ACCIÓN 1: Ver Proforma */}
                           <button
                             onClick={() => setSelectedProforma(proforma)}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            className="p-1.5.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                             title="Ver e imprimir documento oficial de cotización"
                           >
                             <Eye className="w-3.5 h-3.5 text-[#FF3366]" />
-                            <span>Ver Proforma</span>
                           </button>
 
                           {/* ACCIÓN 2: Convertir a Factura (o Ver Factura emitida) */}
@@ -550,20 +549,18 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                                   setSelectedProforma(proforma);
                                 }
                               }}
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                              title="Ver comprobante de la factura emitida"
+                              className="p-1.5.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                              title={`Ver factura ${proforma.invoiceNumber || 'emitida'}`}
                             >
                               <FileCheck className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Factura {proforma.invoiceNumber}</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleOpenBillingModal(proforma)}
-                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(16,185,129,0.3)] cursor-pointer"
+                              className="p-1.5.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-[0_0_10px_rgba(16,185,129,0.3)] cursor-pointer"
                               title="Convertir esta proforma en factura oficial y cobrar en POS"
                             >
                               <Receipt className="w-3.5 h-3.5" />
-                              <span>Convertir a Factura</span>
                             </button>
                           )}
 

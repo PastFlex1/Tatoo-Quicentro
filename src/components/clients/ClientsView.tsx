@@ -1144,31 +1144,28 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                               setViewHistoryClient(client);
                               setHistoryTab('sales');
                             }}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            className="p-1.5.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                             title="Ver expediente clínico, historial de compras, citas y comprobantes"
                           >
                             <Eye className="w-3.5 h-3.5 text-[#FF3366]" />
-                            <span>Visualizar Historial</span>
                           </button>
 
                           {/* ACCIÓN 2: Editar Cliente */}
                           <button
                             onClick={() => handleOpenEditModal(client)}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                            className="p-1.5.5 rounded-xl bg-[#121215] hover:bg-[#252530] text-neutral-200 hover:text-white border border-[#272730] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                             title="Editar datos, contacto y ficha del cliente"
                           >
                             <Edit2 className="w-3.5 h-3.5 text-blue-400" />
-                            <span>Editar</span>
                           </button>
 
                           {/* Ficha de salud + carta de consentimiento */}
                           <button
                             onClick={() => openConsentWizard(client)}
-                            className="px-2.5 py-1.5 rounded-xl bg-[#FF3366]/10 hover:bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                            className="p-1.5.5 rounded-xl bg-[#FF3366]/10 hover:bg-[#FF3366]/20 text-[#FF3366] border border-[#FF3366]/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                             title="Actualizar ficha de salud y firmar carta de consentimiento"
                           >
                             <FileSignature className="w-3.5 h-3.5" />
-                            <span>Consentimiento</span>
                           </button>
 
                           {/* Acción complementaria: WhatsApp */}
@@ -1441,11 +1438,10 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                       <button
                                         type="button"
                                         onClick={() => setViewingProcedureConsent(procConsent)}
-                                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                        className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
                                         title="Ver o imprimir el consentimiento firmado subido para este procedimiento"
                                       >
                                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                        <span>Ver Firmado</span>
                                       </button>
                                       <button
                                         type="button"
@@ -1460,22 +1456,20 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                     <button
                                       type="button"
                                       onClick={() => handleOpenConsentUploadForSale(sale)}
-                                      className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                      className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
                                       title="Subir consentimiento ya firmado por el cliente para este procedimiento"
                                     >
                                       <UploadCloud className="w-3.5 h-3.5" />
-                                      <span>Subir Consentimiento</span>
                                     </button>
                                   )}
                                 </td>
                                 <td className="py-2.5 px-3 text-center whitespace-nowrap">
                                   <button
                                     onClick={() => onOpenReceipt(sale)}
-                                    className="px-2.5 py-1 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
                                     title="Ver ticket térmico o factura A4"
                                   >
                                     <FileCheck className="w-3 h-3" />
-                                    <span>Ticket</span>
                                   </button>
                                 </td>
                               </tr>
@@ -1535,11 +1529,10 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                       <button
                                         type="button"
                                         onClick={() => setViewingProcedureConsent(procConsent)}
-                                        className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                        className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold transition-colors inline-flex items-center gap-1 cursor-pointer"
                                         title="Ver o imprimir el consentimiento firmado subido para esta cita"
                                       >
                                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                                        <span>Ver Firmado</span>
                                       </button>
                                       <button
                                         type="button"
@@ -1554,11 +1547,10 @@ export const ClientsView: React.FC<ClientsViewProps> = ({ onOpenReceipt, onSelec
                                     <button
                                       type="button"
                                       onClick={() => handleOpenConsentUploadForAppointment(apt)}
-                                      className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                      className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-[#FF3366] text-amber-300 hover:text-white border border-amber-500/35 hover:border-[#FF3366] text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
                                       title="Subir consentimiento ya firmado por el cliente para este procedimiento"
                                     >
                                       <UploadCloud className="w-3.5 h-3.5" />
-                                      <span>Subir Consentimiento</span>
                                     </button>
                                   )}
                                 </td>

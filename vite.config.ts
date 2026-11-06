@@ -1,9 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { consultarIdentificacionSriBackend, consultarRucSriBackend } from './src/utils/sriServerHandler.ts';
 import { sequenceMiddleware } from './src/utils/sequenceServer.ts';
+import { sriAutorizacionMiddleware } from './src/utils/sriAutorizacionServer.ts';
+import { comprasWebhookMiddleware } from './src/utils/comprasWebhookServer.ts';
+import { sriMiddleware } from './src/server/modules/sri/sri.routes.ts';
+import { detenerProgramador, iniciarProgramador } from './src/server/modules/sri/sri.scheduler.ts';
 
 function sriDevApiPlugin(): Plugin {
   return {
@@ -11,9 +15,19 @@ function sriDevApiPlugin(): Plugin {
     // Numeración central de documentos (también disponible con `vite preview`)
     configurePreviewServer(server) {
       server.middlewares.use(sequenceMiddleware);
+      server.middlewares.use(sriAutorizacionMiddleware);
+      server.middlewares.use(comprasWebhookMiddleware);
+      server.middlewares.use(sriMiddleware());
     },
     configureServer(server) {
       server.middlewares.use(sequenceMiddleware);
+      server.middlewares.use(sriAutorizacionMiddleware);
+      server.middlewares.use(comprasWebhookMiddleware);
+      // Comprobantes recibidos SRI (MongoDB): /api/sri/sincronizar, /api/sri/comprobantes-recibidos, …
+      server.middlewares.use(sriMiddleware());
+      // Sincronización automática mientras el servidor esté encendido
+      iniciarProgramador();
+      server.httpServer?.once('close', detenerProgramador);
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url || '';
         const urlObj = new URL(rawUrl, 'http://localhost:3000');
@@ -85,7 +99,12 @@ function sriDevApiPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  // Variables del servidor (sin prefijo VITE_, nunca llegan al navegador) para el webhook de compras
+  const env = loadEnv(mode, process.cwd(), '');
+  for (const key of ['SRI_WEBHOOK_TOKEN', 'EMPRESA_RUC', 'COMPRAS_RECIBIDAS_PATH', 'MONGODB_URI', 'SRI_SECRET_KEY', 'SRI_API_PERMITIR_REMOTO', 'SRI_PROGRAMADOR']) {
+    if (env[key] && !process.env[key]) process.env[key] = env[key];
+  }
   return {
     plugins: [react(), tailwindcss(), sriDevApiPlugin()],
     resolve: {

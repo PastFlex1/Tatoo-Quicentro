@@ -1366,6 +1366,19 @@ export interface ComprobanteRecibido {
   estado: EstadoComprobanteRecibido;
   items: ItemComprobanteRecibido[];
   fechaImportacion: string;
+  numeroAutorizacion?: string;
+  fechaAutorizacion?: string;
+  /** Origen del registro: consulta al SRI por clave/TXT, XML subido o webhook de un proveedor de API */
+  origen?: 'SRI' | 'XML' | 'WEBHOOK';
+  nombreComercialProveedor?: string;
+  /** RUC/cédula del comprador según el comprobante */
+  receptorRuc?: string;
+  /** Bases desagregadas para el ATS */
+  subtotalNoObjeto?: number;
+  subtotalExento?: number;
+  /** Gasto creado al contabilizar */
+  expenseId?: string;
+  observacion?: string;
 }
 
 export interface BitacoraSincronizacion {

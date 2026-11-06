@@ -105,6 +105,7 @@ export const getDefaultTabsForRole = (role: UserRole): string[] => {
         'proformas',
         'sales',
         'expenses',
+        'received-docs',
         'suppliers',
         'purchase-orders',
         'artists',

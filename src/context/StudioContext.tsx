@@ -7,6 +7,7 @@ import {
   ExpenseRecord,
   ExpenseCategory,
   InventoryItem,
+  ComprobanteRecibido,
   SaleRecord,
   StudioSettings,
   Appointment,
@@ -94,6 +95,8 @@ interface StudioContextType {
   suppliers: Supplier[];
   purchaseOrders: PurchaseOrder[];
   creditNotes: CreditNoteRecord[];
+  /** Bandeja de comprobantes electrónicos recibidos (compras) */
+  comprobantesRecibidos: ComprobanteRecibido[];
   users: SystemUser[];
   currentUser: SystemUser;
   currentShift: CashShift;
@@ -155,6 +158,12 @@ interface StudioContextType {
   emitCreditNoteToSri: (creditNoteId: string) => Promise<SriEmissionResult | null>;
   addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => Promise<CreditNoteRecord>;
   deleteCreditNote: (id: string) => void;
+
+  // Actions - Comprobantes recibidos (compras SRI)
+  /** Agrega a la bandeja; omite los que ya existen (misma clave de acceso) */
+  addComprobantesRecibidos: (items: ComprobanteRecibido[]) => { added: number; duplicates: number };
+  updateComprobanteRecibido: (id: string, patch: Partial<ComprobanteRecibido>) => void;
+  deleteComprobanteRecibido: (id: string) => void;
 
   // Actions - Expenses
   addExpense: (expense: Omit<ExpenseRecord, 'id'>) => ExpenseRecord;
@@ -364,6 +373,7 @@ const STORAGE_KEYS = {
   SUPPLIERS: 'inkledger_suppliers_v1',
   PURCHASE_ORDERS: 'inkledger_purchase_orders_v1',
   CREDIT_NOTES: 'inkledger_credit_notes_v1',
+  RECEIVED_DOCS: 'inkledger_received_docs_v1',
   USERS: 'inkledger_users_v1',
   CURRENT_USER: 'inkledger_current_user_v1',
   CURRENT_SHIFT: 'inkledger_curr_shift_v1',
@@ -448,6 +458,10 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const [creditNotes, setCreditNotes] = useState<CreditNoteRecord[]>(() =>
     safeLoadFromStorage(STORAGE_KEYS.CREDIT_NOTES, INITIAL_CREDIT_NOTES)
+  );
+
+  const [comprobantesRecibidos, setComprobantesRecibidos] = useState<ComprobanteRecibido[]>(() =>
+    safeLoadFromStorage<ComprobanteRecibido[]>(STORAGE_KEYS.RECEIVED_DOCS, [])
   );
 
   const [users, setUsers] = useState<SystemUser[]>(() =>
@@ -606,6 +620,45 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CREDIT_NOTES, JSON.stringify(creditNotes));
   }, [creditNotes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.RECEIVED_DOCS, JSON.stringify(comprobantesRecibidos));
+    } catch (err) {
+      console.warn('[StudioContext] No se pudieron guardar los comprobantes recibidos (¿almacenamiento lleno?):', err);
+    }
+  }, [comprobantesRecibidos]);
+
+  const comprobantesRecibidosRef = useRef(comprobantesRecibidos);
+  comprobantesRecibidosRef.current = comprobantesRecibidos;
+
+  const addComprobantesRecibidos = (items: ComprobanteRecibido[]) => {
+    const known = new Set(comprobantesRecibidosRef.current.map(c => c.claveAcceso));
+    const fresh: ComprobanteRecibido[] = [];
+    let duplicates = 0;
+    for (const item of items) {
+      // También evita duplicados dentro del mismo lote
+      if (!item.claveAcceso || known.has(item.claveAcceso)) {
+        duplicates++;
+        continue;
+      }
+      known.add(item.claveAcceso);
+      fresh.push(item);
+    }
+    if (fresh.length) {
+      comprobantesRecibidosRef.current = [...fresh, ...comprobantesRecibidosRef.current];
+      setComprobantesRecibidos(comprobantesRecibidosRef.current);
+    }
+    return { added: fresh.length, duplicates };
+  };
+
+  const updateComprobanteRecibido = (id: string, patch: Partial<ComprobanteRecibido>) => {
+    setComprobantesRecibidos(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const deleteComprobanteRecibido = (id: string) => {
+    setComprobantesRecibidos(prev => prev.filter(c => c.id !== id));
+  };
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
@@ -1069,7 +1122,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Secciones del menú que comparten permisos con otro módulo
-  const TAB_PERMISSION_ALIAS: Record<string, string> = { 'credit-notes': 'sales.view' };
+  const TAB_PERMISSION_ALIAS: Record<string, string> = { 'credit-notes': 'sales.view', 'received-docs': 'expenses.view' };
   const canAccessTab = (tabId: string): boolean => can(TAB_PERMISSION_ALIAS[tabId] || `${tabId}.view`);
 
   const getRole = (roleId: string) => roles.find(r => r.id === roleId);
@@ -2555,6 +2608,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       galleryPhotos,
       suppliers,
       purchaseOrders,
+      comprobantesRecibidos,
       users,
       roles,
       currentUser,
@@ -2586,6 +2640,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (parsed.galleryPhotos && Array.isArray(parsed.galleryPhotos)) setGalleryPhotos(parsed.galleryPhotos);
       if (parsed.suppliers && Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
       if (parsed.purchaseOrders && Array.isArray(parsed.purchaseOrders)) setPurchaseOrders(parsed.purchaseOrders);
+      if (parsed.comprobantesRecibidos && Array.isArray(parsed.comprobantesRecibidos)) setComprobantesRecibidos(parsed.comprobantesRecibidos);
       if (parsed.users && Array.isArray(parsed.users)) setUsers(parsed.users);
       if (parsed.roles && Array.isArray(parsed.roles) && parsed.roles.length > 0) {
         const admin = DEFAULT_ROLES.find(r => r.id === ADMIN_ROLE_ID)!;
@@ -2624,6 +2679,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         suppliers,
         purchaseOrders,
         creditNotes,
+        comprobantesRecibidos,
         users,
         currentUser,
         currentShift,
@@ -2651,6 +2707,9 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         deleteSale,
         addCreditNote,
         deleteCreditNote,
+        addComprobantesRecibidos,
+        updateComprobanteRecibido,
+        deleteComprobanteRecibido,
         addExpense,
         updateExpense,
         deleteExpense,
@@ -2734,6 +2793,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   suppliers: INITIAL_SUPPLIERS,
   purchaseOrders: INITIAL_PURCHASE_ORDERS,
   creditNotes: INITIAL_CREDIT_NOTES,
+  comprobantesRecibidos: [],
   users: INITIAL_USERS,
   currentUser: INITIAL_USERS[0],
   currentShift: INITIAL_CASH_SHIFT,
@@ -2761,6 +2821,9 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   deleteSale: () => {},
   addCreditNote: async cn => ({ ...cn, sriStatus: cn.sriStatus || 'PENDIENTE', id: 'temp-' + Date.now(), creditNoteNumber: '001-001-000000001', createdAt: new Date().toISOString() }),
   deleteCreditNote: () => {},
+  addComprobantesRecibidos: () => ({ added: 0, duplicates: 0 }),
+  updateComprobanteRecibido: () => {},
+  deleteComprobanteRecibido: () => {},
   addExpense: (exp) => ({ ...exp, id: 'temp-' + Date.now() }),
   updateExpense: () => {},
   deleteExpense: () => {},

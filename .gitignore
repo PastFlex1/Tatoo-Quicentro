@@ -9,3 +9,7 @@ coverage/
 data_counters.json
 data_counters.json.tmp
 data_sequence_log.jsonl
+data_compras_recibidas.json
+data_compras_recibidas.json.tmp
+tmp-sri/
+logs/

@@ -17,6 +17,7 @@ import { CashRegisterView } from './components/cash/CashRegisterView';
 import { InventoryView } from './components/inventory/InventoryView';
 import { KardexView } from './components/kardex/KardexView';
 import { ServicesView } from './components/services/ServicesView';
+import { ComprobantesRecibidosView } from './components/purchases/ComprobantesRecibidosView';
 import { GeneralLedgerView } from './components/ledger/GeneralLedgerView';
 import { ReportsView } from './components/reports/ReportsView';
 import { AppointmentsView } from './components/appointments/AppointmentsView';
@@ -116,6 +117,8 @@ const MainLayout: React.FC = () => {
         );
       case 'expenses':
         return <ExpensesView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
+      case 'received-docs':
+        return <ComprobantesRecibidosView />;
       case 'suppliers':
         return <SuppliersView onOpenNewExpense={() => setIsExpenseModalOpen(true)} />;
       case 'purchase-orders':

@@ -67,6 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'Arqueo de Caja';
       case 'inventory':
         return 'Inventario & Joyería';
+      case 'received-docs':
+        return 'Comprobantes Recibidos SRI';
       case 'services':
         return 'Catálogo de Servicios';
       case 'kardex':

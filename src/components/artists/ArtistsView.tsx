@@ -623,11 +623,10 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                               </button>
                               <button
                                 onClick={() => handleOpenEditArtist(art)}
-                                className="text-[10px] text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                                className="p-1 rounded-lg text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer"
                                 title="Editar ficha del artista"
                               >
                                 <Edit2 className="w-3 h-3" />
-                                Editar
                               </button>
                             </div>
                           </div>
@@ -697,16 +696,15 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                           <button
                             onClick={() => handleOpenSettle(art, 'anticipo')}
                             disabled={!art.active}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+                            className="p-1.5.5 rounded-lg text-[11px] font-bold flex items-center gap-1 border border-amber-500/40 text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
                             title="Registrar un anticipo (pago parcial)"
                           >
                             <HandCoins className="w-3.5 h-3.5" />
-                            Anticipo
                           </button>
                           <button
                             onClick={() => handleOpenSettle(art, 'liquidacion')}
                             disabled={!isPending}
-                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1 whitespace-nowrap ${
+                            className={`p-1.5.5 rounded-lg text-[11px] font-bold flex items-center gap-1 whitespace-nowrap ${
                               isPending
                                 ? 'bg-gradient-to-r from-[#FF3366] to-[#E62557] hover:from-[#E62557] hover:to-[#CC1F4B] text-white cursor-pointer'
                                 : 'bg-[#1E1E26] text-neutral-600 border border-[#272730] cursor-not-allowed'
@@ -714,7 +712,6 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                             title="Liquidar el saldo pendiente"
                           >
                             <DollarSign className="w-3.5 h-3.5" />
-                            Liquidar
                           </button>
                         </div>
                       </td>
@@ -965,11 +962,10 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({ onOpenReceipt }) => {
                               {onOpenReceipt && (
                                 <button
                                   onClick={() => onOpenReceipt(sale)}
-                                  className="px-2.5 py-1 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                  className="p-1.5 rounded-lg bg-[#252530] hover:bg-[#FF3366] hover:text-white text-neutral-300 text-[11px] font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
                                   title="Ver comprobante RIDE o Ticket"
                                 >
                                   <Eye className="w-3 h-3" />
-                                  <span>Ticket</span>
                                 </button>
                               )}
                             </td>

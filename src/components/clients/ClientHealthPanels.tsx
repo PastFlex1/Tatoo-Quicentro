@@ -159,9 +159,8 @@ export const HealthControlPanel: React.FC<{
                     </td>
                     <td className="py-2.5 px-4">
                       <div className="flex justify-center gap-1.5">
-                        <button onClick={() => onNewConsent(c)} className="px-2.5 py-1.5 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap" title="Actualizar ficha y firmar nueva carta">
+                        <button onClick={() => onNewConsent(c)} className="p-1.5 rounded-lg bg-[#FF3366]/15 border border-[#FF3366]/40 text-[#FF3366] flex items-center cursor-pointer" title="Actualizar ficha y firmar nueva carta">
                           <FileSignature className="w-3.5 h-3.5" />
-                          Ficha + carta
                         </button>
                         {last && (
                           <button onClick={() => onViewForm(last)} className="p-1.5 rounded-lg border border-[#272730] text-neutral-300 hover:text-white cursor-pointer" title={`Ver carta ${last.number}`}>
