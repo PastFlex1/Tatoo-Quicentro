@@ -1,0 +1,254 @@
+/* ARCHIVO GENERADO por scripts/build-light-theme.mjs — no editar a mano (npm run theme:light). */
+/* Modo claro: se aplica cuando <html> no tiene la clase .dark. 150 reglas de superficie. */
+
+@layer utilities {
+  :where(html:not(.dark)) .bg-\[\#0D0D10\] { background-color: hsl(240 10.3% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#0E0E11\] { background-color: hsl(240 9.7% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#0F0F12\] { background-color: hsl(240 9.1% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#101013\] { background-color: hsl(240 8.6% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#101014\] { background-color: hsl(240 11.1% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#111114\] { background-color: hsl(240 8.1% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#121215\] { background-color: hsl(240 7.7% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#121215\]\/60 { background-color: color-mix(in oklab, hsl(240 7.7% 96.5%) 60%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#121215\]\/80 { background-color: color-mix(in oklab, hsl(240 7.7% 96.5%) 80%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#121216\] { background-color: hsl(240 10.0% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#121217\] { background-color: hsl(240 12.2% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#131317\] { background-color: hsl(240 9.5% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#141417\] { background-color: hsl(240 7.0% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#141417\]\/40 { background-color: color-mix(in oklab, hsl(240 7.0% 96.5%) 40%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#141418\] { background-color: hsl(240 9.1% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#141419\] { background-color: hsl(240 11.1% 96.5%); }
+  :where(html:not(.dark)) .bg-\[\#14141A\] { background-color: hsl(240 13.0% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#14231A\] { background-color: hsl(144 18.0% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#16161B\] { background-color: hsl(240 10.2% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#16161B\]\/60 { background-color: color-mix(in oklab, hsl(240 10.2% 100.0%) 60%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#16161D\] { background-color: hsl(240 13.7% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#16161D\]\/60 { background-color: color-mix(in oklab, hsl(240 13.7% 100.0%) 60%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#17171C\] { background-color: hsl(240 9.8% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#18181D\] { background-color: hsl(240 9.4% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#181820\] { background-color: hsl(240 14.3% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#191920\] { background-color: hsl(240 12.3% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1A1A20\] { background-color: hsl(240 10.3% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1A1A21\] { background-color: hsl(240 11.9% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1A1A22\] { background-color: hsl(240 13.3% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1A1A24\] { background-color: hsl(240 16.1% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1C1C22\] { background-color: hsl(240 9.7% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1C1C24\] { background-color: hsl(240 12.5% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#1E1E26\] { background-color: hsl(240 11.8% 96.3%); }
+  :where(html:not(.dark)) .bg-\[\#1F1F26\] { background-color: hsl(240 10.1% 96.0%); }
+  :where(html:not(.dark)) .bg-\[\#1F1F27\] { background-color: hsl(240 11.4% 95.6%); }
+  :where(html:not(.dark)) .bg-\[\#202028\] { background-color: hsl(240 11.1% 95.0%); }
+  :where(html:not(.dark)) .bg-\[\#20202A\] { background-color: hsl(240 13.5% 94.4%); }
+  :where(html:not(.dark)) .bg-\[\#21141A\] { background-color: hsl(332 18.0% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#22222A\] { background-color: hsl(240 10.5% 93.8%); }
+  :where(html:not(.dark)) .bg-\[\#22222B\] { background-color: hsl(240 11.7% 93.4%); }
+  :where(html:not(.dark)) .bg-\[\#23232C\] { background-color: hsl(240 11.4% 92.8%); }
+  :where(html:not(.dark)) .bg-\[\#24242C\] { background-color: hsl(240 10.0% 92.5%); }
+  :where(html:not(.dark)) .bg-\[\#24242D\] { background-color: hsl(240 11.1% 92.2%); }
+  :where(html:not(.dark)) .bg-\[\#24242F\] { background-color: hsl(240 13.3% 91.6%); }
+  :where(html:not(.dark)) .bg-\[\#25151D\]\/30 { background-color: color-mix(in oklab, hsl(330 18.0% 100.0%) 30%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#25151D\]\/40 { background-color: color-mix(in oklab, hsl(330 18.0% 100.0%) 40%, transparent); }
+  :where(html:not(.dark)) .bg-\[\#25252E\] { background-color: hsl(240 10.8% 91.6%); }
+  :where(html:not(.dark)) .bg-\[\#252530\] { background-color: hsl(240 12.9% 90.9%); }
+  :where(html:not(.dark)) .bg-\[\#26151B\] { background-color: hsl(339 18.0% 100.0%); }
+  :where(html:not(.dark)) .bg-\[\#26262F\] { background-color: hsl(240 10.6% 90.9%); }
+  :where(html:not(.dark)) .bg-\[\#272730\] { background-color: hsl(240 10.3% 90.3%); }
+  :where(html:not(.dark)) .bg-\[\#29141D\] { background-color: hsl(334 18.0% 100.0%); }
+  :where(html:not(.dark)) .border-\[\#1C1C22\] { border-color: hsl(240 9.7% 100.0%); }
+  :where(html:not(.dark)) .border-\[\#1E1E24\] { border-color: hsl(240 9.1% 100.0%); }
+  :where(html:not(.dark)) .border-\[\#1E1E26\] { border-color: hsl(240 11.8% 96.3%); }
+  :where(html:not(.dark)) .border-\[\#202026\] { border-color: hsl(240 8.6% 95.6%); }
+  :where(html:not(.dark)) .border-\[\#222228\] { border-color: hsl(240 8.1% 94.4%); }
+  :where(html:not(.dark)) .border-\[\#222229\] { border-color: hsl(240 9.3% 94.1%); }
+  :where(html:not(.dark)) .border-\[\#22222A\] { border-color: hsl(240 10.5% 93.8%); }
+  :where(html:not(.dark)) .border-\[\#23232A\] { border-color: hsl(240 9.1% 93.4%); }
+  :where(html:not(.dark)) .border-\[\#23232C\] { border-color: hsl(240 11.4% 92.8%); }
+  :where(html:not(.dark)) .border-\[\#24242A\] { border-color: hsl(240 7.7% 93.1%); }
+  :where(html:not(.dark)) .border-\[\#24242B\] { border-color: hsl(240 8.9% 92.8%); }
+  :where(html:not(.dark)) .border-\[\#24242C\] { border-color: hsl(240 10.0% 92.5%); }
+  :where(html:not(.dark)) .border-\[\#24242F\] { border-color: hsl(240 13.3% 91.6%); }
+  :where(html:not(.dark)) .border-\[\#25252E\] { border-color: hsl(240 10.8% 91.6%); }
+  :where(html:not(.dark)) .border-\[\#252530\] { border-color: hsl(240 12.9% 90.9%); }
+  :where(html:not(.dark)) .border-\[\#26262D\] { border-color: hsl(240 8.4% 91.6%); }
+  :where(html:not(.dark)) .border-\[\#26262E\] { border-color: hsl(240 9.5% 91.2%); }
+  :where(html:not(.dark)) .border-\[\#26262F\] { border-color: hsl(240 10.6% 90.9%); }
+  :where(html:not(.dark)) .border-\[\#262630\] { border-color: hsl(240 11.6% 90.6%); }
+  :where(html:not(.dark)) .border-\[\#272730\] { border-color: hsl(240 10.3% 90.3%); }
+  :where(html:not(.dark)) .border-\[\#272732\] { border-color: hsl(240 12.4% 89.7%); }
+  :where(html:not(.dark)) .border-\[\#272733\] { border-color: hsl(240 13.3% 89.4%); }
+  :where(html:not(.dark)) .border-\[\#282830\] { border-color: hsl(240 9.1% 90.0%); }
+  :where(html:not(.dark)) .border-\[\#282832\] { border-color: hsl(240 11.1% 89.4%); }
+  :where(html:not(.dark)) .border-\[\#282833\] { border-color: hsl(240 12.1% 89.1%); }
+  :where(html:not(.dark)) .border-\[\#282834\] { border-color: hsl(240 13.0% 88.7%); }
+  :where(html:not(.dark)) .border-\[\#292933\] { border-color: hsl(240 10.9% 88.7%); }
+  :where(html:not(.dark)) .border-\[\#2A2A33\] { border-color: hsl(240 9.7% 88.4%); }
+  :where(html:not(.dark)) .border-\[\#2A2A34\] { border-color: hsl(240 10.6% 88.1%); }
+  :where(html:not(.dark)) .border-\[\#2A2A36\] { border-color: hsl(240 12.5% 87.5%); }
+  :where(html:not(.dark)) .border-\[\#2A2A38\] { border-color: hsl(240 14.3% 86.9%); }
+  :where(html:not(.dark)) .border-\[\#2B2B36\] { border-color: hsl(240 11.3% 87.2%); }
+  :where(html:not(.dark)) .border-\[\#2B2B38\] { border-color: hsl(240 13.1% 86.5%); }
+  :where(html:not(.dark)) .border-\[\#2C2C36\] { border-color: hsl(240 10.2% 86.9%); }
+  :where(html:not(.dark)) .border-\[\#2C2C38\] { border-color: hsl(240 12.0% 86.2%); }
+  :where(html:not(.dark)) .border-\[\#2D2D36\] { border-color: hsl(240 9.1% 86.5%); }
+  :where(html:not(.dark)) .border-\[\#2D2D38\] { border-color: hsl(240 10.9% 85.9%); }
+  :where(html:not(.dark)) .border-\[\#2D2D3A\] { border-color: hsl(240 12.6% 85.3%); }
+  :where(html:not(.dark)) .border-\[\#2E2E38\] { border-color: hsl(240 9.8% 85.6%); }
+  :where(html:not(.dark)) .border-\[\#2E2E3A\] { border-color: hsl(240 11.5% 85.0%); }
+  :where(html:not(.dark)) .border-\[\#2F2F3B\] { border-color: hsl(240 11.3% 84.3%); }
+  :where(html:not(.dark)) .border-\[\#2F2F3D\] { border-color: hsl(240 13.0% 83.7%); }
+  :where(html:not(.dark)) .border-\[\#30303D\] { border-color: hsl(240 11.9% 83.4%); }
+  :where(html:not(.dark)) .border-\[\#323240\] { border-color: hsl(240 12.3% 81.8%); }
+  :where(html:not(.dark)) .border-\[\#323242\] { border-color: hsl(240 13.8% 81.2%); }
+  :where(html:not(.dark)) .border-\[\#333342\] { border-color: hsl(240 12.8% 80.9%); }
+  :where(html:not(.dark)) .border-\[\#3A3A48\] { border-color: hsl(240 10.8% 78.0%); }
+  :where(html:not(.dark)) .divide-\[\#1D1D24\] > :not(:last-child) { border-color: hsl(240 10.8% 100.0%); }
+  :where(html:not(.dark)) .divide-\[\#1E1E25\] > :not(:last-child) { border-color: hsl(240 10.4% 96.6%); }
+  :where(html:not(.dark)) .divide-\[\#1F1F27\] > :not(:last-child) { border-color: hsl(240 11.4% 95.6%); }
+  :where(html:not(.dark)) .divide-\[\#202026\] > :not(:last-child) { border-color: hsl(240 8.6% 95.6%); }
+  :where(html:not(.dark)) .divide-\[\#222228\] > :not(:last-child) { border-color: hsl(240 8.1% 94.4%); }
+  :where(html:not(.dark)) .divide-\[\#22222A\] > :not(:last-child) { border-color: hsl(240 10.5% 93.8%); }
+  :where(html:not(.dark)) .divide-\[\#22222C\] > :not(:last-child) { border-color: hsl(240 12.8% 93.1%); }
+  :where(html:not(.dark)) .divide-\[\#23232F\] > :not(:last-child) { border-color: hsl(240 14.6% 91.9%); }
+  :where(html:not(.dark)) .divide-\[\#24242B\] > :not(:last-child) { border-color: hsl(240 8.9% 92.8%); }
+  :where(html:not(.dark)) .divide-\[\#24242F\] > :not(:last-child) { border-color: hsl(240 13.3% 91.6%); }
+  :where(html:not(.dark)) .divide-\[\#2A2A33\] > :not(:last-child) { border-color: hsl(240 9.7% 88.4%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#16161D\]:hover { background-color: hsl(240 13.7% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#18181D\]:hover { background-color: hsl(240 9.4% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#181820\]:hover { background-color: hsl(240 14.3% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1A1A20\]:hover { background-color: hsl(240 10.3% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1A1A22\]:hover { background-color: hsl(240 13.3% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1A1A24\]\/60:hover { background-color: color-mix(in oklab, hsl(240 16.1% 100.0%) 60%, transparent); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1C1C22\]:hover { background-color: hsl(240 9.7% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1C1C24\]:hover { background-color: hsl(240 12.5% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1C1C24\]\/70:hover { background-color: color-mix(in oklab, hsl(240 12.5% 100.0%) 70%, transparent); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1E1E24\]:hover { background-color: hsl(240 9.1% 100.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1E1E25\]:hover { background-color: hsl(240 10.4% 96.6%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1E1E26\]:hover { background-color: hsl(240 11.8% 96.3%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#1F1F26\]:hover { background-color: hsl(240 10.1% 96.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#202027\]:hover { background-color: hsl(240 9.9% 95.3%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#202028\]:hover { background-color: hsl(240 11.1% 95.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#20202A\]:hover { background-color: hsl(240 13.5% 94.4%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#222228\]:hover { background-color: hsl(240 8.1% 94.4%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#22222A\]:hover { background-color: hsl(240 10.5% 93.8%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#22222D\]:hover { background-color: hsl(240 13.9% 92.8%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#24242F\]:hover { background-color: hsl(240 13.3% 91.6%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#242430\]:hover { background-color: hsl(240 14.3% 91.2%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#25252E\]:hover { background-color: hsl(240 10.8% 91.6%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#252530\]:hover { background-color: hsl(240 12.9% 90.9%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#282832\]:hover { background-color: hsl(240 11.1% 89.4%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#282834\]:hover { background-color: hsl(240 13.0% 88.7%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#2A2A36\]:hover { background-color: hsl(240 12.5% 87.5%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#2B2B36\]:hover { background-color: hsl(240 11.3% 87.2%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#2B2B38\]:hover { background-color: hsl(240 13.1% 86.5%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#2C2C36\]:hover { background-color: hsl(240 10.2% 86.9%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#2F2F3D\]:hover { background-color: hsl(240 13.0% 83.7%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#30303B\]:hover { background-color: hsl(240 10.3% 84.0%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#30303E\]:hover { background-color: hsl(240 12.7% 83.1%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#32323D\]:hover { background-color: hsl(240 9.9% 82.8%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#323240\]:hover { background-color: hsl(240 12.3% 81.8%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#323242\]:hover { background-color: hsl(240 13.8% 81.2%); }
+  :where(html:not(.dark)) .hover\:bg-\[\#343440\]:hover { background-color: hsl(240 10.3% 81.2%); }
+  :where(html:not(.dark)) .hover\:border-\[\#383844\]:hover { border-color: hsl(240 9.7% 78.7%); }
+  :where(html:not(.dark)) .hover\:border-\[\#383845\]:hover { border-color: hsl(240 10.4% 78.4%); }
+  :where(html:not(.dark)) .hover\:border-\[\#38384A\]:hover { border-color: hsl(240 13.8% 78.0%); }
+  :where(html:not(.dark)) .hover\:border-\[\#3A3A48\]:hover { border-color: hsl(240 10.8% 78.0%); }
+
+  :where(html:not(.dark)) body, :where(html:not(.dark)) html { background-color: hsl(240 10% 96.5%); color: #18181b; }
+
+  :where(html:not(.dark)) .text-white,
+  :where(html:not(.dark)) .hover\:text-white:hover,
+  :where(html:not(.dark)) .group:hover .group-hover\:text-white { color: #18181b; }
+  :where(html:not(.dark)) .text-white\/80 { color: rgb(24 24 27 / 0.8); }
+  :where(html:not(.dark)) .text-zinc-100, :where(html:not(.dark)) .text-neutral-100 { color: var(--color-neutral-900); }
+  :where(html:not(.dark)) .text-neutral-200, :where(html:not(.dark)) .hover\:text-neutral-200:hover { color: var(--color-neutral-800); }
+  :where(html:not(.dark)) .text-neutral-300 { color: var(--color-neutral-700); }
+  :where(html:not(.dark)) .text-neutral-400, :where(html:not(.dark)) .hover\:text-neutral-400:hover { color: var(--color-neutral-600); }
+  :where(html:not(.dark)) .text-neutral-600 { color: var(--color-neutral-400); }
+  :where(html:not(.dark)) .placeholder-neutral-600::placeholder { color: var(--color-neutral-400); }
+
+  :where(html:not(.dark)) .bg-neutral-950 { background-color: hsl(240 10% 96.5%); }
+  :where(html:not(.dark)) .bg-neutral-900 { background-color: var(--color-neutral-100); }
+  :where(html:not(.dark)) .bg-neutral-800, :where(html:not(.dark)) .bg-neutral-800\/80 { background-color: var(--color-neutral-200); }
+  :where(html:not(.dark)) .hover\:bg-neutral-700:hover { background-color: var(--color-neutral-300); }
+  :where(html:not(.dark)) .border-neutral-700, :where(html:not(.dark)) .hover\:border-neutral-700:hover { border-color: var(--color-neutral-300); }
+  :where(html:not(.dark)) .border-neutral-800, :where(html:not(.dark)) .border-neutral-900 { border-color: var(--color-neutral-200); }
+  :where(html:not(.dark)) .hover\:bg-white\/10:hover { background-color: rgb(0 0 0 / 0.05); }
+
+  /* Texto de colores claros (pensado para fondo oscuro) → tonos más oscuros */
+  :where(html:not(.dark)) .text-emerald-100, :where(html:not(.dark)) .text-emerald-200, :where(html:not(.dark)) .text-emerald-300 { color: var(--color-emerald-700); }
+  :where(html:not(.dark)) .text-emerald-400 { color: var(--color-emerald-600); }
+  :where(html:not(.dark)) [class*="text-emerald-100/"], :where(html:not(.dark)) [class*="text-emerald-200/"] { color: var(--color-emerald-800); }
+  :where(html:not(.dark)) .text-green-100, :where(html:not(.dark)) .text-green-200, :where(html:not(.dark)) .text-green-300 { color: var(--color-green-700); }
+  :where(html:not(.dark)) .text-green-400 { color: var(--color-green-600); }
+  :where(html:not(.dark)) [class*="text-green-100/"], :where(html:not(.dark)) [class*="text-green-200/"] { color: var(--color-green-800); }
+  :where(html:not(.dark)) .text-amber-100, :where(html:not(.dark)) .text-amber-200, :where(html:not(.dark)) .text-amber-300 { color: var(--color-amber-700); }
+  :where(html:not(.dark)) .text-amber-400 { color: var(--color-amber-600); }
+  :where(html:not(.dark)) [class*="text-amber-100/"], :where(html:not(.dark)) [class*="text-amber-200/"] { color: var(--color-amber-800); }
+  :where(html:not(.dark)) .text-yellow-100, :where(html:not(.dark)) .text-yellow-200, :where(html:not(.dark)) .text-yellow-300 { color: var(--color-yellow-700); }
+  :where(html:not(.dark)) .text-yellow-400 { color: var(--color-yellow-600); }
+  :where(html:not(.dark)) [class*="text-yellow-100/"], :where(html:not(.dark)) [class*="text-yellow-200/"] { color: var(--color-yellow-800); }
+  :where(html:not(.dark)) .text-orange-100, :where(html:not(.dark)) .text-orange-200, :where(html:not(.dark)) .text-orange-300 { color: var(--color-orange-700); }
+  :where(html:not(.dark)) .text-orange-400 { color: var(--color-orange-600); }
+  :where(html:not(.dark)) [class*="text-orange-100/"], :where(html:not(.dark)) [class*="text-orange-200/"] { color: var(--color-orange-800); }
+  :where(html:not(.dark)) .text-red-100, :where(html:not(.dark)) .text-red-200, :where(html:not(.dark)) .text-red-300 { color: var(--color-red-700); }
+  :where(html:not(.dark)) .text-red-400 { color: var(--color-red-600); }
+  :where(html:not(.dark)) [class*="text-red-100/"], :where(html:not(.dark)) [class*="text-red-200/"] { color: var(--color-red-800); }
+  :where(html:not(.dark)) .text-rose-100, :where(html:not(.dark)) .text-rose-200, :where(html:not(.dark)) .text-rose-300 { color: var(--color-rose-700); }
+  :where(html:not(.dark)) .text-rose-400 { color: var(--color-rose-600); }
+  :where(html:not(.dark)) [class*="text-rose-100/"], :where(html:not(.dark)) [class*="text-rose-200/"] { color: var(--color-rose-800); }
+  :where(html:not(.dark)) .text-pink-100, :where(html:not(.dark)) .text-pink-200, :where(html:not(.dark)) .text-pink-300 { color: var(--color-pink-700); }
+  :where(html:not(.dark)) .text-pink-400 { color: var(--color-pink-600); }
+  :where(html:not(.dark)) [class*="text-pink-100/"], :where(html:not(.dark)) [class*="text-pink-200/"] { color: var(--color-pink-800); }
+  :where(html:not(.dark)) .text-blue-100, :where(html:not(.dark)) .text-blue-200, :where(html:not(.dark)) .text-blue-300 { color: var(--color-blue-700); }
+  :where(html:not(.dark)) .text-blue-400 { color: var(--color-blue-600); }
+  :where(html:not(.dark)) [class*="text-blue-100/"], :where(html:not(.dark)) [class*="text-blue-200/"] { color: var(--color-blue-800); }
+  :where(html:not(.dark)) .text-sky-100, :where(html:not(.dark)) .text-sky-200, :where(html:not(.dark)) .text-sky-300 { color: var(--color-sky-700); }
+  :where(html:not(.dark)) .text-sky-400 { color: var(--color-sky-600); }
+  :where(html:not(.dark)) [class*="text-sky-100/"], :where(html:not(.dark)) [class*="text-sky-200/"] { color: var(--color-sky-800); }
+  :where(html:not(.dark)) .text-cyan-100, :where(html:not(.dark)) .text-cyan-200, :where(html:not(.dark)) .text-cyan-300 { color: var(--color-cyan-700); }
+  :where(html:not(.dark)) .text-cyan-400 { color: var(--color-cyan-600); }
+  :where(html:not(.dark)) [class*="text-cyan-100/"], :where(html:not(.dark)) [class*="text-cyan-200/"] { color: var(--color-cyan-800); }
+  :where(html:not(.dark)) .text-teal-100, :where(html:not(.dark)) .text-teal-200, :where(html:not(.dark)) .text-teal-300 { color: var(--color-teal-700); }
+  :where(html:not(.dark)) .text-teal-400 { color: var(--color-teal-600); }
+  :where(html:not(.dark)) [class*="text-teal-100/"], :where(html:not(.dark)) [class*="text-teal-200/"] { color: var(--color-teal-800); }
+  :where(html:not(.dark)) .text-indigo-100, :where(html:not(.dark)) .text-indigo-200, :where(html:not(.dark)) .text-indigo-300 { color: var(--color-indigo-700); }
+  :where(html:not(.dark)) .text-indigo-400 { color: var(--color-indigo-600); }
+  :where(html:not(.dark)) [class*="text-indigo-100/"], :where(html:not(.dark)) [class*="text-indigo-200/"] { color: var(--color-indigo-800); }
+  :where(html:not(.dark)) .text-violet-100, :where(html:not(.dark)) .text-violet-200, :where(html:not(.dark)) .text-violet-300 { color: var(--color-violet-700); }
+  :where(html:not(.dark)) .text-violet-400 { color: var(--color-violet-600); }
+  :where(html:not(.dark)) [class*="text-violet-100/"], :where(html:not(.dark)) [class*="text-violet-200/"] { color: var(--color-violet-800); }
+  :where(html:not(.dark)) .text-purple-100, :where(html:not(.dark)) .text-purple-200, :where(html:not(.dark)) .text-purple-300 { color: var(--color-purple-700); }
+  :where(html:not(.dark)) .text-purple-400 { color: var(--color-purple-600); }
+  :where(html:not(.dark)) [class*="text-purple-100/"], :where(html:not(.dark)) [class*="text-purple-200/"] { color: var(--color-purple-800); }
+  :where(html:not(.dark)) .text-fuchsia-100, :where(html:not(.dark)) .text-fuchsia-200, :where(html:not(.dark)) .text-fuchsia-300 { color: var(--color-fuchsia-700); }
+  :where(html:not(.dark)) .text-fuchsia-400 { color: var(--color-fuchsia-600); }
+  :where(html:not(.dark)) [class*="text-fuchsia-100/"], :where(html:not(.dark)) [class*="text-fuchsia-200/"] { color: var(--color-fuchsia-800); }
+  :where(html:not(.dark)) .text-lime-100, :where(html:not(.dark)) .text-lime-200, :where(html:not(.dark)) .text-lime-300 { color: var(--color-lime-700); }
+  :where(html:not(.dark)) .text-lime-400 { color: var(--color-lime-600); }
+  :where(html:not(.dark)) [class*="text-lime-100/"], :where(html:not(.dark)) [class*="text-lime-200/"] { color: var(--color-lime-800); }
+
+  /* Sobre fondos de color fuerte (botones rosados, verdes, rojos…) el texto sigue siendo blanco */
+  :where(html:not(.dark)) :is(
+    [class~="bg-[#FF3366]"], [class~="bg-[#E62557]"], [class~="bg-[#e02958]"], [class~="bg-[#ff3366]"],
+    [class*="from-[#FF3366]"], [class*="bg-gradient-to"][class*="from-[#FF"],
+    [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-red-500"], [class~="bg-red-600"],
+    [class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-blue-500"], [class~="bg-blue-600"],
+    [class~="bg-amber-500"], [class~="bg-amber-600"], [class~="bg-black"], [class*="bg-black/"]
+  ):is(.text-white, :has(> .text-white)),
+  :where(html:not(.dark)) :is(
+    [class~="bg-[#FF3366]"], [class~="bg-[#E62557]"], [class~="bg-[#e02958]"], [class*="from-[#FF3366]"],
+    [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-red-500"], [class~="bg-red-600"],
+    [class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-blue-500"], [class~="bg-blue-600"],
+    [class~="bg-amber-500"], [class~="bg-amber-600"]
+  ) .text-white { color: #fff; }
+
+
+  /* Barras de desplazamiento */
+  :where(html:not(.dark)) ::-webkit-scrollbar-thumb { background: #d4d4d8; }
+  :where(html:not(.dark)) ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+  :where(html:not(.dark)) .ui-scroll { scrollbar-color: #d4d4d8 transparent; }
+  :where(html:not(.dark)) ::selection { color: #18181b; }
+  :where(html:not(.dark)) input, :where(html:not(.dark)) textarea, :where(html:not(.dark)) select { color-scheme: light; }
+  :where(html:not(.dark)) { color-scheme: light; }
+
+}

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Modo claro (generado: npm run theme:light) */
+@import "./styles/light-theme.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
