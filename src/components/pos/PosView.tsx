@@ -828,50 +828,47 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     />
   );
 
-  /** Ticket tipo caja registradora (pantallas ≤1366 px) */
+  /** Ticket tipo caja registradora (pantallas ≤1366 px): cada ítem en UNA sola fila */
+  const ticketCols = 'grid grid-cols-[minmax(96px,1fr)_80px_62px_66px_72px_74px_24px] items-center gap-x-2';
   const ticketList = (
-    <div className="divide-y divide-dashed divide-[#2A2A33]">
-      {lines.map(l => {
-        const isAppointment = l.id.startsWith('apt-');
-        const lineTotal = r2(lineBase(l) * (1 + effectiveTax(l) / 100));
-        const lbl = 'block text-[9px] uppercase tracking-wider text-neutral-500 mb-1';
-        return (
-          <div key={l.id} className="px-3 py-3 space-y-2.5">
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-white leading-snug break-words" title={l.description}>
-                  {l.description}
+    <div className="overflow-x-auto">
+      <div className="min-w-[500px]">
+        <div className={`${ticketCols} px-3 py-2 bg-[#121215] text-[9px] uppercase tracking-wider text-neutral-500 border-b border-[#24242B]`}>
+          <span>Descripción</span>
+          <span className="text-center">Cant.</span>
+          <span className="text-right">P. unit.</span>
+          <span className="text-center">IVA</span>
+          <span className="text-right">Desc. $</span>
+          <span className="text-right">Total</span>
+          <span />
+        </div>
+        <div className="divide-y divide-dashed divide-[#2A2A33]">
+          {lines.map(l => {
+            const isAppointment = l.id.startsWith('apt-');
+            const lineTotal = r2(lineBase(l) * (1 + effectiveTax(l) / 100));
+            return (
+              <div key={l.id} className={`${ticketCols} px-3 py-2.5`}>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-white truncate" title={l.description}>
+                    {l.description}
+                  </div>
+                  <div className="text-[10px] text-neutral-500 truncate">{lineKindLabel(l)}</div>
                 </div>
-                <div className="text-[10px] text-neutral-500 truncate">{lineKindLabel(l)}</div>
-              </div>
-              <span className="font-mono text-sm font-bold text-white whitespace-nowrap pt-0.5">{formatMoney(lineTotal)}</span>
-              <button type="button" onClick={() => removeLine(l.id)} className="-mr-1 p-1.5 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer shrink-0" aria-label="Quitar línea">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-[auto_1fr_72px_84px] items-end gap-x-3 text-[11px]">
-              <div>
-                <span className={lbl}>Cant.</span>
-                {isAppointment ? <span className="font-mono text-white text-sm leading-8">1</span> : qtyStepper(l, true)}
-              </div>
-              <div className="min-w-0">
-                <span className={lbl}>P. unit.</span>
-                <span className={`block font-mono text-sm leading-8 truncate ${l.unitPrice <= 0 ? 'text-amber-300' : 'text-neutral-200'}`}>
+                <div>{isAppointment ? <div className="text-center font-mono text-white text-sm">1</div> : qtyStepper(l)}</div>
+                <span className={`text-right font-mono text-xs truncate ${l.unitPrice <= 0 ? 'text-amber-300' : 'text-neutral-200'}`}>
                   {l.unitPrice > 0 ? formatMoney(l.unitPrice) : 'Sin precio'}
                 </span>
+                <div>{taxSelect(l, '!py-1.5')}</div>
+                <div>{discountInput(l, '!py-1.5')}</div>
+                <span className="text-right font-mono text-sm font-bold text-white whitespace-nowrap">{formatMoney(lineTotal)}</span>
+                <button type="button" onClick={() => removeLine(l.id)} className="p-1 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer justify-self-end" aria-label="Quitar línea">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <div>
-                <span className={lbl}>IVA</span>
-                {taxSelect(l, '!py-1.5')}
-              </div>
-              <div>
-                <span className={lbl}>Desc. $</span>
-                {discountInput(l, '!py-1.5')}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 
@@ -1021,27 +1018,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   // ---- Artista y comprobante
   const artistDocBlock = (
     <div className="grid grid-cols-2 gap-2.5">
-      {!loggedArtist && (
-        <label className="col-span-2 block">
-          <span className="block text-[10px] uppercase text-neutral-400 mb-1">Artista</span>
-          <UiSelect
-            value={artistId}
-            onChange={e => {
-              setArtistId(e.target.value);
-              const a = artists.find(x => x.id === e.target.value);
-              if (a) setCommission(a.defaultCommissionRate || settings.defaultArtistCommission || 80);
-            }}
-            className={inputCls}
-          >
-            {artists.length === 0 && <option value="">Registre artistas primero</option>}
-            {artists.filter(a => a.active).map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </UiSelect>
-        </label>
-      )}
       <div className="col-span-2 grid grid-cols-2 gap-2">
         {(['factura', 'nota_venta'] as const).map(t => (
           <button
@@ -1055,12 +1031,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             {t === 'factura' ? (terminal ? `Factura (IVA ${standardVatRate}%)` : `Factura electrónica (IVA ${standardVatRate}%)`) : 'Nota de venta RIMPE'}
           </button>
         ))}
-      </div>
-      <div className="col-span-2 flex items-center justify-between px-3 py-2 rounded-xl bg-[#121215] border border-[#2B2B36]">
-        <span className="text-[10px] uppercase text-neutral-400">Secuencial {isNotaVenta ? 'nota de venta' : 'factura'}</span>
-        <span className={`font-mono text-sm font-bold ${sequenceOffline ? 'text-red-300' : 'text-white'}`}>
-          {sequenceOffline ? 'Servidor sin conexión' : nextDocumentNumber || 'Cargando…'}
-        </span>
       </div>
     </div>
   );
