@@ -22,6 +22,7 @@ import { useStudio } from '../../context/StudioContext';
 import { Appointment, ServiceCategory, PaymentMethod } from '../../types';
 import { consultarIdentificacion } from '../../services/sriService';
 import { DatePicker, TimePicker } from '../common/DatePicker';
+import { getServiceCatalog, serviceCategoryLabel } from '../../data/serviceCatalog';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -86,6 +87,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [artistId, setArtistId] = useState(initialArtistId || (artists[0]?.id || ''));
   const [serviceCategory, setServiceCategory] = useState<ServiceCategory>('tattoo');
   const [serviceName, setServiceName] = useState('');
+  const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(initialDate || todayStr);
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -104,32 +106,36 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 
   const selectedArtist = artists.find(a => a.id === artistId);
 
-  // Auto-suggest service name on category switch if empty
+  // Catálogo de servicios del estudio (sección Servicios): de ahí salen nombre, duración y precio
+  const catalog = getServiceCatalog(settings).filter(sv => sv.active);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+
+  /** Hora fin = inicio + duración (formato HH:mm, sin pasar de 23:59) */
+  const addHours = (start: string, hours: number) => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(start || '');
+    if (!m || !hours) return '';
+    const total = Math.min(23 * 60 + 59, parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + Math.round(hours * 60));
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+
   const handleCategorySelect = (cat: ServiceCategory) => {
     setServiceCategory(cat);
-    if (!serviceName || serviceName.startsWith('Tatuaje') || serviceName.startsWith('Piercing')) {
-      if (cat === 'tattoo') {
-        setServiceName('Tatuaje Personalizado');
-        setEstimatedHours(3);
-        setEstimatedPrice(250);
-        setDepositAmount(50);
-      } else if (cat === 'piercing') {
-        setServiceName('Perforación Aséptica + Joya Titanio ASTM F136');
-        setEstimatedHours(0.75);
-        setEstimatedPrice(80);
-        setDepositAmount(25);
-      } else if (cat === 'jewelry') {
-        setServiceName('Cambio de Joyería & Curación');
-        setEstimatedHours(0.5);
-        setEstimatedPrice(45);
-        setDepositAmount(15);
-      } else {
-        setServiceName('Sesión Retoque / Consulta');
-        setEstimatedHours(1);
-        setEstimatedPrice(90);
-        setDepositAmount(20);
-      }
-    }
+    // Si el servicio elegido es de otro tipo, se suelta para elegir uno nuevo
+    const current = catalog.find(sv => sv.id === serviceId);
+    if (current && current.category !== cat) setServiceId('');
+  };
+
+  /** Al elegir un servicio del catálogo se completan los datos de la cita */
+  const handleServiceSelect = (id: string) => {
+    setServiceId(id);
+    const sv = catalog.find(x => x.id === id);
+    if (!sv) return;
+    setServiceCategory(sv.category);
+    setServiceName(sv.name);
+    const hours = sv.hours && sv.hours > 0 ? sv.hours : sv.category === 'tattoo' ? 1 : 0.5;
+    setEstimatedHours(hours);
+    if (startTime) setEndTime(addHours(startTime, hours));
+    if (sv.price > 0) setEstimatedPrice(r2(sv.price * (1 + (sv.taxRate || 0) / 100)));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -371,6 +377,34 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                 </UiSelect>
               </div>
 
+              <div className="sm:col-span-2">
+                <label className="text-[11px] text-neutral-400 block mb-1">Servicio del catálogo</label>
+                <UiSelect
+                  value={serviceId}
+                  onChange={e => handleServiceSelect(e.target.value)}
+                  placeholder={catalog.length ? 'Elija un servicio para llenar los datos…' : 'No hay servicios en el catálogo'}
+                  searchable={catalog.length > 6}
+                  searchPlaceholder="Buscar servicio…"
+                  className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden"
+                >
+                  {(['tattoo', 'piercing', 'jewelry', 'other'] as ServiceCategory[])
+                    .filter(cat => catalog.some(sv => sv.category === cat))
+                    .map(cat => (
+                      <optgroup key={cat} label={serviceCategoryLabel(cat)}>
+                        {catalog
+                          .filter(sv => sv.category === cat)
+                          .map(sv => (
+                            <option key={sv.id} value={sv.id}>
+                              {sv.name}
+                              {sv.hours ? ` · ${sv.hours} h` : ''}
+                              {sv.price > 0 ? ` · ${formatMoney(r2(sv.price * (1 + (sv.taxRate || 0) / 100)))}` : ' · sin precio'}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))}
+                </UiSelect>
+              </div>
+
               <div>
                 <label className="text-[11px] text-neutral-400 block mb-1">Descripción del Servicio *</label>
                 <input
@@ -431,7 +465,10 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                   <TimePicker
                     required
                     value={startTime}
-                    onChange={v => setStartTime(v)}
+                    onChange={v => {
+                      setStartTime(v);
+                      if (serviceId || !endTime) setEndTime(addHours(v, estimatedHours));
+                    }}
                     className="w-full bg-[#111114] border border-[#272730] focus:border-[#FF3366] rounded-xl px-3 py-2 text-xs text-white focus:outline-hidden" />
                 </div>
               </div>
@@ -456,7 +493,11 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               <div className="flex items-center gap-2 bg-[#121215] border border-[#2A2A33] rounded-full p-1">
                 <button
                   type="button"
-                  onClick={() => setEstimatedHours(prev => Math.max(0.5, prev - 0.5))}
+                  onClick={() => {
+                    const h = Math.max(0.5, estimatedHours - 0.5);
+                    setEstimatedHours(h);
+                    if (startTime) setEndTime(addHours(startTime, h));
+                  }}
                   className="w-7 h-7 rounded-full bg-[#1C1C22] text-white hover:bg-[#FF3366] transition-colors flex items-center justify-center font-bold text-xs"
                 >
                   -
@@ -466,7 +507,11 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setEstimatedHours(prev => prev + 0.5)}
+                  onClick={() => {
+                    const h = estimatedHours + 0.5;
+                    setEstimatedHours(h);
+                    if (startTime) setEndTime(addHours(startTime, h));
+                  }}
                   className="w-7 h-7 rounded-full bg-[#1C1C22] text-white hover:bg-[#FF3366] transition-colors flex items-center justify-center font-bold text-xs"
                 >
                   +
