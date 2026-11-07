@@ -204,6 +204,8 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
       endTime,
       estimatedHours: Number(estimatedHours) || 1,
       estimatedPrice: Number(estimatedPrice) || 0,
+      serviceId: serviceId || undefined,
+      taxRate: catalog.find(sv => sv.id === serviceId)?.taxRate,
       depositAmount: Number(depositAmount) || 0,
       depositPaid,
       depositPaymentMethod: depositPaid ? depositPaymentMethod : undefined,

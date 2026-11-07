@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ECUADOR_BANKS from '../../data/ecuadorBanks.json';
 import { UiSelect } from '../common/UiSelect';
 import { SriProgressModal } from './SriProgressModal';
+import { splitVatIncluded } from '../../utils/vat';
 import {
   Search,
   Plus,
@@ -341,6 +342,12 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     }
     setDeposit(apt.depositPaid ? apt.depositAmount || 0 : 0);
     setConsentSigned(Boolean(apt.consentSigned));
+    // El precio de la cita es lo que paga el cliente (con IVA): se desglosa, no se le suma IVA otra vez
+    const aptRate =
+      typeof apt.taxRate === 'number'
+        ? apt.taxRate
+        : serviceCatalog.find(sv => sv.id === apt.serviceId)?.taxRate ?? standardVatRate;
+    const aptBase = splitVatIncluded(apt.estimatedPrice || 0, aptRate).base;
     setLines(prev => [
       ...prev.filter(l => !l.id.startsWith('apt-')),
       {
@@ -349,9 +356,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         category: apt.serviceCategory,
         description: apt.serviceName + (apt.bodyPlacement ? ` · ${apt.bodyPlacement}` : ''),
         quantity: 1,
-        unitPrice: apt.estimatedPrice || 0,
+        unitPrice: aptBase,
         discount: 0,
-        taxRate: standardVatRate,
+        taxRate: aptRate,
         commissionPercent: art?.defaultCommissionRate ?? commission,
         hours: apt.estimatedHours,
       },

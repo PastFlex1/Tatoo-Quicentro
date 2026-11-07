@@ -194,7 +194,8 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
   const [billingFinalPrice, setBillingFinalPrice] = useState<number>(0);
   const [billingBuyerDni, setBillingBuyerDni] = useState<string>('');
   // Importe del comprobante (con IVA y propina): es lo que mira el SRI para el límite de consumidor final
-  const billingInvoiceTotal = Math.round(billingFinalPrice * (1 + (settings.defaultTaxRate || 0) / 100) * 100) / 100 + billingTipAmount;
+  // El precio acordado de la cita YA INCLUYE IVA (no se le vuelve a sumar)
+  const billingInvoiceTotal = Math.round((billingFinalPrice + billingTipAmount) * 100) / 100;
   const billingCfBlocked = exceedsConsumidorFinalLimit(billingBuyerDni, billingInvoiceTotal);
 
   const handleStartBilling = (apt: Appointment) => {
@@ -1021,7 +1022,7 @@ export const AppointmentsView: React.FC<AppointmentsViewProps> = ({ onOpenReceip
             <div className="p-6 space-y-5 text-xs">
               <div className="p-4 rounded-2xl bg-[#18181D] border border-[#272730] space-y-3">
                 <div className="flex justify-between text-neutral-300">
-                  <span>Precio Acordado / Final:</span>
+                  <span>Precio Acordado / Final (IVA incluido):</span>
                   <input
                     type="number"
                     value={billingFinalPrice || ''}

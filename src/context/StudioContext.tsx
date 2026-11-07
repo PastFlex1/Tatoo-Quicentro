@@ -61,6 +61,8 @@ import {
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
 import { hashPassword, validatePassword, verifyPassword } from '../utils/password';
+import { splitVatIncluded, standardVatRate } from '../utils/vat';
+import { getServiceCatalog } from '../data/serviceCatalog';
 import { reserveDocumentNumber } from '../services/sequenceService';
 import {
   CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE,
@@ -1302,6 +1304,14 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // Appointment Operations
+  // Precio de cita = total con IVA: tarifa del servicio (o la general) y desglose base + IVA
+  const aptVatRate = (a: Pick<Appointment, 'taxRate' | 'serviceId'>) =>
+    typeof a.taxRate === 'number'
+      ? a.taxRate
+      : getServiceCatalog(settings).find(sv => sv.id === a.serviceId)?.taxRate ?? standardVatRate(settings.defaultTaxRate);
+  const aptVat = (a: Pick<Appointment, 'taxRate' | 'serviceId' | 'estimatedPrice'>) =>
+    splitVatIncluded(a.estimatedPrice || 0, aptVatRate(a));
+
   const addAppointment = (aptData: Omit<Appointment, 'id' | 'createdAt'>): Appointment => {
     const newApt: Appointment = {
       ...aptData,
@@ -1345,15 +1355,15 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           category: aptData.serviceCategory,
           hours: aptData.estimatedHours,
           quantity: 1,
-          unitPrice: aptData.estimatedPrice,
-          total: aptData.estimatedPrice,
+          unitPrice: aptVat(aptData).base,
+          total: aptVat(aptData).base,
         },
       ],
-      subtotal: aptData.estimatedPrice,
+      subtotal: aptVat(aptData).base,
       discount: 0,
-      taxRate: 0,
-      taxAmount: 0,
-      total: aptData.estimatedPrice,
+      taxRate: aptVatRate(aptData),
+      taxAmount: aptVat(aptData).tax,
+      total: aptVat(aptData).total,
       suggestedDeposit: aptData.depositAmount,
       estimatedHours: aptData.estimatedHours,
       appointmentId: newApt.id,
@@ -1395,12 +1405,13 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const artist = artists.find(a => a.id === apt.artistId);
     const commissionPercent = artist?.defaultCommissionRate || settings.defaultArtistCommission;
 
-    const baseAmount = finalTotal !== undefined ? finalTotal : apt.estimatedPrice;
+    // El precio de la cita (o el final que confirme el cajero) YA INCLUYE IVA: se desglosa, no se suma
+    const taxRate = aptVatRate(apt);
+    const split = splitVatIncluded(finalTotal !== undefined ? finalTotal : apt.estimatedPrice, taxRate);
     const deposit = apt.depositAmount || 0;
-    const taxRate = settings.defaultTaxRate;
-    const subtotal = baseAmount;
-    const taxAmount = (subtotal * taxRate) / 100;
-    const total = subtotal + taxAmount;
+    const subtotal = split.base;
+    const taxAmount = split.tax;
+    const total = split.total;
     const amountPaidNow = Math.max(0, total - deposit);
 
     const artistShare = ((total - taxAmount) * commissionPercent) / 100;
@@ -1528,15 +1539,15 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           category: apt.serviceCategory,
           hours: apt.estimatedHours,
           quantity: 1,
-          unitPrice: apt.estimatedPrice,
-          total: apt.estimatedPrice,
+          unitPrice: aptVat(apt).base,
+          total: aptVat(apt).base,
         },
       ],
-      subtotal: apt.estimatedPrice,
+      subtotal: aptVat(apt).base,
       discount: 0,
-      taxRate: 0,
-      taxAmount: 0,
-      total: apt.estimatedPrice,
+      taxRate: aptVatRate(apt),
+      taxAmount: aptVat(apt).tax,
+      total: aptVat(apt).total,
       suggestedDeposit: apt.depositAmount,
       estimatedHours: apt.estimatedHours,
       appointmentId: apt.id,
@@ -1616,11 +1627,24 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const artist = artists.find(a => a.id === prof.artistId);
     const commissionPercent = artist?.defaultCommissionRate || settings.defaultArtistCommission;
 
-    const baseAmount = finalTotal !== undefined ? finalTotal : prof.total;
-    const taxRate = prof.taxRate ?? settings.defaultTaxRate;
-    const taxableBase = prof.subtotal > 0 ? Math.max(0, prof.subtotal - (prof.discount || 0)) : baseAmount;
-    const taxAmount = prof.taxAmount > 0 ? prof.taxAmount : Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
-    const total = finalTotal !== undefined ? finalTotal : (prof.total || (taxableBase + taxAmount));
+    // Proformas antiguas generadas desde una cita guardaban IVA 0 con el total ya con IVA
+    const legacyFromAppointment = Boolean(prof.appointmentId) && !prof.taxRate && !prof.taxAmount;
+    const taxRate = legacyFromAppointment ? standardVatRate(settings.defaultTaxRate) : prof.taxRate ?? standardVatRate(settings.defaultTaxRate);
+    const changedTotal = finalTotal !== undefined && Math.abs(finalTotal - prof.total) >= 0.01;
+    let taxableBase: number;
+    let taxAmount: number;
+    let total: number;
+    if (changedTotal || legacyFromAppointment) {
+      // El total (con IVA) manda: se desglosa con la tarifa de la proforma
+      const split = splitVatIncluded(finalTotal !== undefined ? finalTotal : prof.total, taxRate);
+      taxableBase = split.base;
+      taxAmount = split.tax;
+      total = split.total;
+    } else {
+      taxableBase = prof.subtotal > 0 ? Math.max(0, prof.subtotal - (prof.discount || 0)) : prof.total;
+      taxAmount = prof.taxAmount > 0 ? prof.taxAmount : Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+      total = prof.total || Math.round((taxableBase + taxAmount) * 100) / 100;
+    }
     const deposit = prof.suggestedDeposit || 0;
     const amountPaidNow = total;
 

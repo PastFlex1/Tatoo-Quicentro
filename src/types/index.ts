@@ -599,7 +599,11 @@ export interface Appointment {
   startTime: string; // HH:mm (e.g. "11:00")
   endTime: string; // HH:mm (e.g. "14:30")
   estimatedHours: number;
-  estimatedPrice: number; // in USD $
+  estimatedPrice: number; // Lo que paga el cliente en USD $: YA INCLUYE IVA
+  /** Servicio del catálogo elegido al agendar */
+  serviceId?: string;
+  /** Tarifa de IVA del servicio (con ella se desglosa el precio al facturar) */
+  taxRate?: number;
   depositAmount: number; // Seña o anticipo cobrado
   depositPaid: boolean;
   depositPaymentMethod?: PaymentMethod;
