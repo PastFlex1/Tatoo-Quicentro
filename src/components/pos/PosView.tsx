@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ECUADOR_BANKS from '../../data/ecuadorBanks.json';
 import { UiSelect } from '../common/UiSelect';
+import { SriProgressModal } from './SriProgressModal';
 import {
   Search,
   Plus,
@@ -126,6 +127,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
 
   const [error, setError] = useState<string | null>(null);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
+  const [sriSale, setSriSale] = useState<SaleRecord | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Si quien cobra es un artista, la venta va a su nombre y con su comisión: no se le pregunta
@@ -537,7 +539,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       status: deposit > 0 && toPay === 0 ? 'deposit_only' : 'completed',
       consentFormSigned: consentSigned || clientHasConsent,
       notes: notes.trim() || undefined,
-      });
+      }, { deferSri: true });
     } catch (err) {
       // Sin número del servidor no se emite nada: así nunca se repite ni se salta un secuencial
       setError(err instanceof Error ? err.message : 'No se pudo emitir el documento.');
@@ -554,7 +556,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     }
 
     setLastSale(sale);
-    onOpenReceipt(sale);
+    // Factura electrónica: primero se firma, se envía y se autoriza en el SRI (modal con el avance);
+    // el comprobante se abre recién con la autorización. La nota de venta no pasa por el SRI.
+    if (sale.documentType === 'factura') setSriSale(sale);
+    else onOpenReceipt(sale);
     resetAll();
   };
 
@@ -1270,10 +1275,23 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   );
 
   // ================================================================ TERMINAL DE CAJA (≤1366 px)
+  const sriModal = sriSale ? (
+    <SriProgressModal
+      sale={sriSale}
+      onClose={() => setSriSale(null)}
+      onShowReceipt={s => {
+        setSriSale(null);
+        setLastSale(s);
+        onOpenReceipt(s);
+      }}
+    />
+  ) : null;
+
   if (terminal) {
     const card = 'rounded-2xl bg-[#18181D] border border-[#272730]';
     return (
       <div className={`w-full flex flex-col gap-2.5 p-2.5 sm:p-3 ${fixedScreen ? 'h-full min-h-0' : ''}`}>
+        {sriModal}
         {/* Barra superior de la caja */}
         <div className={`${card} px-3 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0`}>
           <div className="flex items-center gap-2 min-w-0">
@@ -1326,6 +1344,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   // ================================================================ ESCRITORIO (>1366 px)
   return (
     <div className="w-full p-3 sm:p-5 lg:p-6 space-y-4">
+      {sriModal}
       {/* Encabezado */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>

@@ -78,6 +78,7 @@ import {
   buildNotaCreditoXml,
   emitElectronicDocument,
   SriEmissionResult,
+  SriStepCallback,
 } from '../services/sriElectronicService';
 
 interface StudioContextType {
@@ -146,7 +147,8 @@ interface StudioContextType {
   getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
   // Actions - Sales
-  addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>) => Promise<SaleRecord>;
+  /** deferSri: no envía la factura al SRI automáticamente (el POS la envía mostrando el avance) */
+  addSale: (sale: Omit<SaleRecord, 'id' | 'invoiceNumber'>, options?: { deferSri?: boolean }) => Promise<SaleRecord>;
   /** Anula una factura a consumidor final o una nota de venta (no admiten nota de crédito) */
   voidSale: (saleId: string, input: VoidSaleInput) => SaleRecord;
   updateSale: (id: string, updated: Partial<SaleRecord>) => void;
@@ -154,7 +156,7 @@ interface StudioContextType {
 
   // Actions - Credit Notes / Notas de Crédito
   /** Envía (o reintenta) una factura al SRI usando la API Java */
-  emitSaleToSri: (saleId: string) => Promise<SriEmissionResult | null>;
+  emitSaleToSri: (saleId: string, opts?: { snapshot?: SaleRecord; onStep?: SriStepCallback }) => Promise<SriEmissionResult | null>;
   /** Envía (o reintenta) una nota de crédito al SRI usando la API Java */
   emitCreditNoteToSri: (creditNoteId: string) => Promise<SriEmissionResult | null>;
   addCreditNote: (creditNote: Omit<CreditNoteRecord, 'id' | 'creditNoteNumber' | 'createdAt' | 'sriStatus'> & { sriStatus?: CreditNoteRecord['sriStatus'] }) => Promise<CreditNoteRecord>;
@@ -1695,7 +1697,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   });
 
   /** Firma, envía y consulta la autorización de una factura en el SRI. */
-  const emitSaleToSri = async (saleId: string, saleSnapshot?: SaleRecord): Promise<SriEmissionResult | null> => {
+  const emitSaleToSri = async (saleId: string, saleSnapshot?: SaleRecord, onStep?: SriStepCallback): Promise<SriEmissionResult | null> => {
     const sale = saleSnapshot || salesRef.current.find(s => s.id === saleId);
     if (!sale || sale.documentType === 'nota_venta' || sale.sriStatus === 'AUTORIZADO' || sale.voidedAt) return null;
     if (sriInFlight.current.has(saleId)) return null;
@@ -1706,7 +1708,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const wasInProcess = sale.sriStatus === 'EN_PROCESO';
       setSales(prev => prev.map(s => (s.id === saleId ? { ...s, sriAccessKey: claveAcceso, sriStatus: 'EN_PROCESO' } : s)));
       const xml = buildFacturaXml({ ...sale, sriAccessKey: claveAcceso }, cfg, claveAcceso);
-      const result = await emitElectronicDocument(xml, claveAcceso, cfg, { alreadyReceived: wasInProcess });
+      const result = await emitElectronicDocument(xml, claveAcceso, cfg, { alreadyReceived: wasInProcess, onStep });
       // Si mientras tanto se anuló la venta, el estado "ANULADO" prevalece sobre la respuesta del SRI
       setSales(prev => prev.map(s => (s.id === saleId && !s.voidedAt ? { ...s, ...applySriResult(result) } : s)));
       return result;
@@ -1804,7 +1806,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   }, [proformas.length]);
 
   // Sale Operations
-  const addSale = async (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>): Promise<SaleRecord> => {
+  const addSale = async (saleData: Omit<SaleRecord, 'id' | 'invoiceNumber'>, options: { deferSri?: boolean } = {}): Promise<SaleRecord> => {
     const isNotaVenta = saleData.documentType === 'nota_venta';
 
     // ---- Reglas del SRI (se validan ANTES de pedir el número, para no gastar un secuencial)
@@ -1840,7 +1842,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       sriAuthorizationDate: undefined,
     };
     setSales(prev => [newSale, ...prev]);
-    if (!isNotaVenta) {
+    if (!isNotaVenta && !options.deferSri) {
       // Envío automático al SRI (firma → recepción → autorización) mediante la API Java
       setTimeout(() => void emitSaleToSri(newSale.id, newSale), 0);
     }
@@ -2899,7 +2901,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         filteredExpenses,
         accountingEntries,
         accountingPostings,
-        emitSaleToSri,
+        emitSaleToSri: (saleId: string, opts?: { snapshot?: SaleRecord; onStep?: SriStepCallback }) =>
+          emitSaleToSri(saleId, opts?.snapshot, opts?.onStep),
         emitCreditNoteToSri,
         voidSale,
       }}

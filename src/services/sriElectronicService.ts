@@ -16,6 +16,11 @@ export const DEFAULT_SRI_API_URL = 'http://localhost:8081';
 
 export type SriEmissionStatus = 'AUTORIZADO' | 'RECHAZADO' | 'EN_PROCESO' | 'ERROR';
 
+/** Pasos visibles del envío al SRI (para mostrar el avance al cajero) */
+export type SriStep = 'firma' | 'recepcion' | 'autorizacion';
+export type SriStepState = 'running' | 'done' | 'error';
+export type SriStepCallback = (step: SriStep, state: SriStepState) => void;
+
 export interface SriEmissionResult {
   status: SriEmissionStatus;
   authorizationNumber?: string;
@@ -407,31 +412,55 @@ export async function emitElectronicDocument(
   unsignedXml: string,
   claveAcceso: string,
   s: StudioSettings,
-  options: { alreadyReceived?: boolean } = {}
+  options: { alreadyReceived?: boolean; onStep?: SriStepCallback } = {}
 ): Promise<SriEmissionResult> {
+  const step: SriStepCallback = (st, state) => {
+    try {
+      options.onStep?.(st, state);
+    } catch {
+      /* el avance visual nunca debe romper la emisión */
+    }
+  };
+  let current: SriStep = 'firma';
   const pre = validateIssuer(s);
-  if (pre.length > 0) return { status: 'ERROR', messages: pre };
+  if (pre.length > 0) {
+    step('firma', 'error');
+    return { status: 'ERROR', messages: pre };
+  }
 
   try {
     let signed: string | undefined;
     if (!options.alreadyReceived) {
+      step('firma', 'running');
       signed = await signXml(unsignedXml, s);
+      step('firma', 'done');
+      current = 'recepcion';
+      step('recepcion', 'running');
       const rec = await sendToReception(signed, s);
       // 43 = CLAVE ACCESO REGISTRADA (ya fue recibido antes): se continúa con la autorización
       const alreadyRegistered = rec.messages.some(m => m.id === '43');
       if (rec.estado !== 'RECIBIDA' && !alreadyRegistered) {
+        step('recepcion', 'error');
         return {
           status: 'RECHAZADO',
           xml: signed,
           messages: rec.messages.length ? rec.messages.map(m => m.text) : [`Recepción SRI: ${rec.estado || 'sin respuesta'}`],
         };
       }
+
+      step('recepcion', 'done');
+    } else {
+      step('firma', 'done');
+      step('recepcion', 'done');
     }
+    current = 'autorizacion';
+    step('autorizacion', 'running');
 
     for (let attempt = 0; attempt < 6; attempt++) {
       await sleep(attempt === 0 ? 1500 : 2500);
       const auth = await queryAuthorization(claveAcceso, s);
       if (auth.estado === 'AUTORIZADO') {
+        step('autorizacion', 'done');
         return {
           status: 'AUTORIZADO',
           authorizationNumber: auth.numeroAutorizacion || claveAcceso,
@@ -441,15 +470,18 @@ export async function emitElectronicDocument(
         };
       }
       if (auth.estado === 'NO AUTORIZADO' || auth.estado === 'RECHAZADO') {
+        step('autorizacion', 'error');
         return { status: 'RECHAZADO', xml: signed, messages: auth.messages.map(m => m.text) };
       }
     }
+    step('autorizacion', 'error');
     return {
       status: 'EN_PROCESO',
       xml: signed,
       messages: ['El SRI aún no responde la autorización. Use "Consultar SRI" en unos minutos.'],
     };
   } catch (err: any) {
+    step(current, 'error');
     return { status: 'ERROR', messages: [err?.message || 'Error desconocido al emitir el comprobante.'] };
   }
 }
