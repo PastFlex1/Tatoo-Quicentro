@@ -131,7 +131,8 @@ interface StudioContextType {
   // Actions - Cotizaciones & Proformas
   addProforma: (proforma: Omit<Proforma, 'id' | 'createdAt' | 'proformaNumber'>) => Promise<Proforma>;
   updateProforma: (id: string, updated: Partial<Proforma>) => void;
-  deleteProforma: (id: string) => void;
+  /** Devuelve false si la proforma ya respalda una factura vigente (no se puede eliminar) */
+  deleteProforma: (id: string) => boolean;
   convertProformaToAppointment: (
     proformaId: string,
     appointmentDate?: string,
@@ -144,7 +145,8 @@ interface StudioContextType {
     paymentMethod?: PaymentMethod,
     tipAmount?: number,
     finalTotal?: number,
-    buyer?: { dni?: string; name?: string }
+    buyer?: { dni?: string; name?: string },
+    options?: { deferSri?: boolean }
   ) => Promise<SaleRecord>;
   getProformaByAppointmentId: (appointmentId: string) => Proforma | undefined;
 
@@ -1506,8 +1508,16 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setProformas(prev => prev.map(p => (p.id === id ? { ...p, ...updated } : p)));
   };
 
-  const deleteProforma = (id: string) => {
+  /** Factura vigente (no anulada) emitida desde una proforma */
+  const proformaInvoice = (prof: Proforma) =>
+    sales.find(sl => !sl.voidedAt && (sl.id === prof.saleId || (!!prof.invoiceNumber && sl.invoiceNumber === prof.invoiceNumber)));
+
+  const deleteProforma = (id: string): boolean => {
+    const prof = proformas.find(p => p.id === id);
+    // Una proforma ya facturada es el respaldo de esa factura: no se elimina (salvo que la factura se anule)
+    if (prof && proformaInvoice(prof)) return false;
     setProformas(prev => prev.filter(p => p.id !== id));
+    return true;
   };
 
   const getProformaByAppointmentId = (appointmentId: string): Proforma | undefined => {
@@ -1619,7 +1629,8 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     paymentMethod: PaymentMethod = 'card',
     tipAmount: number = 0,
     finalTotal?: number,
-    buyer?: { dni?: string; name?: string }
+    buyer?: { dni?: string; name?: string },
+    options: { deferSri?: boolean } = {}
   ): Promise<SaleRecord> => {
     const prof = proformas.find(p => p.id === proformaId);
     if (!prof) throw new Error('Cotización / Proforma no encontrada');
@@ -1682,7 +1693,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       status: 'completed',
       consentFormSigned: true,
       notes: `Factura oficial generada desde Proforma ${prof.proformaNumber}. ${prof.notes || ''}`.trim(),
-    });
+    }, { deferSri: options.deferSri });
 
     // Mark proforma as invoiced with reference to sale and its official invoice number
     updateProforma(proformaId, {
@@ -2970,7 +2981,7 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   completeAndBillAppointment: async () => ({} as any),
   addProforma: async prof => ({ ...prof, id: 'temp-' + Date.now(), createdAt: new Date().toISOString(), proformaNumber: '#000001' }),
   updateProforma: () => {},
-  deleteProforma: () => {},
+  deleteProforma: () => false,
   convertProformaToAppointment: () => ({} as any),
   convertProformaToSale: async () => ({} as any),
   getProformaByAppointmentId: () => undefined,

@@ -32,6 +32,7 @@ import { Proforma, ProformaStatus, ServiceCategory, SaleRecord, PaymentMethod } 
 import { useStudio } from '../../context/StudioContext';
 import { ProformaModal } from './ProformaModal';
 import { NewProformaModal } from './NewProformaModal';
+import { SriProgressModal } from '../pos/SriProgressModal';
 
 interface ProformasViewProps {
   onOpenReceipt?: (sale: SaleRecord) => void;
@@ -172,6 +173,9 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
     setIsBillingModalOpen(true);
   };
 
+  // Factura recién emitida que se está autorizando en el SRI (modal con el avance)
+  const [sriSale, setSriSale] = useState<SaleRecord | null>(null);
+
   const handleProcessBilling = async () => {
     if (!guardPermission('proformas.convert')) return;
     if (!billingProforma) return;
@@ -181,14 +185,17 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
         billingPaymentMethod,
         billingTipAmount,
         billingFinalPrice,
-        { dni: billingBuyerDni }
+        { dni: billingBuyerDni },
+        { deferSri: true }
       );
       setIsBillingModalOpen(false);
-      setBillingSuccessNotice(`¡Factura ${sale.invoiceNumber} emitida exitosamente para ${sale.clientName}!`);
-      setTimeout(() => setBillingSuccessNotice(null), 5000);
-
-      if (onOpenReceipt) {
-        onOpenReceipt(sale);
+      // Igual que en el POS: firma → recepción → autorización, y recién ahí se abre el comprobante
+      if (sale.documentType === 'factura') {
+        setSriSale(sale);
+      } else {
+        setBillingSuccessNotice(`¡Comprobante ${sale.invoiceNumber} emitido para ${sale.clientName}!`);
+        setTimeout(() => setBillingSuccessNotice(null), 5000);
+        if (onOpenReceipt) onOpenReceipt(sale);
       }
     } catch (err: any) {
       alert('Error al facturar proforma: ' + (err.message || 'Error desconocido'));
@@ -197,10 +204,22 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
 
   const handleDeleteProforma = (proforma: Proforma) => {
     if (!guardPermission('proformas.delete')) return;
+    const invoice = invoiceOf(proforma);
+    if (invoice) {
+      alert(
+        `No se puede eliminar la cotización ${proforma.proformaNumber}: respalda la factura ${invoice.invoiceNumber}` +
+          `${invoice.sriStatus === 'AUTORIZADO' ? ' autorizada por el SRI' : ''}. Para quitarla, primero anule la factura.`
+      );
+      return;
+    }
     if (confirm(`¿Eliminar la cotización ${proforma.proformaNumber} del cliente "${proforma.clientName}"?`)) {
       deleteProforma(proforma.id);
     }
   };
+
+  /** Factura vigente (no anulada) emitida desde la proforma */
+  const invoiceOf = (p: Proforma) =>
+    sales.find(sl => !sl.voidedAt && (sl.id === p.saleId || (!!p.invoiceNumber && sl.invoiceNumber === p.invoiceNumber)));
 
   const handleShareWhatsApp = (p: Proforma) => {
     const cleanPhone = (p.clientPhone || '').replace(/\D/g, '');
@@ -393,6 +412,7 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                 filteredProformas.map(proforma => {
                   const badge = getStatusBadge(proforma.status, proforma.invoiceNumber);
                   const isInvoiced = Boolean(proforma.invoiceNumber) || proforma.status === 'invoiced';
+                  const lockedInvoice = invoiceOf(proforma);
 
                   return (
                     <tr
@@ -576,8 +596,14 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                           {/* ACCIÓN 3: Eliminar */}
                           <button
                             onClick={() => handleDeleteProforma(proforma)}
-                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-[#272730] transition-colors cursor-pointer"
-                            title="Eliminar cotización"
+                            disabled={Boolean(lockedInvoice)}
+                            className="p-1.5 rounded-xl bg-[#121215] hover:bg-red-500/20 text-neutral-500 hover:text-red-400 border border-[#272730] transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#121215] disabled:hover:text-neutral-500"
+                            title={
+                              lockedInvoice
+                                ? `No se puede eliminar: respalda la factura ${lockedInvoice.invoiceNumber}${lockedInvoice.sriStatus === 'AUTORIZADO' ? ' (autorizada SRI)' : ''}`
+                                : 'Eliminar cotización'
+                            }
+                            aria-label="Eliminar cotización"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -815,11 +841,29 @@ export const ProformasView: React.FC<ProformasViewProps> = ({ onOpenReceipt }) =
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Receipt className="w-4 h-4" />
-                <span>Emitir Factura & Abrir Ticket</span>
+                <span>Emitir y autorizar factura</span>
               </button>
             </div>
           </div>
         </div>
+      )}
+      {sriSale && (
+        <SriProgressModal
+          sale={sriSale}
+          onClose={() => {
+            setBillingSuccessNotice(`Factura ${sriSale.invoiceNumber} registrada; quedó pendiente de autorización en Facturación.`);
+            setTimeout(() => setBillingSuccessNotice(null), 6000);
+            setSriSale(null);
+          }}
+          onShowReceipt={sl => {
+            setSriSale(null);
+            if (sl.sriStatus === 'AUTORIZADO') {
+              setBillingSuccessNotice(`¡Factura ${sl.invoiceNumber} autorizada por el SRI para ${sl.clientName}!`);
+              setTimeout(() => setBillingSuccessNotice(null), 5000);
+            }
+            if (onOpenReceipt) onOpenReceipt(sl);
+          }}
+        />
       )}
     </div>
   );
