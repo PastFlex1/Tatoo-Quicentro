@@ -76,10 +76,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     updateProforma,
     formatMoney,
     setActiveTab,
+    currentUser,
   } = useStudio();
   const { guard: guardPermission, can } = usePermission();
   const canDiscount = can('pos.discount');
-  const canChangeCommission = can('pos.change_commission');
   const canChangeTax = can('pos.change_tax');
   const serviceCatalog = useMemo(() => getServiceCatalog(settings).filter(s => s.active), [settings]);
 
@@ -119,21 +119,26 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const [consentSigned, setConsentSigned] = useState(false);
   const [notes, setNotes] = useState('');
 
-  // Insumos de cabina
-  const [supplies, setSupplies] = useState<{ itemId: string; name: string; quantity: number }[]>([]);
-  const [showSupplies, setShowSupplies] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Si quien cobra es un artista, la venta va a su nombre y con su comisión: no se le pregunta
+  const loggedArtist = currentUser?.artistId ? artists.find(a => a.id === currentUser.artistId && a.active) : undefined;
+
   useEffect(() => {
+    if (loggedArtist) {
+      setArtistId(loggedArtist.id);
+      setCommission(loggedArtist.defaultCommissionRate || settings.defaultArtistCommission || 80);
+      return;
+    }
     if (!artistId && artists.length > 0) {
       const first = artists.find(a => a.active) || artists[0];
       setArtistId(first.id);
       setCommission(first.defaultCommissionRate);
     }
-  }, [artists, artistId]);
+  }, [artists, artistId, loggedArtist?.id]);
 
   // ---------------------------------------------------------------- datos derivados
   const isNotaVenta = documentType === 'nota_venta';
@@ -417,8 +422,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setSplit({ cash: '', card: '', transfer: '' });
     setConsentSigned(false);
     setNotes('');
-    setSupplies([]);
-    setShowSupplies(false);
     setCommissionEdited(false);
     setError(null);
     setDocumentType('factura');
@@ -484,7 +487,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       artistId,
       artistName: artist?.name || 'Artista del estudio',
       items: finalLines,
-      consumedSupplies: supplies.length > 0 ? supplies : undefined,
       hours: tattooHours || undefined,
       pieces: finalLines.length === 1 ? main.quantity : 1,
       subtotal: computed.subtotal,
@@ -829,39 +831,42 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   /** Ticket tipo caja registradora (pantallas ≤1366 px) */
   const ticketList = (
     <div className="divide-y divide-dashed divide-[#2A2A33]">
-      {lines.map((l, idx) => {
+      {lines.map(l => {
         const isAppointment = l.id.startsWith('apt-');
         const lineTotal = r2(lineBase(l) * (1 + effectiveTax(l) / 100));
+        const lbl = 'block text-[9px] uppercase tracking-wider text-neutral-500 mb-1';
         return (
-          <div key={l.id} className="px-3 py-2.5 flex gap-2.5">
-            <span className="w-5 shrink-0 pt-0.5 text-[10px] font-mono text-neutral-600 text-right">{idx + 1}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-semibold text-white flex items-center gap-1.5">
-                    <Lock className="w-3 h-3 shrink-0 text-neutral-600" aria-hidden />
-                    <span className="truncate" title={l.description}>
-                      {l.description}
-                    </span>
-                  </div>
-                  <div className="text-[10px] text-neutral-500 truncate">{lineKindLabel(l)}</div>
+          <div key={l.id} className="px-3 py-3 space-y-2.5">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-white leading-snug break-words" title={l.description}>
+                  {l.description}
                 </div>
-                <span className="font-mono text-sm font-bold text-white whitespace-nowrap">{formatMoney(lineTotal)}</span>
+                <div className="text-[10px] text-neutral-500 truncate">{lineKindLabel(l)}</div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
-                {isAppointment ? <span className="font-mono text-white">1 ×</span> : qtyStepper(l, true)}
-                <span className={`font-mono ${l.unitPrice <= 0 ? 'text-amber-300' : 'text-neutral-400'}`}>
-                  {l.unitPrice > 0 ? `${formatMoney(l.unitPrice)} c/u` : 'Sin precio'}
+              <span className="font-mono text-sm font-bold text-white whitespace-nowrap pt-0.5">{formatMoney(lineTotal)}</span>
+              <button type="button" onClick={() => removeLine(l.id)} className="-mr-1 p-1.5 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer shrink-0" aria-label="Quitar línea">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-[auto_1fr_72px_84px] items-end gap-x-3 text-[11px]">
+              <div>
+                <span className={lbl}>Cant.</span>
+                {isAppointment ? <span className="font-mono text-white text-sm leading-8">1</span> : qtyStepper(l, true)}
+              </div>
+              <div className="min-w-0">
+                <span className={lbl}>P. unit.</span>
+                <span className={`block font-mono text-sm leading-8 truncate ${l.unitPrice <= 0 ? 'text-amber-300' : 'text-neutral-200'}`}>
+                  {l.unitPrice > 0 ? formatMoney(l.unitPrice) : 'Sin precio'}
                 </span>
-                <label className="flex items-center gap-1 text-neutral-500">
-                  IVA {taxSelect(l, '!w-[68px] !py-1')}
-                </label>
-                <label className="flex items-center gap-1 text-neutral-500">
-                  Desc. {discountInput(l, '!w-[76px] !py-1')}
-                </label>
-                <button type="button" onClick={() => removeLine(l.id)} className="ml-auto p-1.5 rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 cursor-pointer" aria-label="Quitar línea">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+              </div>
+              <div>
+                <span className={lbl}>IVA</span>
+                {taxSelect(l, '!py-1.5')}
+              </div>
+              <div>
+                <span className={lbl}>Desc. $</span>
+                {discountInput(l, '!py-1.5')}
               </div>
             </div>
           </div>
@@ -919,49 +924,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       </table>
     </div>
   );
-
-  const suppliesBlock = hasServices ? (
-    <div className="px-4 py-2.5 border-t border-[#24242B] space-y-2 shrink-0">
-      <button type="button" onClick={() => setShowSupplies(v => !v)} className="text-[11px] text-neutral-300 hover:text-white flex items-center gap-1.5 cursor-pointer">
-        <Layers className="w-3.5 h-3.5 text-[#FF3366]" />
-        Insumos usados en cabina ({supplies.length}) — descuenta del Kardex
-      </button>
-      {showSupplies && (
-        <div className="space-y-1.5">
-          <UiSelect
-            value=""
-            onChange={e => {
-              const inv = inventory.find(i => i.id === e.target.value);
-              if (inv && !supplies.some(s => s.itemId === inv.id)) setSupplies(prev => [...prev, { itemId: inv.id, name: inv.name, quantity: 1 }]);
-            }}
-            className={inputCls}
-          >
-            <option value="">+ Agregar insumo…</option>
-            {inventory.filter(i => i.currentStock > 0).map(i => (
-              <option key={i.id} value={i.id}>
-                {i.name} (stock {i.currentStock})
-              </option>
-            ))}
-          </UiSelect>
-          {supplies.map(s => (
-            <div key={s.itemId} className="flex items-center gap-2 text-[11px]">
-              <span className="flex-1 text-neutral-300 truncate">{s.name}</span>
-              <input
-                type="number"
-                min="1"
-                value={s.quantity}
-                onChange={e => setSupplies(prev => prev.map(x => (x.itemId === s.itemId ? { ...x, quantity: Math.max(1, parseInt(e.target.value, 10) || 1) } : x)))}
-                className="w-16 px-2 py-1 bg-[#121215] border border-[#2B2B36] rounded-lg text-white font-mono text-right"
-              />
-              <button type="button" onClick={() => setSupplies(prev => prev.filter(x => x.itemId !== s.itemId))} className="text-neutral-500 hover:text-red-400 cursor-pointer" aria-label="Quitar insumo">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  ) : null;
 
   const recentSalesBlock =
     recentSales.length > 0 ? (
@@ -1059,44 +1021,27 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   // ---- Artista y comprobante
   const artistDocBlock = (
     <div className="grid grid-cols-2 gap-2.5">
-      <label className="col-span-2 sm:col-span-1 block">
-        <span className="block text-[10px] uppercase text-neutral-400 mb-1">Artista</span>
-        <UiSelect
-          value={artistId}
-          onChange={e => {
-            setArtistId(e.target.value);
-            const a = artists.find(x => x.id === e.target.value);
-            if (a) {
-              setCommission(a.defaultCommissionRate);
-              setCommissionEdited(false);
-            }
-          }}
-          className={inputCls}
-        >
-          {artists.length === 0 && <option value="">Registre artistas primero</option>}
-          {artists.filter(a => a.active).map(a => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </UiSelect>
-      </label>
-      <label className="block">
-        <span className="block text-[10px] uppercase text-neutral-400 mb-1">Comisión servicios %</span>
-        <input
-          type="number"
-          min="0"
-          max="100"
-          value={commission}
-          disabled={!canChangeCommission}
-          title={canChangeCommission ? undefined : 'Sin permiso para modificar la comisión'}
-          onChange={e => {
-            setCommissionEdited(true);
-            setCommission(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)));
-          }}
-          className={numCls}
-        />
-      </label>
+      {!loggedArtist && (
+        <label className="col-span-2 block">
+          <span className="block text-[10px] uppercase text-neutral-400 mb-1">Artista</span>
+          <UiSelect
+            value={artistId}
+            onChange={e => {
+              setArtistId(e.target.value);
+              const a = artists.find(x => x.id === e.target.value);
+              if (a) setCommission(a.defaultCommissionRate || settings.defaultArtistCommission || 80);
+            }}
+            className={inputCls}
+          >
+            {artists.length === 0 && <option value="">Registre artistas primero</option>}
+            {artists.filter(a => a.active).map(a => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </UiSelect>
+        </label>
+      )}
       <div className="col-span-2 grid grid-cols-2 gap-2">
         {(['factura', 'nota_venta'] as const).map(t => (
           <button
@@ -1296,7 +1241,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
             <div className={`${card} flex flex-col overflow-hidden ${fixedScreen ? 'flex-1 min-h-0' : ''}`}>
               {ticketHeader}
               <div className={`${fixedScreen ? 'flex-1 min-h-0 overflow-y-auto ink-scroll' : ''}`}>{lines.length === 0 ? ticketEmpty : ticketList}</div>
-              {suppliesBlock}
             </div>
           </div>
 
@@ -1350,7 +1294,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           <div className="rounded-2xl bg-[#18181D] border border-[#272730] overflow-hidden">
             {ticketHeader}
             {lines.length === 0 ? ticketEmpty : ticketTable}
-            {suppliesBlock}
           </div>
 
           {recentSalesBlock}

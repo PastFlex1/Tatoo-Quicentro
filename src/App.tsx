@@ -30,6 +30,8 @@ import { SalesNotePrintModal } from './components/sales/SalesNotePrintModal';
 import { SaleRecord } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { POS_TERMINAL_QUERY, useMediaQuery } from './hooks/useMediaQuery';
+import { LoginScreen } from './components/auth/LoginScreen';
+import { PasswordModal } from './components/users/PasswordModal';
 
 const MainLayout: React.FC = () => {
   const { activeTab, setActiveTab, currentUser, canAccessTab, currentRole } = useStudio();
@@ -198,12 +200,24 @@ const MainLayout: React.FC = () => {
   );
 };
 
+/** Sin sesión iniciada no se muestra ninguna sección. */
+const AuthGate: React.FC = () => {
+  const { isAuthenticated, currentUser } = useStudio();
+  if (!isAuthenticated) return <LoginScreen />;
+  return (
+    <>
+      <MainLayout />
+      {currentUser.mustChangePassword && <PasswordModal mode="self" user={currentUser} forced onClose={() => {}} />}
+    </>
+  );
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
       <StudioProvider>
         <AlertModalProvider>
-          <MainLayout />
+          <AuthGate />
         </AlertModalProvider>
       </StudioProvider>
     </ErrorBoundary>

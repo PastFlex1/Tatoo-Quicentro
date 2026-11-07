@@ -22,6 +22,7 @@ import { useStudio } from '../../context/StudioContext';
 import { SystemUser, UserRole } from '../../types';
 import { ADMIN_ROLE_ID, PERMISSION_MODULES } from '../../data/permissions';
 import { consultarIdentificacion } from '../../services/sriService';
+import { hashPassword, MIN_PASSWORD_LENGTH, validatePassword } from '../../utils/password';
 
 interface NewUserModalProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [rol, setRol] = useState<UserRole>('CAJERO_RECEPCION');
-  const [pin, setPin] = useState('');
+  const [password, setPassword] = useState('');
   const [artistId, setArtistId] = useState<string>('');
   const [estado, setEstado] = useState<'ACTIVO' | 'INACTIVO'>('ACTIVO');
 
@@ -61,7 +62,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       setEmail(userToEdit.email);
       setTelefono(userToEdit.telefono || '');
       setRol(userToEdit.rol);
-      setPin(userToEdit.pin || '');
+      setPassword('');
       setArtistId(userToEdit.artistId || '');
       setEstado(userToEdit.estado);
     } else {
@@ -72,7 +73,7 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       setEmail('');
       setTelefono('');
       setRol('CAJERO_RECEPCION');
-      setPin('');
+      setPassword('');
       setArtistId(artists[0]?.id || '');
       setEstado('ACTIVO');
     }
@@ -118,9 +119,12 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       setErrorMessage('Por favor ingrese un nombre de usuario (ej. alex.palma).');
       return;
     }
-    if (pin && pin.length < 4) {
-      setErrorMessage('El PIN debe tener al menos 4 dígitos numéricos.');
-      return;
+    if (!userToEdit) {
+      const pwError = validatePassword(password);
+      if (pwError) {
+        setErrorMessage(pwError);
+        return;
+      }
     }
 
     const userData = {
@@ -132,14 +136,14 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
       telefono: telefono.trim() || undefined,
       rol,
       estado,
-      pin: pin.trim() || undefined,
       artistId: rol === 'ARTISTA' ? artistId || undefined : undefined,
     };
 
     if (userToEdit) {
       updateUser(userToEdit.id, userData);
     } else {
-      addUser(userData);
+      // Contraseña temporal: el trabajador debe cambiarla en su primer ingreso
+      addUser({ ...userData, ...hashPassword(password), mustChangePassword: true });
     }
 
     onClose();
@@ -331,19 +335,25 @@ export const NewUserModal: React.FC<NewUserModalProps> = ({
                 </UiSelect>
               </div>
 
-              {/* PIN */}
+              {/* Contraseña (solo al crear; después se restablece con el botón de llave) */}
               <div>
                 <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                  PIN de Acceso Rápido (4 dígitos)
+                  {userToEdit ? 'Contraseña' : 'Contraseña temporal *'}
                 </label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  value={pin}
-                  onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Ej: 1234"
-                  className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white font-mono tracking-widest text-center focus:outline-none focus:border-[#FF3366]"
-                />
+                {userToEdit ? (
+                  <p className="text-[10px] text-neutral-500 leading-snug pt-1.5">
+                    Use el botón de llave en la lista de usuarios para restablecerla.
+                  </p>
+                ) : (
+                  <input
+                    type="text"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    autoComplete="off"
+                    placeholder={`Mín. ${MIN_PASSWORD_LENGTH} caracteres`}
+                    className="w-full bg-[#121215] border border-[#2B2B38] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#FF3366]"
+                  />
+                )}
               </div>
             </div>
 

@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { UserSwitcherModal } from '../users/UserSwitcherModal';
+import { LogoutModal } from '../users/LogoutModal';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -250,14 +250,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = false, onClose, force
               </div>
             </div>
             <span className="text-[10px] text-neutral-500 font-semibold px-1.5 py-0.5 rounded bg-[#1C1C24] border border-[#2B2B38]">
-              Cambiar
+              Mi cuenta
             </span>
           </button>
         </div>
       </aside>
 
       {/* User Switcher Modal */}
-      <UserSwitcherModal
+      <LogoutModal
         isOpen={isSwitcherOpen}
         onClose={() => setIsSwitcherOpen(false)}
       />

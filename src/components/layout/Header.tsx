@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
 import { DateFilterRange } from '../../types';
-import { UserSwitcherModal } from '../users/UserSwitcherModal';
+import { LogoutModal } from '../users/LogoutModal';
 import { CalendarPanel, todayKey } from '../common/DatePicker';
 
 interface HeaderProps {
@@ -229,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* User Switcher Modal */}
-      <UserSwitcherModal
+      <LogoutModal
         isOpen={isSwitcherOpen}
         onClose={() => setIsSwitcherOpen(false)}
       />

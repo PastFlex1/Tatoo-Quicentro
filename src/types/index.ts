@@ -1310,7 +1310,12 @@ export interface SystemUser {
   telefono?: string;
   rol: UserRole;
   estado: 'ACTIVO' | 'INACTIVO';
-  pin?: string;          // PIN numérico de 4 dígitos para cambio rápido
+  pin?: string;          // (en desuso) PIN antiguo; el acceso ahora es con contraseña
+  passwordHash?: string; // Huella de la contraseña (nunca la contraseña en claro)
+  passwordSalt?: string;
+  mustChangePassword?: boolean; // El usuario debe cambiarla en su próximo ingreso
+  failedAttempts?: number;
+  lockedUntil?: string;  // Bloqueo temporal tras varios intentos fallidos
   artistId?: string;     // Vinculación a un artista de INITIAL_ARTISTS si rol === 'ARTISTA'
   avatar?: string;
   allowedTabs?: string[]; // Personalización granular opcional de módulos

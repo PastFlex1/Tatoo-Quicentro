@@ -60,6 +60,7 @@ import {
   getDefaultTabsForRole,
 } from '../data/initialData';
 import { computeArtistBalance } from '../utils/artistBalance';
+import { hashPassword, validatePassword, verifyPassword } from '../utils/password';
 import { reserveDocumentNumber } from '../services/sequenceService';
 import {
   CONSUMIDOR_FINAL_CREDIT_NOTE_MESSAGE,
@@ -233,7 +234,16 @@ interface StudioContextType {
   ) => void;
 
   // Actions - Users & Roles / Gestión de Usuarios y Permisos
-  switchUser: (userId: string, pin?: string) => boolean;
+  /** ¿Hay una sesión iniciada? Sin sesión no se muestra ningún módulo. */
+  isAuthenticated: boolean;
+  /** Instalación nueva: el administrador aún no tiene contraseña y debe crearla. */
+  needsAdminSetup: boolean;
+  login: (username: string, password: string) => { ok: boolean; error?: string };
+  setupAdminPassword: (password: string) => { ok: boolean; error?: string };
+  logout: () => void;
+  changeOwnPassword: (current: string, next: string) => { ok: boolean; error?: string };
+  /** El administrador asigna o restablece la contraseña de un trabajador. */
+  setUserPassword: (userId: string, password: string, mustChange?: boolean) => { ok: boolean; error?: string };
   addUser: (user: Omit<SystemUser, 'id' | 'createdAt'>) => SystemUser;
   updateUser: (id: string, updated: Partial<SystemUser>) => void;
   deleteUser: (id: string) => void;
@@ -482,11 +492,50 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     localStorage.setItem(STORAGE_KEYS.ROLES, JSON.stringify(roles));
   }, [roles]);
 
-  const [currentUser, setCurrentUser] = useState<SystemUser>(() => {
-    const saved = safeLoadFromStorage<SystemUser | null>(STORAGE_KEYS.CURRENT_USER, null);
-    if (saved && saved.id) return saved;
-    return INITIAL_USERS[0];
+  // Sesión: vive solo en esta pestaña del navegador (al cerrarla hay que volver a ingresar)
+  const SESSION_KEY = 'inkledger_session_v1';
+  const [sessionUserId, setSessionUserId] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(SESSION_KEY);
+    } catch {
+      return null;
+    }
   });
+  const persistSession = (id: string | null) => {
+    setSessionUserId(id);
+    try {
+      if (id) sessionStorage.setItem(SESSION_KEY, id);
+      else sessionStorage.removeItem(SESSION_KEY);
+    } catch {
+      /* sin almacenamiento de sesión: se mantiene solo en memoria */
+    }
+  };
+
+  const [currentUser, setCurrentUser] = useState<SystemUser>(() => {
+    const sid = (() => {
+      try {
+        return sessionStorage.getItem(SESSION_KEY);
+      } catch {
+        return null;
+      }
+    })();
+    return users.find(u => u.id === sid && u.estado === 'ACTIVO') || INITIAL_USERS[0];
+  });
+
+  const isAuthenticated = !!sessionUserId && users.some(u => u.id === sessionUserId && u.estado === 'ACTIVO');
+  const needsAdminSetup = !users.some(u => u.rol === ADMIN_ROLE_ID && u.estado === 'ACTIVO' && !!u.passwordHash);
+
+  // Si la cuenta con sesión abierta se desactiva o elimina, la sesión se cierra sola
+  useEffect(() => {
+    if (sessionUserId && !isAuthenticated) persistSession(null);
+  }, [sessionUserId, isAuthenticated]);
+
+  // Mantiene currentUser al día con la lista de usuarios
+  useEffect(() => {
+    if (!sessionUserId) return;
+    const fresh = users.find(u => u.id === sessionUserId);
+    if (fresh && fresh !== currentUser) setCurrentUser(fresh);
+  }, [users, sessionUserId]);
 
   const [currentShift, setCurrentShift] = useState<CashShift>(() =>
     safeLoadFromStorage(STORAGE_KEYS.CURRENT_SHIFT, INITIAL_CASH_SHIFT)
@@ -663,10 +712,6 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
   }, [users]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
-  }, [currentUser]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CURRENT_SHIFT, JSON.stringify(currentShift));
@@ -1058,31 +1103,113 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   // User & Role Operations / Gestión de Usuarios y Permisos
-  const switchUser = (userId: string, pin?: string): boolean => {
-    const targetUser = users.find(u => u.id === userId && u.estado === 'ACTIVO');
-    if (!targetUser) return false;
+  const MAX_FAILED_ATTEMPTS = 5;
+  const LOCK_MINUTES = 5;
+  const IDLE_LOGOUT_MS = 30 * 60 * 1000;
 
-    // Si el usuario tiene PIN, siempre es obligatorio (no se puede omitir)
-    if (targetUser.pin && pin !== targetUser.pin) {
-      return false;
-    }
-
-    const updated: SystemUser = {
-      ...targetUser,
-      lastLogin: new Date().toISOString(),
-    };
-
+  const enterSession = (user: SystemUser) => {
+    const updated: SystemUser = { ...user, lastLogin: new Date().toISOString(), failedAttempts: 0, lockedUntil: undefined };
+    setUsers(prev => prev.map(u => (u.id === user.id ? updated : u)));
     setCurrentUser(updated);
-    setUsers(prev => prev.map(u => (u.id === userId ? updated : u)));
-
-    // Redirect if current tab is not accessible
-    const targetPerms = new Set(roles.find(r => r.id === targetUser.rol)?.permissions || []);
-    if (targetUser.rol !== ADMIN_ROLE_ID && !targetPerms.has(`${activeTab}.view`)) {
-      setActiveTab(firstTabForRole(targetUser.rol));
-    }
-
-    return true;
+    persistSession(user.id);
+    // Cada trabajador entra directo a una sección que sí tiene asignada
+    const perms = new Set(roles.find(r => r.id === user.rol)?.permissions || []);
+    if (user.rol === ADMIN_ROLE_ID || perms.has('dashboard.view')) setActiveTab('dashboard');
+    else setActiveTab(firstTabForRole(user.rol));
   };
+
+  const login = (username: string, password: string): { ok: boolean; error?: string } => {
+    const generic = 'Usuario o contraseña incorrectos.';
+    const uname = username.trim().toLowerCase();
+    const user = users.find(u => u.username.toLowerCase() === uname);
+    if (!user || !password) return { ok: false, error: generic };
+    if (user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now()) {
+      const mins = Math.max(1, Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000));
+      return { ok: false, error: `Cuenta bloqueada por intentos fallidos. Intente de nuevo en ${mins} min.` };
+    }
+    if (user.estado !== 'ACTIVO') return { ok: false, error: 'Esta cuenta está inactiva. Contacte al administrador.' };
+    if (!user.passwordHash) return { ok: false, error: 'Esta cuenta aún no tiene contraseña. Pídasela al administrador.' };
+    if (!verifyPassword(password, user)) {
+      const attempts = (user.failedAttempts || 0) + 1;
+      const lock = attempts >= MAX_FAILED_ATTEMPTS;
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === user.id
+            ? { ...u, failedAttempts: lock ? 0 : attempts, lockedUntil: lock ? new Date(Date.now() + LOCK_MINUTES * 60000).toISOString() : u.lockedUntil }
+            : u
+        )
+      );
+      return {
+        ok: false,
+        error: lock ? `Demasiados intentos. Cuenta bloqueada ${LOCK_MINUTES} minutos.` : generic,
+      };
+    }
+    enterSession(user);
+    return { ok: true };
+  };
+
+  const setupAdminPassword = (password: string): { ok: boolean; error?: string } => {
+    if (!needsAdminSetup) return { ok: false, error: 'El administrador ya tiene contraseña.' };
+    const err = validatePassword(password);
+    if (err) return { ok: false, error: err };
+    const admin = users.find(u => u.rol === ADMIN_ROLE_ID && u.estado === 'ACTIVO');
+    if (!admin) return { ok: false, error: 'No existe una cuenta de administrador activa.' };
+    const withPassword: SystemUser = { ...admin, ...hashPassword(password), mustChangePassword: false };
+    setUsers(prev => prev.map(u => (u.id === admin.id ? withPassword : u)));
+    enterSession(withPassword);
+    return { ok: true };
+  };
+
+  const logout = () => {
+    persistSession(null);
+    setActiveTab('dashboard');
+  };
+
+  const changeOwnPassword = (current: string, next: string): { ok: boolean; error?: string } => {
+    if (!isAuthenticated) return { ok: false, error: 'Sin sesión iniciada.' };
+    if (!verifyPassword(current, currentUser)) return { ok: false, error: 'La contraseña actual no es correcta.' };
+    const err = validatePassword(next);
+    if (err) return { ok: false, error: err };
+    if (verifyPassword(next, currentUser)) return { ok: false, error: 'La nueva contraseña debe ser distinta a la actual.' };
+    setUsers(prev => prev.map(u => (u.id === currentUser.id ? { ...u, ...hashPassword(next), mustChangePassword: false } : u)));
+    return { ok: true };
+  };
+
+  const setUserPassword = (userId: string, password: string, mustChange = true): { ok: boolean; error?: string } => {
+    const target = users.find(u => u.id === userId);
+    if (!target) return { ok: false, error: 'Usuario no encontrado.' };
+    const self = userId === currentUser.id;
+    if (!self && !can('users.edit')) return { ok: false, error: 'No tiene permiso para cambiar contraseñas de otros usuarios.' };
+    if (target.rol === ADMIN_ROLE_ID && currentUser.rol !== ADMIN_ROLE_ID) return { ok: false, error: 'Solo un administrador puede cambiar la contraseña de un administrador.' };
+    const err = validatePassword(password);
+    if (err) return { ok: false, error: err };
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId ? { ...u, ...hashPassword(password), mustChangePassword: self ? false : mustChange, failedAttempts: 0, lockedUntil: undefined } : u
+      )
+    );
+    return { ok: true };
+  };
+
+  // Cierre de sesión automático por inactividad (equipo compartido en recepción)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        persistSession(null);
+        setActiveTab('dashboard');
+      }, IDLE_LOGOUT_MS);
+    };
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(ev => window.removeEventListener(ev, reset));
+    };
+  }, [isAuthenticated]);
 
   const addUser = (userData: Omit<SystemUser, 'id' | 'createdAt'>): SystemUser => {
     const newUser: SystemUser = {
@@ -1104,10 +1231,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const deleteUser = (id: string) => {
     if (users.length <= 1) return;
     setUsers(prev => prev.filter(u => u.id !== id));
-    if (currentUser.id === id) {
-      const fallback = users.find(u => u.id !== id) || INITIAL_USERS[0];
-      setCurrentUser(fallback);
-    }
+    if (currentUser.id === id) persistSession(null);
   };
 
   // ===================== ROLES & PERMISOS =====================
@@ -1116,7 +1240,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   /** ¿El usuario conectado tiene el permiso `modulo.accion`? */
   const can = (permission: string): boolean => {
-    if (!currentUser) return false;
+    if (!currentUser || !isAuthenticated) return false;
     if (currentUser.rol === ADMIN_ROLE_ID) return true;
     return currentPermissions.has(permission);
   };
@@ -2574,6 +2698,7 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setPurchaseOrders([]);
     setUsers([INITIAL_USERS[0]]);
     setCurrentUser(INITIAL_USERS[0]);
+    persistSession(null);
     const freshShift: CashShift = {
       id: `shift-${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
@@ -2737,7 +2862,13 @@ export const StudioProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         updatePurchaseOrder,
         deletePurchaseOrder,
         receivePurchaseOrder,
-        switchUser,
+        isAuthenticated,
+        needsAdminSetup,
+        login,
+        setupAdminPassword,
+        logout,
+        changeOwnPassword,
+        setUserPassword,
         addUser,
         updateUser,
         deleteUser,
@@ -2851,7 +2982,13 @@ const FALLBACK_STUDIO_CONTEXT: StudioContextType = {
   updatePurchaseOrder: () => {},
   deletePurchaseOrder: () => {},
   receivePurchaseOrder: () => {},
-  switchUser: () => true,
+  isAuthenticated: false,
+  needsAdminSetup: false,
+  login: () => ({ ok: false }),
+  setupAdminPassword: () => ({ ok: false }),
+  logout: () => {},
+  changeOwnPassword: () => ({ ok: false }),
+  setUserPassword: () => ({ ok: false }),
   addUser: (u) => ({ ...u, id: 'temp-' + Date.now(), createdAt: new Date().toISOString() }),
   updateUser: () => {},
   deleteUser: () => {},

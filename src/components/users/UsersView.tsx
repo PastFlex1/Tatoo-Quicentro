@@ -27,13 +27,13 @@ import { ADMIN_ROLE_ID, PERMISSION_MODULES } from '../../data/permissions';
 import { NewUserModal } from './NewUserModal';
 import { RoleEditorModal } from './RoleEditorModal';
 import { Copy } from 'lucide-react';
-import { UserSwitcherModal } from './UserSwitcherModal';
+import { LogoutModal } from './LogoutModal';
+import { PasswordModal } from './PasswordModal';
 
 export const UsersView: React.FC = () => {
   const {
     users,
     currentUser,
-    switchUser,
     deleteUser,
     updateUser,
     roles,
@@ -58,7 +58,7 @@ export const UsersView: React.FC = () => {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<SystemUser | null>(null);
   const [isSwitcherModalOpen, setIsSwitcherModalOpen] = useState(false);
-  const [switchTarget, setSwitchTarget] = useState<SystemUser | null>(null);
+  const [passwordTarget, setPasswordTarget] = useState<SystemUser | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
   // Filtered Users
@@ -129,18 +129,6 @@ export const UsersView: React.FC = () => {
 
   const totalPermissions = PERMISSION_MODULES.reduce((acc, m) => acc + m.actions.length, 0);
 
-  const handleQuickSwitch = (u: SystemUser) => {
-    // Usuarios con PIN: abrir el modal para que se ingrese el PIN
-    if (u.pin) {
-      setSwitchTarget(u);
-      setIsSwitcherModalOpen(true);
-      return;
-    }
-    if (!switchUser(u.id)) return;
-    setSuccessNotice(`Sesión cambiada a @${u.username} (${u.nombres} ${u.apellidos})`);
-    setTimeout(() => setSuccessNotice(null), 4000);
-  };
-
   const handleToggleStatus = (u: SystemUser) => {
     if (u.id === currentUser.id) {
       alert('No puedes desactivar el usuario con el que estás conectado actualmente.');
@@ -207,7 +195,7 @@ export const UsersView: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#1C1C24] hover:bg-[#252530] text-neutral-300 hover:text-white text-xs font-bold border border-[#2B2B38] transition-all cursor-pointer"
           >
             <LogIn className="w-4 h-4 text-[#FF3366]" />
-            <span>Cambiar de Usuario</span>
+            <span>Mi cuenta / Salir</span>
           </button>
 
           {can('users.manage_roles') && (
@@ -443,7 +431,7 @@ export const UsersView: React.FC = () => {
                 <th className="py-3.5 px-4">Rol en el Estudio</th>
                 <th className="py-3.5 px-4">Contacto</th>
                 <th className="py-3.5 px-4">Permisos & Módulos</th>
-                <th className="py-3.5 px-4 text-center">PIN</th>
+                <th className="py-3.5 px-4 text-center">Contraseña</th>
                 <th className="py-3.5 px-4 text-center">Estado</th>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
               </tr>
@@ -525,11 +513,17 @@ export const UsersView: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* PIN */}
+                      {/* Contraseña */}
                       <td className="py-3 px-4 text-center">
-                        <span className="font-mono text-neutral-400 font-bold tracking-widest text-xs">
-                          {user.pin ? '••••' : 'Ninguno'}
-                        </span>
+                        {user.passwordHash ? (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            {user.mustChangePassword ? 'Temporal' : 'Asignada'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            Sin contraseña
+                          </span>
+                        )}
                       </td>
 
                       {/* State */}
@@ -551,15 +545,16 @@ export const UsersView: React.FC = () => {
                       {/* Actions */}
                       <td className="py-3 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Quick Switch */}
-                          {!isCurrent && user.estado === 'ACTIVO' && (
+                          {/* Asignar / restablecer contraseña */}
+                          {can('users.edit') && (
                             <button
                               type="button"
-                              onClick={() => handleQuickSwitch(user)}
-                              className="p-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                              title={`Acceder como @${user.username}`}
+                              onClick={() => setPasswordTarget(user)}
+                              className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 transition-colors cursor-pointer"
+                              title={user.passwordHash ? 'Restablecer contraseña' : 'Asignar contraseña'}
+                              aria-label="Asignar contraseña"
                             >
-                              <LogIn className="w-3.5 h-3.5" />
+                              <KeyRound className="w-3.5 h-3.5" />
                             </button>
                           )}
 
@@ -623,15 +618,11 @@ export const UsersView: React.FC = () => {
         userToEdit={userToEdit}
       />
 
-      {/* Modal 2: Selector Rápido de Usuario */}
-      <UserSwitcherModal
-        isOpen={isSwitcherModalOpen}
-        onClose={() => {
-          setIsSwitcherModalOpen(false);
-          setSwitchTarget(null);
-        }}
-        preselectedUser={switchTarget}
-      />
+      {/* Mi cuenta: cambiar contraseña / cerrar sesión */}
+      <LogoutModal isOpen={isSwitcherModalOpen} onClose={() => setIsSwitcherModalOpen(false)} />
+
+      {/* El administrador asigna la contraseña de un trabajador */}
+      {passwordTarget && <PasswordModal mode={passwordTarget.id === currentUser.id ? 'self' : 'admin'} user={passwordTarget} onClose={() => setPasswordTarget(null)} />}
     </div>
   );
 };
