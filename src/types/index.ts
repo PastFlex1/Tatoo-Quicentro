@@ -65,6 +65,10 @@ export interface SaleRecord {
   cashPaid?: number;
   cardPaid?: number;
   transferPaid?: number;
+  /** Banco de origen de la transferencia del cliente */
+  transferBank?: string;
+  /** Número / comprobante de la transferencia */
+  transferReference?: string;
   tipAmount: number;
   artistCommissionPercent: number; // e.g. 60
   artistShare: number; // (total - insumos/tax) * %

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ECUADOR_BANKS from '../../data/ecuadorBanks.json';
 import { UiSelect } from '../common/UiSelect';
 import {
   Search,
@@ -116,6 +117,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [cashTendered, setCashTendered] = useState('');
   const [split, setSplit] = useState({ cash: '', card: '', transfer: '' });
+  // Datos de la transferencia del cliente
+  const [transferBank, setTransferBank] = useState('');
+  const [transferRef, setTransferRef] = useState('');
   const [consentSigned, setConsentSigned] = useState(false);
   const [notes, setNotes] = useState('');
 
@@ -160,6 +164,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
   const toCollect = r2(toPay + tipNum);
   const cashNum = parseFloat(cashTendered) || 0;
   const change = method === 'cash' && cashNum > toCollect ? r2(cashNum - toCollect) : 0;
+  const usesTransfer = method === 'transfer' || (method === 'split' && (parseFloat(split.transfer) || 0) > 0);
   const splitTotal = r2((parseFloat(split.cash) || 0) + (parseFloat(split.card) || 0) + (parseFloat(split.transfer) || 0));
   const splitRemaining = r2(toCollect - splitTotal);
 
@@ -190,12 +195,28 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       .sort((a, b) => (a.date === todayStr ? -1 : 0) - (b.date === todayStr ? -1 : 0) || `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`));
   }, [appointments]);
 
-  const products = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return inventory
-      .filter(i => i.isForSale)
-      .filter(i => !q || i.name.toLowerCase().includes(q) || (i.brand || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q));
-  }, [inventory, query]);
+  // Búsqueda sin distinguir mayúsculas ni tildes ("sesion" encuentra "sesión")
+  const norm = (t: string | undefined) => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const q = norm(query.trim());
+  const matches = (...fields: (string | undefined)[]) => !q || fields.some(f => norm(f).includes(q));
+
+  const products = useMemo(
+    () => inventory.filter(i => i.isForSale).filter(i => matches(i.name, i.brand, i.sku)),
+    [inventory, q]
+  );
+
+  const filteredServices = useMemo(
+    () => serviceCatalog.filter(s => matches(s.name, serviceCategoryLabel(s.category))),
+    [serviceCatalog, q]
+  );
+
+  const filteredAppointments = useMemo(
+    () =>
+      pendingAppointments.filter(a =>
+        matches(a.clientName, a.serviceName, a.clientPhone, a.date, artists.find(x => x.id === a.artistId)?.name)
+      ),
+    [pendingAppointments, artists, q]
+  );
 
   // ---------------------------------------------------------------- secuencial del próximo comprobante
   const estab = padCode(settings.codigoEstablecimiento, 3, '001');
@@ -420,6 +441,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     setMethod('cash');
     setCashTendered('');
     setSplit({ cash: '', card: '', transfer: '' });
+    setTransferBank('');
+    setTransferRef('');
     setConsentSigned(false);
     setNotes('');
     setCommissionEdited(false);
@@ -442,6 +465,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     if (method === 'cash' && cashTendered && cashNum < toCollect) return 'El efectivo recibido es menor al total.';
     if (method === 'split' && Math.abs(splitRemaining) >= 0.01)
       return `Los montos del pago mixto deben sumar ${formatMoney(toCollect)} (falta ${formatMoney(splitRemaining)}).`;
+    if (usesTransfer) {
+      if (!transferBank) return 'Seleccione el banco de la transferencia.';
+      if (!transferRef.trim()) return 'Ingrese el número de la transferencia.';
+    }
     return null;
   };
 
@@ -501,6 +528,8 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
       cashPaid,
       cardPaid,
       transferPaid,
+      transferBank: transferPaid > 0 ? transferBank || undefined : undefined,
+      transferReference: transferPaid > 0 ? transferRef.trim() || undefined : undefined,
       tipAmount: tipNum,
       artistCommissionPercent: commission,
       artistShare: computed.artistShare,
@@ -587,6 +616,22 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         {isNotaVenta ? 'Nota de venta' : 'Factura'} N°{' '}
         <span className="font-mono">{sequenceOffline ? 'sin conexión' : nextDocumentNumber || '…'}</span>
       </div>
+      <div className="flex items-center p-0.5 rounded-full bg-[#121215] border border-[#2B2B36]" role="group" aria-label="Tipo de comprobante">
+        {(['factura', 'nota_venta'] as const).map(t => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setDocumentType(t)}
+            aria-pressed={documentType === t}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
+              documentType === t ? 'bg-[#FF3366] text-white' : 'text-neutral-400 hover:text-white'
+            }`}
+            title={t === 'factura' ? `Factura electrónica (IVA ${standardVatRate}%)` : 'Nota de venta RIMPE (sin IVA)'}
+          >
+            {t === 'factura' ? `Factura IVA ${standardVatRate}%` : 'Nota de venta'}
+          </button>
+        ))}
+      </div>
       <button
         type="button"
         onClick={() => setActiveTab('settings')}
@@ -625,7 +670,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         <button
           key={t.id}
           type="button"
-          onClick={() => setCatalogTab(t.id as typeof catalogTab)}
+          onClick={() => {
+            setCatalogTab(t.id as typeof catalogTab);
+            setQuery('');
+          }}
           className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer ${
             catalogTab === t.id ? 'bg-[#FF3366] text-white' : 'bg-[#121215] border border-[#2B2B36] text-neutral-400 hover:text-white'
           }`}
@@ -634,22 +682,47 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           {t.label}
         </button>
       ))}
-      {catalogTab === 'products' && (
-        <div className="relative flex-1 min-w-[180px]">
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && products[0]) addProduct(products[0]);
-              if (e.key === 'Escape') setQuery('');
+      <div className="relative flex-1 min-w-[180px]">
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              if (catalogTab === 'products' && products[0] && products[0].currentStock > 0) addProduct(products[0]);
+              if (catalogTab === 'services') {
+                const first = filteredServices.find(s => s.price > 0);
+                if (first) addService(first);
+              }
+              if (catalogTab === 'appointments' && filteredAppointments[0]) loadAppointment(filteredAppointments[0]);
+            }
+            if (e.key === 'Escape') setQuery('');
+          }}
+          placeholder={
+            catalogTab === 'products'
+              ? 'Buscar producto por nombre, marca o código'
+              : catalogTab === 'services'
+              ? 'Buscar servicio por nombre o tipo'
+              : 'Buscar cita por cliente, servicio, artista o fecha'
+          }
+          aria-label="Buscar en el catálogo"
+          className={`${inputCls} pl-8 ${query ? 'pr-8' : ''}`}
+        />
+        <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-2.5" />
+        {query && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              searchRef.current?.focus();
             }}
-            placeholder="Buscar por nombre, marca o código (Enter agrega el primero)"
-            className={`${inputCls} pl-8`}
-          />
-          <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-2.5" />
-        </div>
-      )}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-500 hover:text-white cursor-pointer"
+            aria-label="Limpiar búsqueda"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -662,7 +735,9 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     <>
       {catalogTab === 'services' && (
         <div className={gridCls}>
-          {serviceCatalog.length === 0 ? (
+          {serviceCatalog.length > 0 && filteredServices.length === 0 ? (
+            <p className="col-span-full text-center text-[11px] text-neutral-500 py-6">Ningún servicio coincide con «{query}».</p>
+          ) : serviceCatalog.length === 0 ? (
             <p className="col-span-full text-center text-[11px] text-neutral-500 py-6">
               No hay servicios activos.{' '}
               <button type="button" onClick={() => setActiveTab('services')} className="underline text-neutral-300 cursor-pointer">
@@ -670,7 +745,7 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
               </button>
             </p>
           ) : (
-            serviceCatalog.map(s => {
+            filteredServices.map(s => {
               const noPrice = s.price <= 0;
               return (
                 <button
@@ -729,8 +804,10 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         <div className={terminal ? 'space-y-1.5' : 'space-y-1.5 max-h-64 overflow-y-auto pr-1'}>
           {pendingAppointments.length === 0 ? (
             <p className="text-center text-[11px] text-neutral-500 py-6">No hay citas pendientes por cobrar.</p>
+          ) : filteredAppointments.length === 0 ? (
+            <p className="text-center text-[11px] text-neutral-500 py-6">Ninguna cita coincide con «{query}».</p>
           ) : (
-            pendingAppointments.map(a => (
+            filteredAppointments.map(a => (
               <button
                 key={a.id}
                 type="button"
@@ -1015,26 +1092,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
     </div>
   );
 
-  // ---- Artista y comprobante
-  const artistDocBlock = (
-    <div className="grid grid-cols-2 gap-2.5">
-      <div className="col-span-2 grid grid-cols-2 gap-2">
-        {(['factura', 'nota_venta'] as const).map(t => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setDocumentType(t)}
-            className={`py-2 rounded-xl border text-xs font-bold cursor-pointer ${
-              documentType === t ? 'bg-[#FF3366]/20 border-[#FF3366] text-white' : 'bg-[#121215] border-[#2B2B36] text-neutral-400'
-            }`}
-          >
-            {t === 'factura' ? (terminal ? `Factura (IVA ${standardVatRate}%)` : `Factura electrónica (IVA ${standardVatRate}%)`) : 'Nota de venta RIMPE'}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   // ---- Totales
   const totalsLines = (
     <div className="space-y-1 text-xs">
@@ -1136,6 +1193,34 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         </div>
       )}
 
+      {usesTransfer && (
+        <div className="space-y-2 p-2.5 rounded-xl bg-[#121215]/60 border border-[#2B2B36]">
+          <span className="block text-[10px] uppercase tracking-wider text-neutral-400">Datos de la transferencia</span>
+          <UiSelect
+            value={transferBank}
+            onChange={e => setTransferBank(e.target.value)}
+            placeholder="Banco de origen…"
+            searchable
+            searchPlaceholder="Escriba para buscar el banco…"
+            className={inputCls}
+            aria-label="Banco de la transferencia"
+          >
+            {(ECUADOR_BANKS as { id: string; name: string }[]).map(b => (
+              <option key={b.id} value={b.name}>
+                {b.name}
+              </option>
+            ))}
+          </UiSelect>
+          <input
+            value={transferRef}
+            onChange={e => setTransferRef(e.target.value.replace(/\s+/g, ' ').slice(0, 40))}
+            placeholder="N° de transferencia / comprobante"
+            aria-label="Número de transferencia"
+            className={`${inputCls} font-mono`}
+          />
+        </div>
+      )}
+
       {hasServices && !clientHasConsent && (
         <label className="flex items-center gap-2 text-[11px] text-neutral-300 cursor-pointer">
           <input type="checkbox" checked={consentSigned} onChange={e => setConsentSigned(e.target.checked)} />
@@ -1218,7 +1303,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
           <aside className={`${card} flex flex-col ${fixedScreen ? 'min-h-0 overflow-hidden' : ''}`}>
             <div className={`p-3 space-y-4 ${fixedScreen ? 'flex-1 min-h-0 overflow-y-auto ink-scroll' : ''}`}>
               {clientBlock}
-              <div className="border-t border-[#24242B] pt-3">{artistDocBlock}</div>
               <div className="border-t border-[#24242B] pt-3">{totalsLines}</div>
               <div className="border-t border-[#24242B] pt-3">{paymentBlock}</div>
               {alertsBlock}
@@ -1272,7 +1356,6 @@ export const PosView: React.FC<PosViewProps> = ({ onOpenReceipt }) => {
         {/* DERECHA: COBRO */}
         <div className="xl:col-span-5 xl:sticky xl:top-4 space-y-3">
           <div className="rounded-2xl bg-[#18181D] border border-[#272730] p-4">{clientBlock}</div>
-          <div className="rounded-2xl bg-[#18181D] border border-[#272730] p-4">{artistDocBlock}</div>
           <div className="rounded-2xl bg-[#18181D] border border-[#272730] p-4 space-y-3">
             {totalsLines}
             {totalDisplay}

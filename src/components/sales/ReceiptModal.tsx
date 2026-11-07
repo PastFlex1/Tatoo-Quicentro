@@ -535,6 +535,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                         <span>{getPaymentMethodLabel(sale.paymentMethod)}</span>
                         <span className="font-bold font-mono">${sale.total.toFixed(2)}</span>
                       </div>
+                      {sale.transferReference && (
+                        <div className="text-neutral-600">
+                          Transferencia {sale.transferBank ? `· ${sale.transferBank} ` : ''}· N° {sale.transferReference}
+                        </div>
+                      )}
                       {sale.depositAmount > 0 && (
                         <div className="flex justify-between text-neutral-600">
                           <span>Seña / Anticipo Deducido:</span>
@@ -779,6 +784,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ sale, onClose, initi
                       : 'Mixto'}
                   </span>
                 </p>
+                {sale.transferReference && (
+                  <p>
+                    <span className="text-neutral-500">TRANSF.:</span>{' '}
+                    <span className="font-bold">{sale.transferBank ? `${sale.transferBank} · ` : ''}N° {sale.transferReference}</span>
+                  </p>
+                )}
                 {sale.remainingBalance > 0 && (
                   <p className="text-red-600 font-bold">
                     SALDO PENDIENTE: ${sale.remainingBalance.toFixed(2)}

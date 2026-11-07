@@ -1,0 +1,1857 @@
+[
+ {
+  "id": "ec-1",
+  "name": "Banco Central Del Ecuador",
+  "bic": "BCENECEQ"
+ },
+ {
+  "id": "ec-2",
+  "name": "Banco Pichincha C.A.",
+  "bic": "PICHECEQ"
+ },
+ {
+  "id": "ec-3",
+  "name": "Banco De Guayaquil S.A",
+  "bic": "GUAYECEG"
+ },
+ {
+  "id": "ec-4",
+  "name": "Banco City Bank"
+ },
+ {
+  "id": "ec-5",
+  "name": "Banco Machala",
+  "bic": "BMACECEG"
+ },
+ {
+  "id": "ec-6",
+  "name": "Banco De Loja",
+  "bic": "LOJBECEL"
+ },
+ {
+  "id": "ec-7",
+  "name": "Banco Del Pacifico",
+  "bic": "PACIECEG"
+ },
+ {
+  "id": "ec-8",
+  "name": "Banco Internacional",
+  "bic": "BINTECEQ"
+ },
+ {
+  "id": "ec-9",
+  "name": "Banco Amazonas",
+  "bic": "BASAECEG"
+ },
+ {
+  "id": "ec-10",
+  "name": "Banco Del Austro",
+  "bic": "AUSTECEQ"
+ },
+ {
+  "id": "ec-11",
+  "name": "Produbanco / Promerica",
+  "bic": "PRODECEQ"
+ },
+ {
+  "id": "ec-12",
+  "name": "Banco Bolivariano",
+  "bic": "BBOLECEG"
+ },
+ {
+  "id": "ec-13",
+  "name": "Banco Comercial De Manabi"
+ },
+ {
+  "id": "ec-14",
+  "name": "Banco General Ruminahui S.A.",
+  "bic": "BGRMECEQ"
+ },
+ {
+  "id": "ec-15",
+  "name": "Banco Del Litoral S.A.",
+  "bic": "LITBECEF"
+ },
+ {
+  "id": "ec-16",
+  "name": "Banco Solidario",
+  "bic": "BNSLECEQ"
+ },
+ {
+  "id": "ec-17",
+  "name": "Banco Procredit S.A.",
+  "bic": "PRCBECEQ"
+ },
+ {
+  "id": "ec-18",
+  "name": "Banco Capital"
+ },
+ {
+  "id": "ec-19",
+  "name": "Banco Desarrollo De Los Pueblos S.A.",
+  "bic": "CODSECEQ"
+ },
+ {
+  "id": "ec-20",
+  "name": "Banecuador B.P."
+ },
+ {
+  "id": "ec-21",
+  "name": "COOPERATIVA DE AHORRO Y CREDITO JUVENTUD ECUATORIANA PROGRESISTA LTDA.",
+  "bic": "CJEPECEQ"
+ },
+ {
+  "id": "ec-22",
+  "name": "Coop. Jardin Azuayo"
+ },
+ {
+  "id": "ec-23",
+  "name": "Coop.De Ahorro Y Credito Policia Nacional"
+ },
+ {
+  "id": "ec-24",
+  "name": "Financoop"
+ },
+ {
+  "id": "ec-25",
+  "name": "Banco Delbank S.A."
+ },
+ {
+  "id": "ec-26",
+  "name": "Banco Ecuatoriano De La Vivienda"
+ },
+ {
+  "id": "ec-27",
+  "name": "Cacpeco Ltda"
+ },
+ {
+  "id": "ec-28",
+  "name": "DINERS CLUB DEL ECUADOR S.A.",
+  "bic": "DICDECEQ"
+ },
+ {
+  "id": "ec-29",
+  "name": "ASOCIACION MUTUALISTA DE AHORRO Y CREDITO PARA LA VIVIENDA PICHINCHA",
+  "bic": "MUPIECEQ"
+ },
+ {
+  "id": "ec-30",
+  "name": "Coop. Ahorro Y Credito 29 De Octubre"
+ },
+ {
+  "id": "ec-31",
+  "name": "Coop. Ahorro Y Credito Andalucia"
+ },
+ {
+  "id": "ec-32",
+  "name": "Coop. Ahorro Y Credito Cotocollao"
+ },
+ {
+  "id": "ec-33",
+  "name": "Coop. Ahorro Y Credito El Sagrario"
+ },
+ {
+  "id": "ec-34",
+  "name": "Coop. Ahorro Y Credito Guaranda Ltda"
+ },
+ {
+  "id": "ec-35",
+  "name": "Coop. Juventud Ecuatoriana Progresista Ltda."
+ },
+ {
+  "id": "ec-36",
+  "name": "Coop. Ahorro Y Credito Manuel"
+ },
+ {
+  "id": "ec-37",
+  "name": "Coop. Ahorro Y Credito Oscus"
+ },
+ {
+  "id": "ec-38",
+  "name": "Coop. Ahorro Y Credito Pablo Munoz Vega"
+ },
+ {
+  "id": "ec-39",
+  "name": "Coop. Ahorro Y Credito Progreso"
+ },
+ {
+  "id": "ec-40",
+  "name": "Coop. Ahorro Y Credito Riobamba"
+ },
+ {
+  "id": "ec-41",
+  "name": "Coop. Ahorro Y Credito San Francisco"
+ },
+ {
+  "id": "ec-42",
+  "name": "Coop. Ahorro Y Credito Tulcan"
+ },
+ {
+  "id": "ec-43",
+  "name": "Coop. De Ahorro Y Credito Atuntaqui Ltda."
+ },
+ {
+  "id": "ec-44",
+  "name": "Coop. De Ahorro Y Credito Comercio Ltda Portoviejo"
+ },
+ {
+  "id": "ec-45",
+  "name": "Coop. De Ahorro Y Credito La Dolorosa Ltda"
+ },
+ {
+  "id": "ec-46",
+  "name": "Coop. Prevision Ahorro Y Desarrollo"
+ },
+ {
+  "id": "ec-47",
+  "name": "Coop.Ahorro Y Credito Alianza Del Valle Ltda"
+ },
+ {
+  "id": "ec-48",
+  "name": "Coop Ahorro Y Credito Constrc Comercio Y Produc"
+ },
+ {
+  "id": "ec-49",
+  "name": "Coop.Ahorro Y Credito Chone Ltda"
+ },
+ {
+  "id": "ec-50",
+  "name": "Cooperativa De Ahorro Y Credito Santa Ana Ltda"
+ },
+ {
+  "id": "ec-51",
+  "name": "Financiera - Diners Club Del Ecuador"
+ },
+ {
+  "id": "ec-52",
+  "name": "Mutualista Ambato"
+ },
+ {
+  "id": "ec-53",
+  "name": "Mutualista Azuay"
+ },
+ {
+  "id": "ec-54",
+  "name": "Mutualista Imbabura"
+ },
+ {
+  "id": "ec-55",
+  "name": "Mutualista Pichincha"
+ },
+ {
+  "id": "ec-56",
+  "name": "Coop De A. Y C. Corporacion Centro Ltda."
+ },
+ {
+  "id": "ec-57",
+  "name": "Coop. De A. Y C. Cordillera De Los Andes Ltda."
+ },
+ {
+  "id": "ec-58",
+  "name": "Coop. De A. Y C. Puerto Francisco De Orellana"
+ },
+ {
+  "id": "ec-59",
+  "name": "Coop. De A Y C. Luz Del Valle"
+ },
+ {
+  "id": "ec-60",
+  "name": "Coop. De A Y C. Esperanza Y Progreso Del Valle"
+ },
+ {
+  "id": "ec-61",
+  "name": "Coop. De A. Y C. Choco Tungurahua Runa Ltda"
+ },
+ {
+  "id": "ec-62",
+  "name": "Coop. De A. Y C. Coopartamos Ltda"
+ },
+ {
+  "id": "ec-63",
+  "name": "Coop. De A. Y C. Emprendedores Coopemprender Ltda."
+ },
+ {
+  "id": "ec-64",
+  "name": "Coop. De A. Y C. Nueva Loja Ltda."
+ },
+ {
+  "id": "ec-65",
+  "name": "Coop. De A. Y C. Pichncha Ltda."
+ },
+ {
+  "id": "ec-66",
+  "name": "Coop. Credito Y Ahorro San Francisco De Asis"
+ },
+ {
+  "id": "ec-67",
+  "name": "Coop.De Ahorro Y Credito Cacec Ltda. (Cotopaxi)"
+ },
+ {
+  "id": "ec-68",
+  "name": "Coop.De A. Y C. Vencedores De Pichincha Ltda."
+ },
+ {
+  "id": "ec-69",
+  "name": "Cooperativa De Ahorro Y Credito San Bartolo Ltda"
+ },
+ {
+  "id": "ec-70",
+  "name": "Coop. De A. Y C. Del Emigrante Ecuatoriano Y Su Fa"
+ },
+ {
+  "id": "ec-71",
+  "name": "Coop. Ahorro Y Credito La Libertad Ltda"
+ },
+ {
+  "id": "ec-72",
+  "name": "Coac Cuna De La Nacionalidad Ltda."
+ },
+ {
+  "id": "ec-73",
+  "name": "Cooperativa De Ahorro Y Credito Macodes Ltda"
+ },
+ {
+  "id": "ec-74",
+  "name": "Cooperativa De Ahorro Y Credito Santa Isabel Ltda."
+ },
+ {
+  "id": "ec-75",
+  "name": "Cooperativa De Ahorro Y Credito Ganansol Ltda"
+ },
+ {
+  "id": "ec-76",
+  "name": "Cooperativa De Ahorro Y Credito Del Azuay"
+ },
+ {
+  "id": "ec-77",
+  "name": "Cooperativa De Ahorro Y Credito Del Colegio De Arq"
+ },
+ {
+  "id": "ec-78",
+  "name": "Cooperativa De Ahorro Y Credito Nukanchik"
+ },
+ {
+  "id": "ec-79",
+  "name": "Coop De Ahorro Y Credito Santa Ana Cuenca"
+ },
+ {
+  "id": "ec-80",
+  "name": "Cooperativa De Ahorro Y Credito Multiempresarial L"
+ },
+ {
+  "id": "ec-81",
+  "name": "Coac Del Sindicato De Choferes Profesionales Del A"
+ },
+ {
+  "id": "ec-82",
+  "name": "Coop. Ahorro Y Credito Juan De Salinas Ltda."
+ },
+ {
+  "id": "ec-83",
+  "name": "Coop. Ahorro Y Credito Puellaro Ltda"
+ },
+ {
+  "id": "ec-84",
+  "name": "Coop. Ahorro Y Credito Nueva Jerusalen"
+ },
+ {
+  "id": "ec-85",
+  "name": "Coop. Ahorro Y Credito Malchingui Ltda."
+ },
+ {
+  "id": "ec-86",
+  "name": "Coop. De Ahorro Y Credito Chola Cuencana Ltda."
+ },
+ {
+  "id": "ec-87",
+  "name": "Coop. Ahorro Y Credito Tena Ltda."
+ },
+ {
+  "id": "ec-88",
+  "name": "Coop. Ahorro Y Credito De La Pequena Empresa Guala"
+ },
+ {
+  "id": "ec-89",
+  "name": "Coop. Ahorro Y Credito Alianza Minas Ltda."
+ },
+ {
+  "id": "ec-90",
+  "name": "Coop. De Ahorro Y Credito Pedro Moncayo Ltda."
+ },
+ {
+  "id": "ec-91",
+  "name": "Cooperativa De Ahorro Y Credito Provida"
+ },
+ {
+  "id": "ec-92",
+  "name": "Cooperativa De Ahorro Y Credito San Jose S.J."
+ },
+ {
+  "id": "ec-93",
+  "name": "Coop. Ahorro Y Credito Senor De Giron"
+ },
+ {
+  "id": "ec-94",
+  "name": "Coop. De Ahorro Y Credito Educ.Del Tungurahua Ltda"
+ },
+ {
+  "id": "ec-95",
+  "name": "Cooperativa 15 De Agosto Pilacoto"
+ },
+ {
+  "id": "ec-96",
+  "name": "Coop. De Ahorro Y Credito Cristo Rey"
+ },
+ {
+  "id": "ec-97",
+  "name": "Coop. De Ahorro Y Credito Educadores De Chimborazo"
+ },
+ {
+  "id": "ec-98",
+  "name": "Cooperativa De Ahorro Y Credito Minga Ltda."
+ },
+ {
+  "id": "ec-99",
+  "name": "Coop. De Ahorro Y Credito 4 De Octubre Ltda."
+ },
+ {
+  "id": "ec-100",
+  "name": "Coop. De Ahorro Y Credito Credi Facil Ltda."
+ },
+ {
+  "id": "ec-101",
+  "name": "Coop. De Ahorro Y Credito Alfonso Jaramillo C.C.C."
+ },
+ {
+  "id": "ec-102",
+  "name": "Coop. De A. Y C. Indigena Sac Pelileo"
+ },
+ {
+  "id": "ec-103",
+  "name": "Coop. De A. Y C. Intercultural Tawantinsuyu Ltda."
+ },
+ {
+  "id": "ec-104",
+  "name": "Coop. De A. Y C. Ocipsa"
+ },
+ {
+  "id": "ec-105",
+  "name": "Coop. De A. Y C. 21 De Noviembre Ltda."
+ },
+ {
+  "id": "ec-106",
+  "name": "Coop. De A. Y C. La Floresta Ltda."
+ },
+ {
+  "id": "ec-107",
+  "name": "Coop. De A. Y C. Corp. Org. Campesinas De Quisapin"
+ },
+ {
+  "id": "ec-108",
+  "name": "Coop. De A. Y C. Multicultural Banco Indigena Ltda"
+ },
+ {
+  "id": "ec-109",
+  "name": "Coop De A. Y C. Crecer Winari Ltda."
+ },
+ {
+  "id": "ec-110",
+  "name": "Coop. De A. Y C. Banos De Agua Santa Ltda."
+ },
+ {
+  "id": "ec-111",
+  "name": "Coop. De Ahorro Y Credito 1 De Julio"
+ },
+ {
+  "id": "ec-112",
+  "name": "Coop. De A. Y C. Sumak Nan Ltda."
+ },
+ {
+  "id": "ec-113",
+  "name": "Cooperativa De Ahorro Y Credito Canar Ltda."
+ },
+ {
+  "id": "ec-114",
+  "name": "Cooperativa De Ahorro Y Credito San Antonio Ltda."
+ },
+ {
+  "id": "ec-115",
+  "name": "Coop. De Ahorro Y Credito Fundar"
+ },
+ {
+  "id": "ec-116",
+  "name": "Coop. Ahorro Y Credito Metropolis Ltda."
+ },
+ {
+  "id": "ec-117",
+  "name": "Coop. De Ahorro Y Credito El Cafetal"
+ },
+ {
+  "id": "ec-118",
+  "name": "Coop.De Ahorro Y Credito Microempresarial Sucre"
+ },
+ {
+  "id": "ec-119",
+  "name": "Coop. De A. Y C. Afroecuatoriana De La Peq. Emp. L"
+ },
+ {
+  "id": "ec-120",
+  "name": "Cooperativa De Ahorro Y Credito Joyocoto Ltda."
+ },
+ {
+  "id": "ec-121",
+  "name": "Coop. Ahorro Y Credito San Antonio Ltda."
+ },
+ {
+  "id": "ec-122",
+  "name": "Coop. De A. Y C. Uniotavalo Ltda."
+ },
+ {
+  "id": "ec-123",
+  "name": "Coop. De A. Y C. Union El Ejido"
+ },
+ {
+  "id": "ec-124",
+  "name": "Coop. De A. Y C. Genesis Ltda."
+ },
+ {
+  "id": "ec-125",
+  "name": "Coop. De A Y C. Maria Auxiliadora De Quiroga Ltda"
+ },
+ {
+  "id": "ec-126",
+  "name": "Coop. De A. Y C. Fortaleza"
+ },
+ {
+  "id": "ec-127",
+  "name": "Banco Para La Asistencia Comunitaria Finca S.A."
+ },
+ {
+  "id": "ec-128",
+  "name": "Coop. Calceta Ltda"
+ },
+ {
+  "id": "ec-129",
+  "name": "Coop. Ahorro Y Credito 9 De Octubre Ltda"
+ },
+ {
+  "id": "ec-130",
+  "name": "Coop. Ahorro Y Credito D La Peq Empr Cacpe Biblian"
+ },
+ {
+  "id": "ec-131",
+  "name": "Coop. Ahorro Y Credito San Gabriel Ltda."
+ },
+ {
+  "id": "ec-132",
+  "name": "Coop. Ahorro Y Credito San Jose Ltda"
+ },
+ {
+  "id": "ec-133",
+  "name": "Coop. Ahorro Y Credito San Miguel De Los Bancos"
+ },
+ {
+  "id": "ec-134",
+  "name": "Coop. Ahorro Y Credito Semilla Del Progreso Ltda"
+ },
+ {
+  "id": "ec-135",
+  "name": "Coop. Ahorro. Y Credi. Mujeres Unidas Tantanakushk"
+ },
+ {
+  "id": "ec-136",
+  "name": "Coop. De Ahorro Y Cred. Santa Rosa Ltda"
+ },
+ {
+  "id": "ec-137",
+  "name": "Coop. De Ahorro Y Credito Once De Junio"
+ },
+ {
+  "id": "ec-138",
+  "name": "Coop. De A. Y C. Pujili Ltda"
+ },
+ {
+  "id": "ec-139",
+  "name": "Coop. De A. Y C. Credil Ltda."
+ },
+ {
+  "id": "ec-140",
+  "name": "Coop. De A. Y C. Mushuk Pakari Ltda."
+ },
+ {
+  "id": "ec-141",
+  "name": "Coop. De A. Y C. Uniblock Y Servicios Ltda."
+ },
+ {
+  "id": "ec-142",
+  "name": "Coop. De A. Y C. San Fernando Limitada"
+ },
+ {
+  "id": "ec-143",
+  "name": "Coop. De A. Y C. Futuro Lamanense"
+ },
+ {
+  "id": "ec-144",
+  "name": "Coop. De A. Y C. Saquisili Ltda."
+ },
+ {
+  "id": "ec-145",
+  "name": "Coop. De A. Y C. Innovacion Andina Ltda."
+ },
+ {
+  "id": "ec-146",
+  "name": "Coop.De A.Y C. El Comerciante Ltda (Mies)"
+ },
+ {
+  "id": "ec-147",
+  "name": "Coop. De A. Y C. Mushuk Wasi Ltda ( Mies )"
+ },
+ {
+  "id": "ec-148",
+  "name": "Cooperativa De Ahorro Y Credito Solidaria Ltda"
+ },
+ {
+  "id": "ec-149",
+  "name": "Cooperativa De Ahorro Y Credito Llanganates"
+ },
+ {
+  "id": "ec-150",
+  "name": "Interdin S.A."
+ },
+ {
+  "id": "ec-151",
+  "name": "Coop.Aho Y Credito De La Peq. Emp. De Loja Cacpe"
+ },
+ {
+  "id": "ec-152",
+  "name": "Cooperativa De Ahorro Y Credito Economia Del Sur C"
+ },
+ {
+  "id": "ec-153",
+  "name": "Cooperativa De Ahorro Y Credito Migrantes Y Empren"
+ },
+ {
+  "id": "ec-154",
+  "name": "Cooperativa De Ahorro Y Credito San Sebastian"
+ },
+ {
+  "id": "ec-155",
+  "name": "Coop. De A. Y C. Del Sindicato De Choferes Profesi"
+ },
+ {
+  "id": "ec-156",
+  "name": "Coop.De Ahorro Y Credito 29 De Enero"
+ },
+ {
+  "id": "ec-157",
+  "name": "Coop. Ahorro Y Credito Agraria Mushuk Kawsay Ltda."
+ },
+ {
+  "id": "ec-158",
+  "name": "Cooperativa De Ahorro Y Credito Runa Shungo Ltda."
+ },
+ {
+  "id": "ec-159",
+  "name": "Coop. De A. Y C. San Marcos"
+ },
+ {
+  "id": "ec-160",
+  "name": "Coop. De A. Y C. Antorcha Ltda."
+ },
+ {
+  "id": "ec-161",
+  "name": "Cooperativa De Ahorro Y Credito Socio Amigo"
+ },
+ {
+  "id": "ec-162",
+  "name": "Coop. De A. Y C. Indigenas Galapagos Ltda."
+ },
+ {
+  "id": "ec-163",
+  "name": "Coop. Ahorro Y Credito Camara De Comercio Del Cant"
+ },
+ {
+  "id": "ec-164",
+  "name": "Cooperativa De Ahorro Y Credito La Benefica Ltda."
+ },
+ {
+  "id": "ec-165",
+  "name": "Coop.De Ahorro Y Credito Abdon Calderon Ltda."
+ },
+ {
+  "id": "ec-166",
+  "name": "Coop. A Y C Camara De Comercio Canton -El Carmen L"
+ },
+ {
+  "id": "ec-167",
+  "name": "Coop.De Ahorro Y Credito Agroproductiva Manabi Ltd"
+ },
+ {
+  "id": "ec-168",
+  "name": "Coop. De Ahorro Y Cred. La Inmaculada De San Placi"
+ },
+ {
+  "id": "ec-169",
+  "name": "Coop. Ahorro Y Credito Cacpe Manabi"
+ },
+ {
+  "id": "ec-170",
+  "name": "Coop.Ahorro Y Credito Magisterio Manabita Limitada"
+ },
+ {
+  "id": "ec-171",
+  "name": "Coac Tienda De Dinero Ltda."
+ },
+ {
+  "id": "ec-172",
+  "name": "Coop.A.Y C. Santa Maria De La Manga Del Cura Ltda."
+ },
+ {
+  "id": "ec-173",
+  "name": "Coop. Ahorro Y Credito Camara De Comercio Indigena"
+ },
+ {
+  "id": "ec-174",
+  "name": "Coop. De A. Y C. Guamote Ltda."
+ },
+ {
+  "id": "ec-175",
+  "name": "Coop. De A.Y C. Produc. Ahorro Invers. Servicio P."
+ },
+ {
+  "id": "ec-176",
+  "name": "Coop. De A. Y C. Frandesc Ltda."
+ },
+ {
+  "id": "ec-177",
+  "name": "Coop. De A. Y C. Nuka Llakta Ltda."
+ },
+ {
+  "id": "ec-178",
+  "name": "Coop. De A Y C. Camara De Comercio Riobamba"
+ },
+ {
+  "id": "ec-179",
+  "name": "Coop. De A. Y C. Bashalan Ltda."
+ },
+ {
+  "id": "ec-180",
+  "name": "Coop. De A. Y C. Camara De Comercio Santo Domingo"
+ },
+ {
+  "id": "ec-181",
+  "name": "Coop. De A. Y C. Educadores Tulcan Ltda."
+ },
+ {
+  "id": "ec-182",
+  "name": "Coop. Warmikunapak Rikchari"
+ },
+ {
+  "id": "ec-183",
+  "name": "Coop Ahorro Y Credito Mi Tierra"
+ },
+ {
+  "id": "ec-184",
+  "name": "Coop Ahorro Y Credito De La Peq Emp Cacpe Yanzatza"
+ },
+ {
+  "id": "ec-185",
+  "name": "Coop Ahorro Y Credito Fundesarrollo"
+ },
+ {
+  "id": "ec-186",
+  "name": "Caja Ecuaespana"
+ },
+ {
+  "id": "ec-187",
+  "name": "Coop De Ahorro Y Credito Nueva Huancavilca"
+ },
+ {
+  "id": "ec-188",
+  "name": "Coop De Ahorro Y Credito Erco Ltda"
+ },
+ {
+  "id": "ec-189",
+  "name": "Coop Ahorro Y Credito Camara Comercio De Ambato"
+ },
+ {
+  "id": "ec-190",
+  "name": "Coop Ahorro Y Credito Mushuc Runa Ltda"
+ },
+ {
+  "id": "ec-191",
+  "name": "Coop De Ahorro Y Credito Ambato Ltda"
+ },
+ {
+  "id": "ec-192",
+  "name": "Coop De Ahorro Y Credito Dorado Ltda"
+ },
+ {
+  "id": "ec-193",
+  "name": "Coop De Ahorro Y Credito Nuestros Abuelos Ltda"
+ },
+ {
+  "id": "ec-194",
+  "name": "Coop De Ahorro Y Credito Artesanos Ltda"
+ },
+ {
+  "id": "ec-195",
+  "name": "Coop De Ahorro Y Credito Santa Anita Ltda"
+ },
+ {
+  "id": "ec-196",
+  "name": "Coop De Ahorro Y Credito Huayco Pungo Ltda"
+ },
+ {
+  "id": "ec-197",
+  "name": "Coop Manuel Esteban Godoy Ortega Ltda Coopmego"
+ },
+ {
+  "id": "ec-198",
+  "name": "Coop Ahorro Y Credito Padre Julian Lorente Ltda"
+ },
+ {
+  "id": "ec-199",
+  "name": "Coop Ahorro Y Credito Cariamanga Ltda"
+ },
+ {
+  "id": "ec-200",
+  "name": "Coop De Ahorro Y Credito Marcabeli Ltda"
+ },
+ {
+  "id": "ec-201",
+  "name": "Coop De Ahorro Y Credito Agricola Junin Ltda"
+ },
+ {
+  "id": "ec-202",
+  "name": "Coop De Ahorro Y Credito Puerto Lopez Ltda"
+ },
+ {
+  "id": "ec-203",
+  "name": "Coop De Ahorro Y Credito Nueva Esperanza"
+ },
+ {
+  "id": "ec-204",
+  "name": "Coop De Ahorro Y Credito San Jorge Ltda"
+ },
+ {
+  "id": "ec-205",
+  "name": "Coop De Ahorro Y Credito Fernando Daquilema"
+ },
+ {
+  "id": "ec-206",
+  "name": "Coop De A Y C Educadores De Pastaza Ltda"
+ },
+ {
+  "id": "ec-207",
+  "name": "Coop. A. Y C. De La Peq. Emp. Cacpe Zamora Ltda"
+ },
+ {
+  "id": "ec-208",
+  "name": "Coop. De A. Y C. Desarrollo Integral Ltda"
+ },
+ {
+  "id": "ec-209",
+  "name": "Coop. De Ahorro Y Credito El Calvario Ltda"
+ },
+ {
+  "id": "ec-210",
+  "name": "Coop. De A. Y C. Juan Pio De Mora Ltda"
+ },
+ {
+  "id": "ec-211",
+  "name": "Coop. De Ahorro Y Credito Pilahuin"
+ },
+ {
+  "id": "ec-212",
+  "name": "Coop. De Ahorro Y Credito Pucara Ltda"
+ },
+ {
+  "id": "ec-213",
+  "name": "Coop. A. Y C. Camara De Comercio De Pindal Cadecop"
+ },
+ {
+  "id": "ec-214",
+  "name": "Banco Del Instituto Ecuatoriano De Seguridad Social"
+ },
+ {
+  "id": "ec-215",
+  "name": "Coop De A Y C De Serv Publ Del Min Educacion Y Cul"
+ },
+ {
+  "id": "ec-216",
+  "name": "Coop De A Y C 23 De Mayo Ltda"
+ },
+ {
+  "id": "ec-217",
+  "name": "Coop De A Y C Coca Ltda"
+ },
+ {
+  "id": "ec-218",
+  "name": "Coop De Ahorro Y Credito Pilahuin Tio Ltda"
+ },
+ {
+  "id": "ec-219",
+  "name": "Coop De Ahorro Y Credito Huaicana Ltda"
+ },
+ {
+  "id": "ec-220",
+  "name": "Coop De A Y C Credisur Ltda"
+ },
+ {
+  "id": "ec-221",
+  "name": "Fondo De Cesantia Del Magisterio Ecuat Fcme-Fcpc"
+ },
+ {
+  "id": "ec-222",
+  "name": "Coop De Ahorro Y Credito Huaquillas Ltda"
+ },
+ {
+  "id": "ec-223",
+  "name": "Coop De A Y C Banos Ltda"
+ },
+ {
+  "id": "ec-224",
+  "name": "Coop De Ahorro Y Credito Cac-Cica Mies"
+ },
+ {
+  "id": "ec-225",
+  "name": "Coop De A Y C Vencedores De Tungurahua"
+ },
+ {
+  "id": "ec-226",
+  "name": "Coop A Y C Ecuafuturo Ltda"
+ },
+ {
+  "id": "ec-227",
+  "name": "Coop De A Y C Maquita Cushun Ltda"
+ },
+ {
+  "id": "ec-228",
+  "name": "Coop De A Y C Valles Del Lirio"
+ },
+ {
+  "id": "ec-229",
+  "name": "Coop Esfuerzo Unido Para El Desarr Del Chilco"
+ },
+ {
+  "id": "ec-230",
+  "name": "Coop A Y C Carroceros De Tungurahua"
+ },
+ {
+  "id": "ec-231",
+  "name": "Coop De Ahorro Y Credito Simiatug Ltda"
+ },
+ {
+  "id": "ec-232",
+  "name": "Coop De A Y C Sinchi Runa Ltda"
+ },
+ {
+  "id": "ec-233",
+  "name": "Coop De A Y C Santa Rosa De Pautan Ltda"
+ },
+ {
+  "id": "ec-234",
+  "name": "Coop De Ahorro Y Credito San Miguel De Sigchos"
+ },
+ {
+  "id": "ec-235",
+  "name": "Coop De A Y C Sierra Centro Ltda"
+ },
+ {
+  "id": "ec-236",
+  "name": "Coop De A Y C Gonzanama Mies"
+ },
+ {
+  "id": "ec-237",
+  "name": "Coop De Ahorro Y Credito Quilanga Ltda"
+ },
+ {
+  "id": "ec-238",
+  "name": "Coop De Ahorro Y Credito 27 De Abril Loja"
+ },
+ {
+  "id": "ec-239",
+  "name": "Coop De A Y C Crediamigo Ltda Loja Mies"
+ },
+ {
+  "id": "ec-240",
+  "name": "Coop De Ahorro Y Credito Fortuna Mies"
+ },
+ {
+  "id": "ec-241",
+  "name": "Coop A Y C Profesionales Del Volante Union Ltda"
+ },
+ {
+  "id": "ec-242",
+  "name": "Coop De Ahorro Y Credito Cacpe Celica"
+ },
+ {
+  "id": "ec-243",
+  "name": "Coop De A Y C Futuro Y Progreso De Galapagos Ltda"
+ },
+ {
+  "id": "ec-244",
+  "name": "Coop De A Y C Sumac Llacta Ltda"
+ },
+ {
+  "id": "ec-245",
+  "name": "Coop De A Y C Lucha Campesina Ltda"
+ },
+ {
+  "id": "ec-246",
+  "name": "Coop De A Y C Maquita Cushunchic Ltda"
+ },
+ {
+  "id": "ec-247",
+  "name": "Coop A Y C Focla"
+ },
+ {
+  "id": "ec-248",
+  "name": "Coop De A Y C Casag Ltda"
+ },
+ {
+  "id": "ec-249",
+  "name": "Banco D Miro Sa"
+ },
+ {
+  "id": "ec-250",
+  "name": "Coop De A Y C General Ruminahui"
+ },
+ {
+  "id": "ec-251",
+  "name": "Coop De A Y C Financiera Indigena Ltda"
+ },
+ {
+  "id": "ec-252",
+  "name": "Coop A Y C 20 Febrero Ltda"
+ },
+ {
+  "id": "ec-253",
+  "name": "Coop De A Y C Del Col. Fisc. Vicente Rocafuerte"
+ },
+ {
+  "id": "ec-254",
+  "name": "Coop De A Y C Jadan Ltda (Mies)"
+ },
+ {
+  "id": "ec-255",
+  "name": "Coop De A Y C Inka Kipu Ltda"
+ },
+ {
+  "id": "ec-256",
+  "name": "Coop De A Y C Accion Tungurahua Ltda"
+ },
+ {
+  "id": "ec-257",
+  "name": "Coop De A Y C Pijal"
+ },
+ {
+  "id": "ec-258",
+  "name": "Coop De A Y C Escencia Indigena Ltda"
+ },
+ {
+  "id": "ec-259",
+  "name": "Coop De A Y C Union Mercedaria Ltda"
+ },
+ {
+  "id": "ec-260",
+  "name": "Coop De A Y C Catamayo Ltda"
+ },
+ {
+  "id": "ec-261",
+  "name": "Coop De A Y C De La Peq Empresa Cacpe Macara"
+ },
+ {
+  "id": "ec-262",
+  "name": "Coop A Y C Nuevos Horizontes El Oro Ltda"
+ },
+ {
+  "id": "ec-263",
+  "name": "Banco Coopnacional Sa"
+ },
+ {
+  "id": "ec-264",
+  "name": "Coop De A Y C 16 De Junio"
+ },
+ {
+  "id": "ec-265",
+  "name": "Coop A Y C Esc Sup Politec Agrop De Manabi Manuel"
+ },
+ {
+  "id": "ec-266",
+  "name": "Coop De Ahorro Y Credito Fasaynan Ltda"
+ },
+ {
+  "id": "ec-267",
+  "name": "Coop Cacique Guritave"
+ },
+ {
+  "id": "ec-268",
+  "name": "Coop Solidaridad Y Progreso Oriental"
+ },
+ {
+  "id": "ec-269",
+  "name": "Coop. De Aho Y Cred Los Andes Latinos Ltda."
+ },
+ {
+  "id": "ec-270",
+  "name": "C. De A. Y C Coopac Austro Ltda (Miess)"
+ },
+ {
+  "id": "ec-271",
+  "name": "Coop. De A. Y C. Salasaca"
+ },
+ {
+  "id": "ec-272",
+  "name": "Coop. De A. Y C. Sumak Samy Ltda."
+ },
+ {
+  "id": "ec-273",
+  "name": "C. A. Y C. Intercult. Tarpuk Runa Ltda."
+ },
+ {
+  "id": "ec-274",
+  "name": "Coop. De A. Y C. Virgen Del Cisne"
+ },
+ {
+  "id": "ec-275",
+  "name": "C. De A Y C Educad. De Zamora Chinchipe"
+ },
+ {
+  "id": "ec-276",
+  "name": "C. De Ah. Y Credito Las Lagunas (Miess)"
+ },
+ {
+  "id": "ec-277",
+  "name": "C. De A Y C. Educadores De El Oro Ltd"
+ },
+ {
+  "id": "ec-278",
+  "name": "C De A Y C Emplead Bancar Del Oro Ltda"
+ },
+ {
+  "id": "ec-279",
+  "name": "Cooperativa De Ah. Y Credito Riochico"
+ },
+ {
+  "id": "ec-280",
+  "name": "C. De A. Y C. San Martin De Tisaleo Ltda."
+ },
+ {
+  "id": "ec-281",
+  "name": "Coop. De A. Y C. Alli Tarpuc Ltda."
+ },
+ {
+  "id": "ec-282",
+  "name": "C. De A Y C. San Miguel De Pallatanga"
+ },
+ {
+  "id": "ec-283",
+  "name": "Coop De A Y C Fenix"
+ },
+ {
+  "id": "ec-284",
+  "name": "Coop.De Ahorro Y Credito Camara De Comercio De Loj"
+ },
+ {
+  "id": "ec-285",
+  "name": "Coop.De A. Y C. De Crecimiento Economico Rentable"
+ },
+ {
+  "id": "ec-286",
+  "name": "Cooperativa De Ahorro Y Credito Santiago Ltda"
+ },
+ {
+  "id": "ec-287",
+  "name": "Coop.De A. Y C. Popular Y Solidaria"
+ },
+ {
+  "id": "ec-288",
+  "name": "Coop.De Ahorro Y Credito San Placido Ltda."
+ },
+ {
+  "id": "ec-289",
+  "name": "Coop.De Ahorro Y Credito Ciudad De Zamora"
+ },
+ {
+  "id": "ec-290",
+  "name": "Coop. De A Y C De La Pequena Empresa De Palora"
+ },
+ {
+  "id": "ec-291",
+  "name": "Coop. De A. Y C. Indigena Alfa Y Omega Ltda"
+ },
+ {
+  "id": "ec-292",
+  "name": "Cooperativa De Ahorro Y Credito Crea Ltda ( Mies)"
+ },
+ {
+  "id": "ec-293",
+  "name": "Coop. De A. Y C. Chibuleo Ltda."
+ },
+ {
+  "id": "ec-294",
+  "name": "Coop. De A. Y C. El Tesoro Pillareno"
+ },
+ {
+  "id": "ec-295",
+  "name": "Coop. De A. Y C. Kisapincha Ltda."
+ },
+ {
+  "id": "ec-296",
+  "name": "Coop. De A. Y C. Juventud Unida Ltda."
+ },
+ {
+  "id": "ec-297",
+  "name": "Coop. De A. Y C. Union Quisapincha Ltda."
+ },
+ {
+  "id": "ec-298",
+  "name": "Coop. De A. Y C. 13 De Abril Ltda"
+ },
+ {
+  "id": "ec-299",
+  "name": "Coop. De A. Y C. Salinas Ltda."
+ },
+ {
+  "id": "ec-300",
+  "name": "Coop. De A. Y C. San Pedro Ltda."
+ },
+ {
+  "id": "ec-301",
+  "name": "Coop. De A. Y C. Los Chasquis Pastocalle Ltda."
+ },
+ {
+  "id": "ec-302",
+  "name": "Coop. De A. Y C. Coopindigena Ltda."
+ },
+ {
+  "id": "ec-303",
+  "name": "Coop. De A. Y C. La Union Ltda."
+ },
+ {
+  "id": "ec-304",
+  "name": "Coop. De A. Y C. Padre Vicente Ponce Rubio"
+ },
+ {
+  "id": "ec-305",
+  "name": "Coop. De A. Y C. Mushug Causay Ltda."
+ },
+ {
+  "id": "ec-306",
+  "name": "Coop. De A. Y C. 29 De Agosto"
+ },
+ {
+  "id": "ec-307",
+  "name": "Coop. De A. Y C. Credisocio"
+ },
+ {
+  "id": "ec-308",
+  "name": "Coop. De A. Y C. Fondo Para El Desarrollo Y La Vid"
+ },
+ {
+  "id": "ec-309",
+  "name": "Cooperativa De A Y C Nueva Vision"
+ },
+ {
+  "id": "ec-310",
+  "name": "Coop. De Ahorro Y Credito Focash Ltda."
+ },
+ {
+  "id": "ec-311",
+  "name": "Coop. De A. Y C. San Vicente Del Sur Ltda."
+ },
+ {
+  "id": "ec-312",
+  "name": "Coop. De A. Y C. Para La Vivienda Orden Y Segurida"
+ },
+ {
+  "id": "ec-313",
+  "name": "Coop De A. Y C. Camara De Comercio Joya De Los Sac"
+ },
+ {
+  "id": "ec-314",
+  "name": "Coop. De A. Y C. Focap"
+ },
+ {
+  "id": "ec-315",
+  "name": "Coop. De A. Y C. 18 De Noviembre"
+ },
+ {
+  "id": "ec-316",
+  "name": "Cooperativa De Ahorro Y Credito Dr. Cornelio Saenz"
+ },
+ {
+  "id": "ec-317",
+  "name": "Coop De A. Y C. Educadores Del Azuay"
+ },
+ {
+  "id": "ec-318",
+  "name": "Coop. De A. Y C. Indigena Sac Ltda"
+ },
+ {
+  "id": "ec-319",
+  "name": "Coop. De A. Y C. Credi Ya Ltda"
+ },
+ {
+  "id": "ec-320",
+  "name": "Coop. De A. Y C. San Bartolome Ltda"
+ },
+ {
+  "id": "ec-321",
+  "name": "Coop. De Ahorro Y Credito Mushuk Yuyay"
+ },
+ {
+  "id": "ec-322",
+  "name": "Coop De A. Y C. Sisay Kanari"
+ },
+ {
+  "id": "ec-323",
+  "name": "Cooperativa De A Y C Accion Imbaburapak Ltda."
+ },
+ {
+  "id": "ec-324",
+  "name": "Coop De A. Y C. Hermes Gaibor Verdesoto"
+ },
+ {
+  "id": "ec-325",
+  "name": "Coop. De A. Y C. Semillas De Pangua"
+ },
+ {
+  "id": "ec-326",
+  "name": "Cooperativa De A Y C Mushuk Solidaria"
+ },
+ {
+  "id": "ec-327",
+  "name": "Coop De A. Y C. Panamericana Ltda"
+ },
+ {
+  "id": "ec-328",
+  "name": "Coop. De A. Y C. Vilcabamba Cacvil"
+ },
+ {
+  "id": "ec-329",
+  "name": "Coop. De A. Y C. Familia Solidaria"
+ },
+ {
+  "id": "ec-330",
+  "name": "Cooperativa De Ahorro Y Credito El Paraiso Manga D"
+ },
+ {
+  "id": "ec-331",
+  "name": "Coac De Los Profesores Empleados Y Trabajadores De"
+ },
+ {
+  "id": "ec-332",
+  "name": "Coac. Santa Rosa De San Carlos Ltda."
+ },
+ {
+  "id": "ec-333",
+  "name": "Coop. De A. Y C. Constructor Del Desarrollo Solida"
+ },
+ {
+  "id": "ec-334",
+  "name": "Coop De A. Y C. Mushuk Yuyay Ltda"
+ },
+ {
+  "id": "ec-335",
+  "name": "Corporacion Financiera"
+ },
+ {
+  "id": "ec-336",
+  "name": "Coop. De A. Y C. Alianza Social Ecu. Alsec"
+ },
+ {
+  "id": "ec-337",
+  "name": "Coop. De A. Y C. Renovadora Ecu"
+ },
+ {
+  "id": "ec-338",
+  "name": "Coop. De A. Y C. Mushuk Yuyay - Napo"
+ },
+ {
+  "id": "ec-339",
+  "name": "Coop. De A. Y C. Santa Ana De Nayon"
+ },
+ {
+  "id": "ec-340",
+  "name": "Coop. De A. Y C. Educadores Del Napo"
+ },
+ {
+  "id": "ec-341",
+  "name": "Cooperativa De A. Y C. Textil 14 De Marzo"
+ },
+ {
+  "id": "ec-342",
+  "name": "Coop. De A Y C San Carlos Ltda."
+ },
+ {
+  "id": "ec-343",
+  "name": "Coac A Y C Esperanza De Valle De La Virgen Ltda."
+ },
+ {
+  "id": "ec-344",
+  "name": "Coac A Y C Zona De Capital Corcimol"
+ },
+ {
+  "id": "ec-345",
+  "name": "Coop.De A. Y C. Artesanal Del Azuay"
+ },
+ {
+  "id": "ec-346",
+  "name": "Cooperativa De Ahorro Y Credito Sumak Sisa"
+ },
+ {
+  "id": "ec-347",
+  "name": "Coop. De A. Y C. Rey David Ltda"
+ },
+ {
+  "id": "ec-348",
+  "name": "Coop. De A. Y C. Kullki Wasi Ltda."
+ },
+ {
+  "id": "ec-349",
+  "name": "Coop De A. Y C. Sinchi Codefis"
+ },
+ {
+  "id": "ec-350",
+  "name": "Coop. De A. Y C. Fuerza De Los Andes"
+ },
+ {
+  "id": "ec-351",
+  "name": "Coop De A. Y C. Camino De Luz Ltda."
+ },
+ {
+  "id": "ec-352",
+  "name": "Coac A Y C Educadores De Bolivar"
+ },
+ {
+  "id": "ec-353",
+  "name": "Coac San Miguel Ltda."
+ },
+ {
+  "id": "ec-354",
+  "name": "Coop. De A. Y C. Salinerita"
+ },
+ {
+  "id": "ec-355",
+  "name": "Coop. De A. Y C. Bola Amarilla"
+ },
+ {
+  "id": "ec-356",
+  "name": "Coop A Y C Vision De Los Andes Visandes"
+ },
+ {
+  "id": "ec-357",
+  "name": "Coop. De A. Y C. Senor Del Arbol"
+ },
+ {
+  "id": "ec-358",
+  "name": "Coop. De A. Y C. Camara De Comercio De La Mana"
+ },
+ {
+  "id": "ec-359",
+  "name": "Coop De A. Y C. Educadores De Loja"
+ },
+ {
+  "id": "ec-360",
+  "name": "Coop De A. Y C. Indigena Sac Latacunga Ltda"
+ },
+ {
+  "id": "ec-361",
+  "name": "Coop De A.Y C. Cadecog Gonzanama"
+ },
+ {
+  "id": "ec-362",
+  "name": "Coac Coopymec Macara"
+ },
+ {
+  "id": "ec-363",
+  "name": "Coac Cadecom Macara"
+ },
+ {
+  "id": "ec-364",
+  "name": "Coop De A. Y C. 22 De Junio-Orianga"
+ },
+ {
+  "id": "ec-365",
+  "name": "Coop. A.Yc.Sagrada Familia Solidaridad"
+ },
+ {
+  "id": "ec-366",
+  "name": "Coop. De A. Y C. Naupa Kausay"
+ },
+ {
+  "id": "ec-367",
+  "name": "Ccop A Y C De Apecap Cac Apecap"
+ },
+ {
+  "id": "ec-368",
+  "name": "Coop De A. Y C. San Juan De Cotogchoa"
+ },
+ {
+  "id": "ec-369",
+  "name": "Coop De Ahorro Y Credito La Merced"
+ },
+ {
+  "id": "ec-370",
+  "name": "Coop. De A. Y C. Cooptopaxi Ltda."
+ },
+ {
+  "id": "ec-371",
+  "name": "Coop. De A. Y C. Grameen Amazonas"
+ },
+ {
+  "id": "ec-372",
+  "name": "Coop. De A. Y C. El Transportista Cacet"
+ },
+ {
+  "id": "ec-373",
+  "name": "Coop. De A Y C. Servidores Municipales De Cuenca"
+ },
+ {
+  "id": "ec-374",
+  "name": "Coop. De Ahorro Y Credito Profuturo Ltda."
+ },
+ {
+  "id": "ec-375",
+  "name": "Coop. De A. Y C. Iliniza Ltda."
+ },
+ {
+  "id": "ec-376",
+  "name": "Coop. De Ahorro Y Credito Saraguros"
+ },
+ {
+  "id": "ec-377",
+  "name": "Cooperativa De Ahorro Y Credito Inti Wasi Ltda."
+ },
+ {
+  "id": "ec-378",
+  "name": "Cooperativa De Ahorro Y Credito San Isidro Ltda."
+ },
+ {
+  "id": "ec-379",
+  "name": "Coop. De A. Y C. Empresas Comunitarias Coocredito"
+ },
+ {
+  "id": "ec-380",
+  "name": "Silvercross S.A Casa De Valores Sccv"
+ },
+ {
+  "id": "ec-381",
+  "name": "Real Casa De Valores De Guayaquil S.A."
+ },
+ {
+  "id": "ec-382",
+  "name": "Cooperativa De Ahorro Y Credito Etapa"
+ },
+ {
+  "id": "ec-383",
+  "name": "Coop. Ahorro Y Credito Mascoop"
+ },
+ {
+  "id": "ec-384",
+  "name": "Coop. De A. Y C. Saint Michel Ltda."
+ },
+ {
+  "id": "ec-385",
+  "name": "Coop. Ahorro Y Credito Manantial De Oro Ltda."
+ },
+ {
+  "id": "ec-386",
+  "name": "Coop. De Ahorro Y Credito Andina Ltda."
+ },
+ {
+  "id": "ec-387",
+  "name": "Coop. De Ahorro Y Credito Accion Y Desarrollo Ltda"
+ },
+ {
+  "id": "ec-388",
+  "name": "Coop. De A. Y C. Union Y Desarrollo"
+ },
+ {
+  "id": "ec-389",
+  "name": "Coop. De A. Y C. Esperanza Del Futuro Ltda."
+ },
+ {
+  "id": "ec-390",
+  "name": "Coop. De A. Y C. 17 De Marzo Ltda"
+ },
+ {
+  "id": "ec-391",
+  "name": "Coop. De A. Y C. Catar Ltda"
+ },
+ {
+  "id": "ec-392",
+  "name": "Coop. De A. Y C. De Accion Popular"
+ },
+ {
+  "id": "ec-393",
+  "name": "Coop. De A. Y C. Alli Tarpuk Ltda"
+ },
+ {
+  "id": "ec-394",
+  "name": "Coop. De A. Y C. 16 De Julio Ltda"
+ },
+ {
+  "id": "ec-395",
+  "name": "Coop. De A. Y C. Suboficiales De La Policia Nacion"
+ },
+ {
+  "id": "ec-396",
+  "name": "Coop. De A. Y C. Politecnica Ltda."
+ },
+ {
+  "id": "ec-397",
+  "name": "Coop. De A. Y C. Nacional Llano Grande Ltda."
+ },
+ {
+  "id": "ec-398",
+  "name": "Coop. De A. Y C. San Valentin"
+ },
+ {
+  "id": "ec-399",
+  "name": "Coop. De A. Y C. Totalife Ltda"
+ },
+ {
+  "id": "ec-400",
+  "name": "Acciones Valores Casa De Valores S.A. Accival"
+ },
+ {
+  "id": "ec-401",
+  "name": "Santa Fe Casa De Valores S.A. Santafevalores"
+ },
+ {
+  "id": "ec-402",
+  "name": "Picaval Casa De Valores S.A"
+ },
+ {
+  "id": "ec-403",
+  "name": "Analytica Securties C.A. Casa De Valores"
+ },
+ {
+  "id": "ec-404",
+  "name": "Orion Casa De Valores S.A"
+ },
+ {
+  "id": "ec-405",
+  "name": "Stratega Casa De Valores S.A."
+ },
+ {
+  "id": "ec-406",
+  "name": "Ecofsa Casa De Valores S.A."
+ },
+ {
+  "id": "ec-407",
+  "name": "Merchantvalores Casa De Valores S.A."
+ },
+ {
+  "id": "ec-408",
+  "name": "Casa De Valores Value S.A."
+ },
+ {
+  "id": "ec-409",
+  "name": "Inmovalor Casa De Valores S.A."
+ },
+ {
+  "id": "ec-410",
+  "name": "Ecuabursatil Casa De Valores S.A."
+ },
+ {
+  "id": "ec-411",
+  "name": "Plus Valores Casa De Valores S.A."
+ },
+ {
+  "id": "ec-412",
+  "name": "Mercapital Casa De Valores S.A."
+ },
+ {
+  "id": "ec-413",
+  "name": "Portafolio Casa De Valores S.A. Portavalor"
+ },
+ {
+  "id": "ec-414",
+  "name": "Metrovalores Casa De Valores S.A."
+ },
+ {
+  "id": "ec-415",
+  "name": "Vectorglobal Wmg Casa De Valores S.A."
+ },
+ {
+  "id": "ec-416",
+  "name": "Holdunpartners Casa De Valores S.A."
+ },
+ {
+  "id": "ec-417",
+  "name": "Coop. De Ahorro Y Credito Base De Taura"
+ },
+ {
+  "id": "ec-418",
+  "name": "Casa De Valores Banrio S.A."
+ },
+ {
+  "id": "ec-419",
+  "name": "Albion Casa De Valores S.A."
+ },
+ {
+  "id": "ec-420",
+  "name": "Masvalores Casa De Valores S.A Cavamasa"
+ },
+ {
+  "id": "ec-421",
+  "name": "Casa De Valores Del Pacifico (Valpacifico) S.A."
+ },
+ {
+  "id": "ec-422",
+  "name": "Casa De Valores Advfin S.A."
+ },
+ {
+  "id": "ec-423",
+  "name": "Kapital One Casa De Valores S.A. Kaovalsa"
+ },
+ {
+  "id": "ec-424",
+  "name": "Plusbursatil Casa De Valores S.A"
+ },
+ {
+  "id": "ec-425",
+  "name": "Activa Ases.E Intermed.Valores Activalores Casa De"
+ },
+ {
+  "id": "ec-426",
+  "name": "Citadel Casa De Valores S.A."
+ },
+ {
+  "id": "ec-427",
+  "name": "Decevale S.A."
+ },
+ {
+  "id": "ec-428",
+  "name": "Coop. De A. Y C. Santa Lucia Ltda"
+ },
+ {
+  "id": "ec-429",
+  "name": "Coop. De A. Y C. Produactiva Ltda"
+ },
+ {
+  "id": "ec-430",
+  "name": "Coop. De A. Y C. Tamboloma Ltda."
+ },
+ {
+  "id": "ec-431",
+  "name": "Coop De A. Y C. Pushak Runa Hombre Lider"
+ },
+ {
+  "id": "ec-432",
+  "name": "Coop. De A. Y C. 15 De Agosto Ltda."
+ },
+ {
+  "id": "ec-433",
+  "name": "Coop. De A. Y C. Migrantes Del Ecuador Ltda"
+ },
+ {
+  "id": "ec-434",
+  "name": "Cooperativa De Ahorro Y Credito Wuamanloma Ltda."
+ },
+ {
+  "id": "ec-435",
+  "name": "Coop. De A. Y C. Salate Ltda."
+ },
+ {
+  "id": "ec-436",
+  "name": "Coop. De A. Y C. Union Popular Ltda."
+ },
+ {
+  "id": "ec-437",
+  "name": "Coac Achik Inti Ltda"
+ },
+ {
+  "id": "ec-438",
+  "name": "Coac El Migrante Solidario"
+ },
+ {
+  "id": "ec-439",
+  "name": "Coop Ac Las Naves"
+ },
+ {
+  "id": "ec-440",
+  "name": "Coop. De A. Y C. De Imbabura Amazonas"
+ },
+ {
+  "id": "ec-441",
+  "name": "Coop. A. Y C. De Indigenas Chuchuqui Ltda"
+ },
+ {
+  "id": "ec-442",
+  "name": "Coop. Ahorro Y Credito Focazsum Ltda."
+ },
+ {
+  "id": "ec-443",
+  "name": "Coop. De A. Y C. Solidaria Ltda.- Cotopaxi"
+ },
+ {
+  "id": "ec-444",
+  "name": "Coop. De A. Y C. Unidad Y Progreso"
+ },
+ {
+  "id": "ec-445",
+  "name": "Coac Loja Internacional Ltda."
+ },
+ {
+  "id": "ec-446",
+  "name": "Coac 23 De Enero"
+ },
+ {
+  "id": "ec-447",
+  "name": "Coac Obras Publicas Fiscales De Loja Y Zamora"
+ },
+ {
+  "id": "ec-448",
+  "name": "Coac Del Sind Chof Prof Virgen Del Cisne"
+ },
+ {
+  "id": "ec-449",
+  "name": "Coac San Miguel De Chirijos Ltda"
+ },
+ {
+  "id": "ec-450",
+  "name": "Coop. Ahorro Y Credito Quevedo Ltda."
+ },
+ {
+  "id": "ec-451",
+  "name": "Coop. De A. Y C. El Altar Ltda."
+ },
+ {
+  "id": "ec-452",
+  "name": "Coop. De A. Y C. Nueva Alianza De Chimborazo Ltda"
+ },
+ {
+  "id": "ec-453",
+  "name": "Coop. De A. Y C. Luis Felipe Duchicela Xxvii"
+ },
+ {
+  "id": "ec-454",
+  "name": "Coop. De A. Y C. Nizag Ltda."
+ },
+ {
+  "id": "ec-455",
+  "name": "Coop. De A. Y C. Makita Kunchik"
+ },
+ {
+  "id": "ec-456",
+  "name": "Coop. De A. Y C. Cerrada Manuela Leon"
+ },
+ {
+  "id": "ec-457",
+  "name": "Coop. De A. Y C. El Buen Sembrador Ltda."
+ },
+ {
+  "id": "ec-458",
+  "name": "Coac Sindicato De Choferes Profesionales De Yantza"
+ },
+ {
+  "id": "ec-459",
+  "name": "Coop. De A. Y C. 5 De Mayo De Santa Martha De Cuba"
+ }
+]
