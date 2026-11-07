@@ -47,6 +47,17 @@ export const NewProformaModal: React.FC<NewProformaModalProps> = ({
   const handleLookupClientSri = async () => {
     const clean = clientDni.trim().replace(/\D/g, '');
     if (!clean) return;
+    // 1) Cliente ya guardado: se cargan sus datos de la base, sin consultar al SRI
+    const saved = clients.find(c => (c.dni || '').replace(/\D/g, '') === clean);
+    if (saved) {
+      setClientName(saved.name);
+      if (saved.phone) setClientPhone(saved.phone);
+      if (saved.email) setClientEmail(saved.email);
+      if (saved.instagram) setClientInstagram(saved.instagram);
+      setSriNotice({ text: `✓ Cliente registrado: ${saved.name} (datos cargados de la base)`, type: 'success' });
+      return;
+    }
+    // 2) Cliente nuevo: se consulta en el SRI / Registro Civil
     setIsSearchingSri(true);
     setSriNotice(null);
     try {

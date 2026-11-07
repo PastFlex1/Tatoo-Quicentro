@@ -19,10 +19,11 @@ import {
   Building2,
 } from 'lucide-react';
 import { useStudio } from '../../context/StudioContext';
-import { Appointment, ServiceCategory, PaymentMethod } from '../../types';
+import { Appointment, ServiceCategory, PaymentMethod, ClientProfile } from '../../types';
 import { consultarIdentificacion } from '../../services/sriService';
 import { DatePicker, TimePicker } from '../common/DatePicker';
 import { getServiceCatalog, serviceCategoryLabel } from '../../data/serviceCatalog';
+import { ConsentWizardModal } from '../clients/ConsentWizardModal';
 
 interface NewAppointmentModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
 }) => {
   const { artists, clients, addAppointment, formatMoney, settings } = useStudio();
 
-  const { guard: guardPermission } = usePermission();
+  const { guard: guardPermission, can } = usePermission();
   const todayStr = new Date().toISOString().split('T')[0];
 
   const [clientName, setClientName] = useState('');
@@ -55,6 +56,17 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const handleLookupClientSri = async () => {
     const clean = clientDni.trim().replace(/\D/g, '');
     if (!clean) return;
+    // 1) Cliente ya guardado: se cargan sus datos de la base, sin consultar al SRI
+    const saved = clients.find(c => (c.dni || '').replace(/\D/g, '') === clean);
+    if (saved) {
+      setClientName(saved.name);
+      if (saved.phone) setClientPhone(saved.phone);
+      if (saved.email) setClientEmail(saved.email);
+      if (saved.instagram) setClientInstagram(saved.instagram);
+      setSriNotice({ text: `✓ Cliente registrado: ${saved.name} (datos cargados de la base)`, type: 'success' });
+      return;
+    }
+    // 2) Cliente nuevo: se consulta en el SRI / Registro Civil
     setIsSearchingSri(true);
     setSriNotice(null);
     try {
@@ -99,6 +111,7 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
   const [bodyPlacement, setBodyPlacement] = useState('');
   const [sizeApprox, setSizeApprox] = useState('');
   const [consentSigned, setConsentSigned] = useState<boolean>(false);
+  const [consentWizard, setConsentWizard] = useState<{ key: number; client: ClientProfile } | null>(null);
   const [notes, setNotes] = useState('');
   const [designNotes, setDesignNotes] = useState('');
 
@@ -136,6 +149,37 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
     setEstimatedHours(hours);
     if (startTime) setEndTime(addHours(startTime, hours));
     if (sv.price > 0) setEstimatedPrice(r2(sv.price * (1 + (sv.taxRate || 0) / 100)));
+  };
+
+  // Cliente ya registrado (por cédula, o por nombre exacto si no se escribió cédula)
+  const dniDigits = clientDni.replace(/\D/g, '');
+  const savedClient = dniDigits
+    ? clients.find(c => (c.dni || '').replace(/\D/g, '') === dniDigits)
+    : clientName.trim()
+    ? clients.find(c => c.name.trim().toLowerCase() === clientName.trim().toLowerCase())
+    : undefined;
+  const savedHasConsent = Boolean(savedClient && (savedClient.consentSigned || (savedClient.consentForms || []).length > 0));
+
+  const openConsentWizard = () => {
+    if (!clientName.trim()) {
+      setSriNotice({ text: 'Escriba primero el nombre (o la cédula) del cliente para generar el consentimiento.', type: 'error' });
+      return;
+    }
+    // Cliente nuevo: se pasa una ficha borrador; el asistente la registra al firmar
+    const client: ClientProfile =
+      savedClient ||
+      ({
+        id: `draft-${Date.now()}`,
+        name: clientName.trim(),
+        dni: clientDni.trim() || undefined,
+        phone: clientPhone.trim() || undefined,
+        email: clientEmail.trim() || undefined,
+        instagram: clientInstagram.trim() || undefined,
+        consentSigned: false,
+        tags: [],
+        createdAt: new Date().toISOString(),
+      } as ClientProfile);
+    setConsentWizard({ key: Date.now(), client });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -627,6 +671,29 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
               6. Bioseguridad, Consentimiento & Notas
             </span>
 
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-[#FF3366]/5 border border-[#FF3366]/25">
+              <div className="text-[11px] min-w-0">
+                <span className="text-white font-semibold block">Carta de consentimiento y ficha de salud</span>
+                <span className={savedHasConsent || consentSigned ? 'text-emerald-300' : 'text-neutral-400'}>
+                  {consentSigned
+                    ? '✓ Consentimiento firmado para esta cita'
+                    : savedHasConsent
+                    ? `✓ ${savedClient?.name} ya tiene un consentimiento registrado`
+                    : 'Genere el formulario para que el cliente lo firme.'}
+                </span>
+              </div>
+              {can('clients.view_medical') && (
+                <button
+                  type="button"
+                  onClick={openConsentWizard}
+                  className="shrink-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF3366] hover:bg-[#e02958] text-white text-xs font-bold shadow-[0_0_12px_rgba(255,51,102,0.3)] cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  {savedHasConsent || consentSigned ? 'Nuevo consentimiento' : 'Generar consentimiento'}
+                </button>
+              )}
+            </div>
+
             <label className="flex items-center gap-3 p-3 rounded-xl bg-[#121215] border border-[#282830] cursor-pointer hover:border-[#FF3366]/40 transition-colors">
               <input
                 type="checkbox"
@@ -687,6 +754,30 @@ export const NewAppointmentModal: React.FC<NewAppointmentModalProps> = ({
           </div>
         </form>
       </div>
+
+      {consentWizard && (
+        <ConsentWizardModal
+          key={consentWizard.key}
+          isOpen
+          initialClient={consentWizard.client}
+          canConsent={can('clients.view_medical')}
+          initialProcedure={{
+            type: serviceCategory === 'piercing' || serviceCategory === 'jewelry' ? 'piercing' : serviceCategory === 'tattoo' ? 'tattoo' : 'other',
+            description: serviceName,
+            zone: bodyPlacement,
+            artistId,
+            date,
+            price: estimatedPrice || undefined,
+          }}
+          onClose={() => setConsentWizard(null)}
+          onSaved={form => {
+            setConsentWizard(null);
+            setConsentSigned(true);
+            if (!clientDni && form.clientDni) setClientDni(form.clientDni);
+            setSriNotice({ text: `✓ Consentimiento ${form.number} firmado y guardado en la ficha del cliente.`, type: 'success' });
+          }}
+        />
+      )}
     </div>
   );
 };

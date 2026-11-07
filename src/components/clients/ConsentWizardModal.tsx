@@ -45,6 +45,15 @@ interface ConsentWizardModalProps {
   canConsent?: boolean;
   onClose: () => void;
   onSaved: (form: ConsentForm) => void;
+  /** Datos del procedimiento ya conocidos (p. ej. desde la cita que se está agendando) */
+  initialProcedure?: {
+    type?: ConsentForm['procedureType'];
+    description?: string;
+    zone?: string;
+    artistId?: string;
+    date?: string;
+    price?: number;
+  };
 }
 
 const STEPS = [
@@ -121,14 +130,16 @@ const ChipGroup: React.FC<{
   </div>
 );
 
-export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, initialClient, canConsent = true, onClose, onSaved }) => {
+export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, initialClient, canConsent = true, onClose, onSaved, initialProcedure }) => {
   const { clients, artists, addClient, updateClient, currentUser } = useStudio();
   const { showAlert } = useAlertModal();
   const [step, setStep] = useState(1);
   const [showErrors, setShowErrors] = useState(false);
 
   // ---- Paso 1: cliente
-  const [clientId, setClientId] = useState<string | null>(initialClient?.id || null);
+  const [clientId, setClientId] = useState<string | null>(
+    initialClient && clients.some(c => c.id === initialClient.id) ? initialClient.id : null
+  );
   const [search, setSearch] = useState('');
   const [name, setName] = useState(initialClient?.name || '');
   const [dni, setDni] = useState(initialClient?.dni || '');
@@ -154,7 +165,8 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
   const [sriLoading, setSriLoading] = useState(false);
   const [sriMsg, setSriMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const isEdit = Boolean(initialClient);
+  // Una ficha borrador (p. ej. desde Agendar cita con un cliente nuevo) no es una edición
+  const isEdit = Boolean(initialClient && clients.some(c => c.id === initialClient.id));
 
   // ---- Paso 2: salud
   const [health, setHealth] = useState<HealthSheet>(() => ({
@@ -166,18 +178,24 @@ export const ConsentWizardModal: React.FC<ConsentWizardModalProps> = ({ isOpen, 
   const [healthConfirmed, setHealthConfirmed] = useState(false);
 
   // ---- Paso 3: procedimiento
-  const [procedureType, setProcedureType] = useState<ConsentForm['procedureType']>('tattoo');
-  const [description, setDescription] = useState('');
-  const [zone, setZone] = useState('');
-  const [zoneOther, setZoneOther] = useState('');
-  const [artistId, setArtistId] = useState(artists.find(a => a.active)?.id || '');
+  const [procedureType, setProcedureType] = useState<ConsentForm['procedureType']>(initialProcedure?.type || 'tattoo');
+  const [description, setDescription] = useState(initialProcedure?.description || '');
+  // Zona recibida (texto libre de la cita): si coincide con una de la lista se elige; si no, va en "Otra"
+  const initialZone = (initialProcedure?.zone || '').trim();
+  const matchedZone = initialZone
+    ? BODY_ZONES.find(z => z.toLowerCase() === initialZone.toLowerCase() || initialZone.toLowerCase().startsWith(z.toLowerCase()))
+    : undefined;
+  const [zone, setZone] = useState(matchedZone || (initialZone ? 'Otra' : ''));
+  const [zoneOther, setZoneOther] = useState(matchedZone ? '' : initialZone);
+  const [artistId, setArtistId] = useState(initialProcedure?.artistId || artists.find(a => a.active)?.id || '');
   const [procedureDate, setProcedureDate] = useState(() => {
+    if (initialProcedure?.date) return initialProcedure.date;
     // Fecha local (no UTC) para que en Ecuador no salte al día siguiente en la noche
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const [sessions, setSessions] = useState('1');
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState(initialProcedure?.price ? String(initialProcedure.price) : '');
   const [jewelry, setJewelry] = useState('');
   const [riskNote, setRiskNote] = useState('');
   const [riskAck, setRiskAck] = useState(false);
